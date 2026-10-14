@@ -239,3 +239,37 @@ matched (-16.94 LUFS). **Silberpfad** "sits on top of Lagerfeuer"; the **in-betw
 **Loudness after the DSP changes** (`descriptors.py --presets`): median -16.90 LUFS;
 Steinerne Ruhe trimmed 0.5 dB (it measured +1.0 LU); Sternenzelt -1.7 LU (EX-002).
 
+
+## 2026-10-14: worship envelopes (brief A-009)
+
+Owner's listening test: most presets sounded cinematic. ATTACK/RELEASE now run on one
+exponential curve from 1% (0%) to 100% (100%) of each layer's designed times - the
+designed envelope moved from the knob's 50% to its 100% - and the stored values were
+re-expressed on it. Pads: a third of their former times. In-between and leads: the
+same times as before (renders against the previous build: residual -69 to -119 dB).
+
+| Preset | Family | ATTACK / RELEASE | Root attack / release (dry) | Before |
+|---|---|---|---|---|
+| Alpengluehen | pad | 79.2 / 79.2% | 0.84 / 0.92 s | 2.53 / 2.76 s |
+| Lagerfeuer | pad | 73.1 / 73.1% | 0.64 / 0.70 s | 1.92 / 2.09 s |
+| Steinerne Ruhe | pad | 86.7 / 86.7% | 1.19 / 1.30 s | 3.57 / 3.90 s |
+| Bergecho | pad | 82.2 / 85.2% | 0.97 / 1.21 s | 2.90 / 3.64 s |
+| Mitternachtsblau | pad | 85.2 / 86.7% | 1.11 / 1.30 s | 3.33 / 3.90 s |
+| Ruhepuls | pad | 79.2 / 80.7% | 0.84 / 0.98 s | 2.53 / 2.95 s |
+| Sternenzelt | pad | 83.7 / 83.7% | 1.04 / 1.13 s | 3.11 / 3.39 s |
+| Daemmerlicht | pad | 77.7 / 79.2% | 0.79 / 0.92 s | 2.36 / 2.76 s |
+| Goldstaub | pad | 74.6 / 76.1% | 0.68 / 0.80 s | 2.05 / 2.40 s |
+| Talwind, Frostklang, Kupferglanz, Sturmfront, Klarheit | in-between | 47.7-71.6 / 77.5-89.8% | unchanged (0.20-0.59 / 0.85-1.50 s) | |
+| Funkenflug, Silberpfad, Glasperle | lead | 0-41.8 / 29.8-59.6% | unchanged | |
+
+Other layers scale alike (designed attack: Clearing and Expanse 2.6 s, Bloom 1.2 s).
+Blend measured dry on the open chord: 10-90% swell 0.36-0.92 s on the pads (was
+1.7-2.5 s), fall to -20 dB 0.30-1.03 s (was 0.9-2.7 s).
+
+**Loudness** (`descriptors.py --presets`, four seeds): every preset within 0.01 LU of
+the previous build, median -16.88 LUFS - the measured window is the sustained level,
+which the envelope times do not touch. No volume changed. **Peaks**, typical playing
+(three voicings, default velocity, four seeds): loudest preset -2.18 dBTP (Glasperle,
+unchanged), every pad at or below -3.18 dBTP; some pads rise up to 1.3 dB (their
+layers' attack peaks now fall closer together, decay times are not scaled), others
+fall up to 0.6 dB. The limiter stays linear.

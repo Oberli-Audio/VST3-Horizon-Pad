@@ -101,7 +101,7 @@ cmake --build build-release --target HorizonPadSoundTool -j 8
 ctest --test-dir build-release --output-on-failure
 ```
 
-Twenty-two tests (~60 s), `tools/tests/dsp_tests.py`, registered by CMake (plus the two validators, label `validation`). They
+Twenty-four tests (~70 s), `tools/tests/dsp_tests.py`, registered by CMake (plus the two validators, label `validation`). They
 drive the real DSP through `HorizonPadSoundTool` rather than unit-testing
 classes: latency, seeded-reset determinism, the 36 sample-rate x block-size
 combinations, 60 s of silence, all 17 presets; regression guards, one per bug
@@ -111,7 +111,8 @@ feature (`root_sub_present`, `clearing_ensemble_present`,
 `bloom_tremolo_survives_chords`, `width_profile_staggered`,
 `detune_spreads_every_stack`); and instrument-level contracts
 (`keyboard_level_span`, `width_mono_safe_and_level_flat`, `sustain_pedal_holds`,
-`low_register_stays_musical`, `bass_is_mono`). **Add a regression test whenever a
+`low_register_stays_musical`, `bass_is_mono`, `attack_release_span`,
+`presets_have_worship_envelopes`). **Add a regression test whenever a
 DSP defect is fixed, and show it failing on the build that has the defect**
 (a `git worktree` of the previous commit). Needs python3 + numpy + scipy; CMake
 skips registration if they are missing, so a plain plugin build never fails

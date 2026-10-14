@@ -1,7 +1,7 @@
 # Tier P gate status
 
 One page: where Horizon Pad stands against the playbook's gates (v3.2: core card
-section 2, F.15.1). Last updated **2026-10-03**.
+section 2, F.15.1). Last updated **2026-10-14**.
 
 Tier **P** (Product), promoted from S on 2026-09-22, which means re-entering at
 G0 and doing every gate the project skipped as a sketch.
@@ -245,6 +245,21 @@ the Klarheit item), which compares the same DSP.
 Sternenzelt at WIDTH 100%; Expanse chord; Bloom chord; the C2 fifth and triad;
 Steinerne Ruhe; the C6 chord (still open); the default patch at DETUNE 0%; Glasperle's
 glass; and the new preset order when browsing.
+
+## Worship envelopes (A-009, 2026-10-14)
+
+Owner's listening test: the pads sounded cinematic. ATTACK/RELEASE now run from the old
+fast floor (0%) to each layer's designed times (100%, was 50%) on one even curve, and
+every pad preset has a third of its former attack and release (Root 0.64-1.19 s /
+0.70-1.30 s); in-between and leads unchanged. Loudness unchanged; limiter still linear
+in typical playing. New tests `attack_release_span`, `presets_have_worship_envelopes`
+(24/24). Details in [`brief.md`](brief.md) A-009.
+
+| Preset | Question |
+|---|---|
+| The pads (Lagerfeuer, Alpengluehen, Steinerne Ruhe, ...) | Worship length now - or still too slow / now too abrupt? |
+| Talwind, Sturmfront, Kupferglanz | They now release longer than the pads (~1.1-1.5 s): keep, or shorten them too? |
+| ATTACK/RELEASE knobs | Is the short end easier to set? Anything missing above 100%? |
 
 ## Presets: three families, 17 (2026-10-07)
 

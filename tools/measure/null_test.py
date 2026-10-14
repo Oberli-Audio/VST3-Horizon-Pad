@@ -72,8 +72,10 @@ def main():
     for ch, solo, name in LAYERS:
         cf = os.path.join(tmp, f"{solo}.wav")
         subprocess.run([CPP, f"--solo={solo}", f"--notes={NOTE_C4}", "--seed=11",
-                        "--velocity=1.0", "--param=reverb=0", "--param=attack=0.5",
-                        "--param=release=0.5", "--param=filter=0.5",
+                        # ATTACK/RELEASE 1.0 is the designed envelope since
+                        # brief A-009 (2026-10-14; it was 0.5 before).
+                        "--velocity=1.0", "--param=reverb=0", "--param=attack=1.0",
+                        "--param=release=1.0", "--param=filter=0.5",
                         "--param=width=0",
                         "--hold=4", "--tail=2", "--sample-rate=48000",
                         f"--out={cf}"], check=True, capture_output=True)

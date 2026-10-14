@@ -310,6 +310,8 @@ else()
         width_mono_safe_and_level_flat
         reverb_level_flat
         sustain_pedal_holds
+        attack_release_span
+        presets_have_worship_envelopes
         low_register_stays_musical
         bass_is_mono
         width_profile_staggered

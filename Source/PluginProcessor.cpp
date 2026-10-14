@@ -25,32 +25,27 @@ namespace
         return std::pow (2.0f, (juce::jlimit (0.0f, 1.0f, macroValue) - 0.5f) * 2.0f);
     }
 
-    /** ATTACK/RELEASE macro mapping. From 15% up this is identical to
-        macroMultiplier() (0.5 = the layer's designed time, 1.0 = doubled), so
-        the plugin's default (40%) and everything the sound design already
-        relies on above the fast zone is unchanged.
+    /** ATTACK/RELEASE macro mapping (brief A-009, 2026-10-14): one
+        exponential curve from 1% of each layer's designed time at 0% to the
+        designed time itself at 100%, so every 10% of travel multiplies the
+        time by the same 1.58 and the short times worship playing lives in get
+        most of the knob - 0-50% leads and plucks (Root attack 22-220 ms),
+        50-80% in-between (0.2-0.9 s), 80-100% pads (0.9-2.2 s).
 
-        Below 15%, macroMultiplier() only reaches 0.5x-0.6x of a layer's
-        multi-second baseline - still 0.6-1.3s, nowhere near a "fast" synth
-        attack/release. This tapers that bottom slice exponentially down to
-        1% of the baseline instead, so a fully left knob lands each layer's
-        attack/release in the ~10-25ms range: short and percussive, but still
-        well clear of the ~1-5ms floor where an envelope ramp starts audibly
-        clicking (conventional synth "fast" attack/release settings sit in
-        that same 5-30ms band). LayerBase::noteOn()'s jmax(0.001f, ...) floor
-        remains as the hard click-free backstop underneath this. */
+        0% keeps the old floor: each layer's attack/release in the ~10-25 ms
+        range, short and percussive but clear of the ~1-5 ms where an
+        envelope ramp starts audibly clicking; LayerBase::beginNote()'s
+        jmax(0.001f, ...) floor remains the hard backstop underneath.
+        Written as kMinScale^(1 - x) so that 100% is exactly 1.0 - the
+        designed envelope, bit for bit (the G5 null test runs there).
+
+        Until A-009, 50% was the designed time and 100% double it, with
+        everything below 0.6x squeezed under 15% of the knob; the owner's
+        listening test found the pads cinematic, and longer times unneeded. */
     float attackReleaseTimeScale (float macroValue) noexcept
     {
-        constexpr float kFastZone = 0.15f;
         constexpr float kMinScale = 0.01f;
-
-        const auto x = juce::jlimit (0.0f, 1.0f, macroValue);
-
-        if (x >= kFastZone)
-            return macroMultiplier (x);
-
-        const auto zoneTopScale = macroMultiplier (kFastZone);
-        return kMinScale * std::pow (zoneTopScale / kMinScale, x / kFastZone);
+        return std::pow (kMinScale, 1.0f - juce::jlimit (0.0f, 1.0f, macroValue));
     }
 
     /** The ten (and only ten) host-automatable parameter IDs, in the fixed
@@ -121,8 +116,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout HorizonPadAudioProcessor::cr
     addPercent (ParamID::clearingVolume, "Clearing", 0.191f);
     addPercent (ParamID::expanseVolume,  "Expanse",  0.096f);
     addPercent (ParamID::bloomVolume,    "Bloom",    0.159f);
-    addPercent (ParamID::attackMacro,    "Attack",   0.40f);
-    addPercent (ParamID::releaseMacro,   "Release",  0.40f);
+    // ATTACK/RELEASE: Lagerfeuer's 73.13% on the curve of A-009 (Root
+    // attack 0.64 s, release 0.70 s).
+    addPercent (ParamID::attackMacro,    "Attack",   0.7313f);
+    addPercent (ParamID::releaseMacro,   "Release",  0.7313f);
     addPercent (ParamID::filterMacro,    "Filter",   0.30f);
     addPercent (ParamID::reverbMacro,    "Reverb",   0.20f);
     addPercent (ParamID::widthMacro,     "Width",    0.40f);

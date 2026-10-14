@@ -87,7 +87,8 @@ def envelope_timing():
     designed = {"root": 2.2, "clearing": 2.6, "expanse": 2.6, "bloom": 1.2}
     rows = []
     for layer, want in designed.items():
-        d = run([f"--solo={layer}", "--notes=60", "--seed=11", "--param=attack=0.5",
+        # ATTACK 1.0 is the designed attack since brief A-009 (it was 0.5).
+        d = run([f"--solo={layer}", "--notes=60", "--seed=11", "--param=attack=1.0",
                  "--param=reverb=0", "--hold=8", "--tail=1", "--window-ms=10"])
         t = d["envelope"]["timing"]
         rows.append((layer, want, t["timeToPeakSec"], t["attack10to90Sec"],

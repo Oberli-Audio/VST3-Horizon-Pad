@@ -302,6 +302,32 @@ shimmer send rolls off above C5 (the C6 chord); DETUNE's drift grows only to 1.5
 100% ("a bit seasick at max"); the default patch stays at DETUNE 0% (the comparison
 was a tie). Proposal P6 (contour-keeping pinning for Expanse) is open for the owner.
 
+### A-009 - worship envelopes: ATTACK/RELEASE up to the designed times (2026-10-14)
+
+The owner's listening test: most presets sounded like a cinematic, film-score pad.
+Worship playing needs shorter attack and release, and longer times than the design's
+are not needed. Decided by the owner:
+
+- **ATTACK/RELEASE span 1% -> 100% of each layer's designed times** on one exponential
+  curve (every 10% of the knob x1.58). 0% is the old fast floor (~10-25 ms); 100% is
+  the designed envelope - it was 50%, and 100% was double. `core_controls` still holds
+  (global scalars on each layer's own ADSR, the relative offsets kept); what changed is
+  the range, and that "designed" sits at 100% rather than at the macros' usual 50%.
+  The G5 null test and G3's envelope check now run at 100%, bit-identical to the old 50%.
+- **The pads have a third of their former attack and release**: Root 0.64-1.19 s
+  attack, 0.70-1.30 s release before the room. In-between and lead presets keep
+  exactly their times, so the in-betweens now release longer than the pads; the bank's
+  cycles order by attack.
+- Loudness is unchanged (every preset within 0.01 LU; the sustained level does not
+  depend on the envelope times). Under typical playing the limiter stays linear: the
+  loudest preset is still -2.18 dBTP; some pads peak up to 1.3 dB higher than before,
+  all at or below -3.2 dBTP.
+- Guarded by `attack_release_span` (the curve, both ends) and
+  `presets_have_worship_envelopes` (no preset swells longer than 1.2 s or falls away
+  slower than 1.4 s, dry); both fail on the build before.
+- User presets saved earlier keep their stored knob values and play shorter - no
+  migration, the plugin is unreleased.
+
 ## Where the exceptions go
 
 12.5 requires a written, dated, named exception whenever a measurement fails and the

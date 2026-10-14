@@ -21,12 +21,13 @@ namespace horizon
     Three global macros reach every layer identically, set once per block by
     the processor:
       * attackTimeScale     - ATTACK macro. 1.0 = the layer's own designed
-                               attack time; <1 snappier, >1 slower. Multiplies
+                               attack time, the knob's top since brief A-009
+                               (it reaches 0.01..1.0); <1 snappier. Multiplies
                                attack only, so each layer's relative timing
                                offset (part of what keeps the four pads from
                                all arriving at once) is preserved.
       * releaseTimeScale    - RELEASE macro. 1.0 = the layer's own designed
-                               release time; <1 shorter, >1 longer. Multiplies
+                               release time, likewise the top; <1 shorter. Multiplies
                                release only, the same way attackTimeScale
                                multiplies attack.
       * brightness           - FILTER macro, ramped per sample (smoothedBrightness,

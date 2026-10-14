@@ -27,9 +27,10 @@ All four layers respond to MIDI note on/off and the sustain pedal (CC64) with
 shared voice allocation (up to 8 voices, four-tier stealing: free slot →
 oldest released-but-ringing slot → oldest pedalled note → oldest held key), so
 a chord sounds coherent across every layer.
-Attack/release are long by design — this is an ambient pad, not a lead — but
-the ATTACK/RELEASE macros can pull them down into a fast, click-free,
-percussive-pad range too (see below).
+Each pad has its own designed attack and release (1.2–2.6 s). The pad presets
+play them at worship length — swelling within a beat and clearing a chord
+change, a third of the designed times — and the ATTACK/RELEASE macros span
+from a fast, click-free ~20 ms up to the full designed times (see below).
 
 Stereo width comes from one **WIDTH** macro. Each layer turns it into its own
 width through a fixed profile, so the pads open in order as the knob turns:
@@ -82,11 +83,11 @@ ATTACK/RELEASE/FILTER/REVERB:
 | 9 | Width | `widthMacro` |
 | 10 | Detune | `detuneMacro` |
 
-- **Attack / Release** scale each layer's own designed attack/release time.
-  50% is unity; below ~15% the mapping tapers exponentially down to a fast,
-  click-free ~10–25 ms floor instead of just halving the (multi-second)
-  baseline, so the far left of the knob is a genuinely fast/percussive
-  setting, not just "a bit faster."
+- **Attack / Release** scale each layer's own designed attack/release time
+  on one exponential curve: 0% is 1% of it (a fast, click-free ~10–25 ms),
+  50% a tenth, 100% the designed time itself. Every 10% of the knob
+  multiplies the time by 1.58, so the short times get most of the travel
+  (since 2026-10-14; before, 50% was the designed time and 100% double).
 - **Filter** scales each layer's own cutoff-over-time curve (darker below
   50%, brighter above), ramped per sample rather than stepped once per
   block, so sweeping it under host automation doesn't zipper.
@@ -126,9 +127,10 @@ host's own per-track program list.
 ## Factory presets
 
 **17** factory programs (`Source/presets/Presets.cpp`) in three families: **pads**
-(slow, the original design), **in-between** (pads that speak in 0.2-0.45 s - at home in
-harmonies) and **leads** (onset 15-165 ms, release 0.2-0.6 s with the room). They are
-ordered in **repeating cycles**, each from the longest attack and release to the
+(swelling in ~0.6-1.2 s and clearing a chord change - a third of the original design's
+envelope times since 2026-10-14), **in-between** (pads that speak in 0.2-0.45 s - at
+home in harmonies) and **leads** (onset 15-165 ms, release 0.2-0.6 s with the room).
+They are ordered in **repeating cycles**, each from the longest attack to the
 shortest, so browsing never jumps from a slow pad straight to a lead; the first cycle
 holds the five most different sounds in the bank. The plugin opens on **Lagerfeuer**
 (#2), the default patch. Method and numbers:
@@ -255,7 +257,7 @@ cmake --build build-release --target HorizonPadSoundTool -j 8
 ctest --test-dir build-release --output-on-failure
 ```
 
-Twenty-two tests, about a minute, driving the real plugin DSP through
+Twenty-four tests, about a minute, driving the real plugin DSP through
 `HorizonPadSoundTool` ([`tools/tests/dsp_tests.py`](tools/tests/dsp_tests.py)).
 Five assert end-to-end properties — zero reported latency, bit-identical
 renders from a seeded reset, all 36 sample-rate × block-size combinations
@@ -279,6 +281,8 @@ feature, or an instrument-level contract:
 | `bass_is_mono` | Stereo content below ~100 Hz (at WIDTH and DETUNE 100%) |
 | `width_profile_staggered` | WIDTH opening every pad at once instead of air first, foundation last |
 | `detune_spreads_every_stack` | DETUNE not reaching a pad's stack, or changing the level |
+| `attack_release_span` | ATTACK/RELEASE leaving their curve: 0% fast, 50% a tenth, 100% the designed times |
+| `presets_have_worship_envelopes` | A preset swelling or fading like a film score (> 1.2 s / 1.4 s, dry) |
 
 The suite needs `python3` with `numpy` and `scipy`. Without them CMake skips
 test registration, so a plain plugin build never fails for want of them.

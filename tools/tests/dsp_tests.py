@@ -419,6 +419,65 @@ def test_sustain_pedal_holds():
         raise Fail(f"3 s after pedal-up the note is only {after:.1f} LU down; it was not released")
 
 
+def test_attack_release_span():
+    """ATTACK/RELEASE run 1% -> 100% of each layer's designed times (brief A-009).
+
+    One exponential curve, time = designed x 0.01^(1 - knob): 0% is the fast,
+    click-free floor, 50% a tenth of the designed time, 100% the designed
+    envelope itself (2026-10-14; until then 50% was designed and 100% double).
+    Release is checked exactly - Root's linear ramp reaches -60 dB at the
+    ramp's length - and attack by how far the note has swelled at 0.3 s.
+    """
+    def release_s(knob):
+        d = run(["--solo=root", "--notes=60", "--hold=4", "--tail=4", "--param=reverb=0",
+                 f"--param=attack={knob}", f"--param=release={knob}", "--window-ms=10", "--seed=3"])
+        return d["envelope"]["timing"]["releaseToMinus60Sec"]
+
+    for knob in (0.0, 0.5, 1.0):
+        want = 2.4 * 0.01 ** (1.0 - knob)
+        got = release_s(knob)
+        if abs(got - want) > max(0.10 * want, 0.006):
+            raise Fail(f"RELEASE {knob:.0%}: Root falls silent in {got:.3f} s, expected {want:.3f} s")
+
+    def swell_db(knob):
+        out = []
+        for seed in (1, 2, 3, 4, 5):
+            d = run(["--solo=root", "--notes=60", "--hold=4", "--tail=1", "--param=reverb=0",
+                     f"--param=attack={knob}", "--window-ms=10", f"--seed={seed}"])
+            r = d["envelope"]["rmsPerWindow"]
+            out.append(20 * np.log10(max(r[30], 1e-12) / max(np.mean(r[290:310]), 1e-12)))
+        return float(np.median(out))   # Root's breathing moves single seeds by +/-4 dB
+
+    half, full = swell_db(0.5), swell_db(1.0)
+    if half < -6.0:
+        raise Fail(f"ATTACK 50%: Root is still {half:.1f} dB below its sustain at 0.3 s "
+                   f"(its 0.22 s swell should be over)")
+    if full > -10.0:
+        raise Fail(f"ATTACK 100%: Root is already at {full:.1f} dB of its sustain at 0.3 s "
+                   f"(the designed 2.2 s swell has barely begun)")
+
+
+def test_presets_have_worship_envelopes():
+    """No factory preset swells or fades like a film score (brief A-009).
+
+    The owner's listening test (2026-10-14) heard the pads as cinematic: worship
+    playing needs a pad that is there within a beat and clears a chord change.
+    Every preset, open chord, dry (the room's tail is REVERB's job): 10-90%
+    swell <= 1.2 s, fall to -20 dB after the keys come up <= 1.4 s. Measured on
+    2026-10-14: worst 0.92 s and 1.15 s; the bank before was 1.7-2.5 s and up
+    to 2.7 s.
+    """
+    slow = []
+    for p in list_presets():
+        d = run([f"--preset={p['name']}", "--notes=48,55,60,64", "--hold=5", "--tail=4",
+                 "--param=reverb=0", "--window-ms=10", "--seed=1"])
+        t = d["envelope"]["timing"]
+        if t["attack10to90Sec"] > 1.2 or t["releaseToMinus20Sec"] > 1.4:
+            slow.append(f"{p['name']} ({t['attack10to90Sec']:.2f} s swell, {t['releaseToMinus20Sec']:.2f} s release)")
+    if slow:
+        raise Fail("slower than a worship pad: " + ", ".join(slow))
+
+
 def test_voice_steal_declick():
     """Stealing a sounding voice must not step harder than an ordinary note-on.
 
