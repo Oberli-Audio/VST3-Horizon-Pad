@@ -5,6 +5,14 @@
 namespace horizon::ui::motion
 {
 
+/** The repaint interval for motion that runs on its own while you play -
+    the pad cards' level glow, the output meter: about 30 fps. Light that
+    follows a sound does not need 60, and the editor's continuous painting
+    halves. Interactive motion (a knob under the mouse, a glide after a
+    recall) keeps the full frame rate. Slightly under 1/30 s, so on a 60 Hz
+    display every second frame qualifies despite timing jitter. */
+constexpr double kAmbientFrameSeconds = 0.03;
+
 /**
     A critically damped spring: eases toward its target from rest, without
     overshoot - the motion behind every glide in the editor (knobs after a

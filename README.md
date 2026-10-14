@@ -193,10 +193,12 @@ cmake --build build --target HorizonPad_VST3
 cp -R "build/HorizonPad_artefacts/Release/VST3/Horizon Pad.vst3" ~/Library/Audio/Plug-Ins/VST3/
 ```
 
-Or, for local dev iteration, `tools/install_plugin.sh` builds a Debug config
-and copies it straight to `~/Library/Audio/Plug-Ins/VST3/` (the per-user
-folder every major DAW, including Ableton Live, scans — no admin privileges
-or password prompt needed).
+Or, for local dev iteration, `tools/install_plugin.sh` builds the Release
+config and copies it straight to `~/Library/Audio/Plug-Ins/VST3/` (the
+per-user folder every major DAW, including Ableton Live, scans — no admin
+privileges or password prompt needed). `tools/install_plugin.sh --debug`
+installs a Debug build for a debugger; it is several times heavier on the
+audio thread, so don't read a DAW's CPU meter with it.
 
 The `.vst3` is a **universal binary** (arm64 + x86_64 in one bundle) by
 default — CMake sets `CMAKE_OSX_ARCHITECTURES="arm64;x86_64"` automatically

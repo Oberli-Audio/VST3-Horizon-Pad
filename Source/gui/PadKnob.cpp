@@ -14,6 +14,10 @@ namespace
     constexpr float kGlowFloorDb = -54.0f;
     constexpr float kGlowCeilingDb = -26.0f;
 
+    // A glow step smaller than this (of its 0..1 range) is not redrawn: at
+    // most 0.007 of alpha on the dot's light, below anything visible.
+    constexpr float kGlowVisibleStep = 0.015f;
+
     constexpr float kDotSize = 17.0f;
     constexpr float kDotGlowReach = 11.0f;   // the dot's light at full level, beyond its 6 px resting halo
     constexpr float kRingGlowReach = 13.0f;  // the ring's halo beyond its outer edge
@@ -78,11 +82,66 @@ void PadKnob::advance (double now, float dt, float layerRms)
     const auto db = juce::Decibels::gainToDecibels (layerRms, -100.0f);
     const auto target = juce::jlimit (0.0f, 1.0f, (db - kGlowFloorDb) / (kGlowCeilingDb - kGlowFloorDb));
 
-    if (levelGlow.advance (target, dt, 0.03f, 0.14f, 2.0e-3f))
+    levelGlow.advance (target, dt, 0.03f, 0.14f, 2.0e-3f);
+
+    // The glow follows every frame but is redrawn at the ambient rate, and
+    // only for a step you could see - or to land exactly on dark.
+    const auto step = std::abs (levelGlow.value - shownGlow);
+    const auto visible = step >= kGlowVisibleStep || (step > 0.0f && levelGlow.value <= 0.0f);
+
+    if (visible && now - glowShownAt >= motion::kAmbientFrameSeconds)
     {
+        shownGlow = levelGlow.value;
+        glowShownAt = now;
         repaint (dotArea());
         repaint (haloArea());
     }
+}
+
+void PadKnob::renderGlowSprites (float scale)
+{
+    glowScale = scale;
+
+    // A radial gradient of the pad's colour at full strength: alpha
+    // `centreAlpha` at the centre, then each (radius, alpha) stop, clear at
+    // `radius`.
+    const auto render = [&] (float radius, float centreAlpha, std::initializer_list<std::pair<float, float>> stops)
+    {
+        const auto pixels = juce::jmax (2, 2 * juce::roundToInt (radius * scale));
+        juce::Image sprite (juce::Image::ARGB, pixels, pixels, true);
+        juce::Graphics g (sprite);
+        g.addTransform (juce::AffineTransform::scale ((float) pixels / (2.0f * radius)));
+
+        juce::ColourGradient gradient (accent.withAlpha (centreAlpha), radius, radius,
+                                       accent.withAlpha (0.0f), 2.0f * radius, radius, true);
+
+        for (const auto& [at, alpha] : stops)
+            gradient.addColour (at / radius, accent.withAlpha (alpha));
+
+        g.setGradientFill (gradient);
+        g.fillEllipse (0.0f, 0.0f, 2.0f * radius, 2.0f * radius);
+        return sprite;
+    };
+
+    // The ring's halo: clear inside the ring, brightest just outside its
+    // outer edge, gone kRingGlowReach beyond.
+    const auto ringOuter = (float) (volumeSlider.getRingBounds().getWidth() - 4) * 0.5f;
+    ringGlow = render (ringOuter + kRingGlowReach, 0.0f, { { ringOuter - 4.0f, 0.0f }, { ringOuter + 1.5f, 0.30f } });
+
+    // The dot's light: full from the centre out past the resting halo, then fading.
+    dotLight = render (kDotSize * 0.5f + 6.0f + kDotGlowReach, 0.45f, { { kDotSize * 0.5f + 4.0f, 0.45f } });
+}
+
+void PadKnob::drawSprite (juce::Graphics& g, const juce::Image& sprite, juce::Point<float> centre, float opacity) const
+{
+    // Top-left on a whole device pixel, so the copy is 1:1.
+    const auto size = (float) sprite.getWidth() / glowScale;
+    const auto x = std::round ((centre.x - size * 0.5f) * glowScale) / glowScale;
+    const auto y = std::round ((centre.y - size * 0.5f) * glowScale) / glowScale;
+
+    juce::Graphics::ScopedSaveState save (g);
+    g.setOpacity (juce::jlimit (0.0f, 1.0f, opacity));
+    g.drawImageTransformed (sprite, juce::AffineTransform::scale (1.0f / glowScale).translated (x, y));
 }
 
 void PadKnob::paint (juce::Graphics& g)
@@ -91,8 +150,16 @@ void PadKnob::paint (juce::Graphics& g)
 
     const auto slots = computeColumnSlots (getLocalBounds());
     const auto c = computePadControlLayout (slots.control.getUnion (slots.value));
-    const auto glow = levelGlow.value;
+    const auto glow = shownGlow;
     const auto shownVolume = volumeSlider.getDisplayValue();
+
+    if (glow > 0.002f)
+    {
+        const auto scale = juce::jlimit (1.0f, 4.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+
+        if (! juce::approximatelyEqual (scale, glowScale))
+            renderGlowSprites (scale);
+    }
 
     // --- Status dot: lit (with a glow) once the pad is audible, matching the
     // design's dotStyle threshold (vol > 0.04); the glow grows with the
@@ -107,15 +174,7 @@ void PadKnob::paint (juce::Graphics& g)
             // Soft light spreading from the resting halo, as strong as the
             // layer is loud.
             if (glow > 0.002f)
-            {
-                const auto inner = kDotSize * 0.5f + 4.0f;
-                const auto outer = kDotSize * 0.5f + 6.0f + kDotGlowReach;
-                juce::ColourGradient light (accent.withAlpha (0.45f * glow), centre.x, centre.y,
-                                            accent.withAlpha (0.0f), centre.x + outer, centre.y, true);
-                light.addColour (inner / outer, accent.withAlpha (0.45f * glow));
-                g.setGradientFill (light);
-                g.fillEllipse (juce::Rectangle<float> (2.0f * outer, 2.0f * outer).withCentre (centre));
-            }
+                drawSprite (g, dotLight, centre, glow);
 
             g.setColour (accent.withAlpha (0.35f));
             g.fillEllipse (dot.expanded (6.0f));
@@ -128,20 +187,7 @@ void PadKnob::paint (juce::Graphics& g)
     // --- The ring's halo: a soft band of the pad's colour just outside the
     // ring, as bright as the layer is loud. Drawn here, behind the knob.
     if (glow > 0.002f)
-    {
-        const auto ring = volumeSlider.getRingBounds().toFloat().reduced (2.0f);
-        const auto centre = ring.getCentre();
-        const auto ringOuter = ring.getWidth() * 0.5f;
-        const auto radius = ringOuter + kRingGlowReach;
-
-        juce::ColourGradient halo (accent.withAlpha (0.0f), centre.x, centre.y,
-                                   accent.withAlpha (0.0f), centre.x + radius, centre.y, true);
-        halo.addColour ((ringOuter - 4.0f) / radius, accent.withAlpha (0.0f));
-        halo.addColour ((ringOuter + 1.5f) / radius, accent.withAlpha (0.30f * glow));
-
-        g.setGradientFill (halo);
-        g.fillEllipse (juce::Rectangle<float> (2.0f * radius, 2.0f * radius).withCentre (centre));
-    }
+        drawSprite (g, ringGlow, volumeSlider.getRingBounds().toFloat().getCentre(), glow);
 
     g.setColour (Palette::textKnobLabel);
     g.setFont (labelFont (TypeScale::label, true));

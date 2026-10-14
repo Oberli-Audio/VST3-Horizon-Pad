@@ -40,32 +40,45 @@ void OutputMeter::advance (double now, float dt)
     const auto levelDb = juce::Decibels::gainToDecibels (processor.getOutputLevel(), kFloorDb);
     const auto target = juce::jlimit (0.0f, 1.0f, (levelDb - kFloorDb) / -kFloorDb);
 
-    auto changed = displayedLevel.advance (target, dt, kRiseSeconds, kFallSeconds, 1.0e-3f);
-
+    displayedLevel.advance (target, dt, kRiseSeconds, kFallSeconds, 1.0e-3f);
     const auto level = displayedLevel.value;
 
     if (level >= peakLevel)
     {
-        changed = changed || level > peakLevel;
         peakLevel = level;
         peakHoldUntil = now + kPeakHoldSeconds;
     }
     else if (now > peakHoldUntil)
     {
         peakLevel = juce::jmax (level, peakLevel - kPeakFallPerSecond * dt);
-        changed = true;
     }
 
-    if (! changed)
+    // Redrawn at the ambient rate, and only for a change of at least a pixel
+    // of the track - or to land exactly on empty, or to show or hide the peak line.
+    if (now - shownAt < motion::kAmbientFrameSeconds)
         return;
 
-    repaint (trackArea().getSmallestIntegerContainer().expanded (1));
+    const auto track = trackArea();
+    const auto pixels = track.getHeight();
+    const auto peakVisible = [] (float peak, float lvl) { return peak > 0.01f && peak > lvl + 0.004f; };
 
+    const auto levelMoved = std::abs (level - shownLevel) * pixels >= 1.0f || (level <= 0.0f && shownLevel > 0.0f);
+    const auto peakMoved = std::abs (peakLevel - shownPeak) * pixels >= 1.0f
+                         || peakVisible (peakLevel, level) != peakVisible (shownPeak, shownLevel);
     const auto percent = juce::roundToInt (level * 100.0f);
+
+    if (levelMoved || peakMoved)
+    {
+        shownLevel = level;
+        shownPeak = peakLevel;
+        shownAt = now;
+        repaint (track.getSmallestIntegerContainer().expanded (1));
+    }
 
     if (percent != shownPercent)
     {
         shownPercent = percent;
+        shownAt = now;
         repaint (computeColumnSlots (getLocalBounds()).value);
     }
 }
@@ -92,7 +105,7 @@ void OutputMeter::paint (juce::Graphics& g)
     g.setColour (Palette::meterBg);
     g.fillRoundedRectangle (track, 11.0f);
 
-    const auto level = displayedLevel.value;
+    const auto level = shownLevel;
     auto fill = track.reduced (1.0f);
     const auto inner = fill;
     fill.setTop (fill.getBottom() - fill.getHeight() * level);
@@ -106,9 +119,9 @@ void OutputMeter::paint (juce::Graphics& g)
     }
 
     // --- Peak line: where the level was a moment ago.
-    if (peakLevel > 0.01f && peakLevel > level + 0.004f)
+    if (shownPeak > 0.01f && shownPeak > level + 0.004f)
     {
-        const auto y = inner.getBottom() - inner.getHeight() * peakLevel;
+        const auto y = inner.getBottom() - inner.getHeight() * shownPeak;
         const auto line = juce::Rectangle<float> (inner.getX() + 4.0f, y - 1.0f, inner.getWidth() - 8.0f, 2.0f);
         g.setColour (Palette::meterFillHigh.withAlpha (0.85f));
         g.fillRoundedRectangle (line.withY (juce::jlimit (inner.getY(), inner.getBottom() - 2.0f, line.getY())), 1.0f);
@@ -116,8 +129,7 @@ void OutputMeter::paint (juce::Graphics& g)
 
     g.setColour (Palette::textValue);
     g.setFont (labelFont (TypeScale::value, true));
-    g.drawText (juce::String (juce::roundToInt (level * 100.0f)) + "%",
-               slots.value, juce::Justification::centred);
+    g.drawText (juce::String (shownPercent) + "%", slots.value, juce::Justification::centred);
 }
 
 } // namespace horizon::ui

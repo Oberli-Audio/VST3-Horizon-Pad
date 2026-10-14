@@ -33,10 +33,19 @@ namespace horizon::ui
     at the designed brightness). Every setting below 50% is darker, so
     higher: at 0% the footer reaches 4.2:1. Re-measure after a palette change.
 
-    Rendered once into an image at 1x - it is all gradients and blur,
-    nothing that needs device resolution - and re-rendered only while
-    something moves, so an idle editor paints the panel as a blit.
-    Message thread only.
+    It fills the window edge to edge, opaque, with a 1 px border along the
+    edge. (The design's panel had 24 px rounded corners - right on the dark
+    web page of the handoff, wrong in a host's rectangular plugin window,
+    where the unpainted corners showed the host's own background. Square
+    since 2026-10-14.)
+
+    Rendered into an image at the screen's own pixel density and
+    re-rendered only while something moves - only the lower band when just
+    REVERB or WIDTH move - so every repaint, even of a few pixels behind a
+    glowing pad, is a plain 1:1 copy. (Until 2026-10-14 the image was 1x,
+    stretched to Retina inside a rounded-corner clip: 16 ms per full redraw
+    on an M3 Pro, and 96% of the editor's painting time; drawn 1:1 it is
+    0.3 ms.) Message thread only.
 */
 class HorizonScene
 {
@@ -62,7 +71,7 @@ public:
     /** The band Change::lower affects: the glow and the ridge. */
     static juce::Rectangle<int> lowerRegion (juce::Rectangle<int> bounds) noexcept;
 
-    /** Paints the panel (clipped to its rounded outline) and its border. */
+    /** Paints the panel, border included - opaque over all of `bounds`. */
     void paint (juce::Graphics&, juce::Rectangle<float> bounds);
 
     /** The sky gradient's colour `proportionDown` of the way down the window
@@ -72,7 +81,7 @@ public:
 
 private:
     juce::ColourGradient skyGradient (float top, float bottom) const;
-    void renderCache (juce::Rectangle<int> bounds);
+    void renderCache (juce::Rectangle<int> bounds, juce::Rectangle<int> region);
     void buildRidgeMasks (juce::Rectangle<int> bounds);
     void blendRidgeMask (float sigma);
 
@@ -80,9 +89,11 @@ private:
     bool recallGlide = false;
     bool rising = false;
 
-    // Background cache (1x) and the ridge's blurred masks, see renderCache().
+    // The panel at the screen's pixel density (cacheScale), and what of it
+    // needs rendering again; see paint() and renderCache().
     juce::Image cache;
-    bool cacheDirty = true;
+    float cacheScale = 1.0f;
+    Change dirty = Change::all;
 
     struct RidgeMask
     {

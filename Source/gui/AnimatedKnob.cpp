@@ -28,6 +28,11 @@ AnimatedKnob::AnimatedKnob (int marginToUse)
     : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox),
       margin (marginToUse)
 {
+    // Kept as an image: the pad cards repaint the glow around their knob up
+    // to 30 times a second while a layer sounds, and a knob that has not
+    // changed is then copied instead of drawn again (its arcs were a third
+    // of the editor's painting while playing).
+    setBufferedToImage (true);
 }
 
 void AnimatedKnob::syncDisplay()

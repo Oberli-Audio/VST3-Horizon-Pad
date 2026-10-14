@@ -27,9 +27,12 @@ cmake --build build --target HorizonPad_VST3 --config Release
 Bundle output: `build/HorizonPad_artefacts/Release/VST3/Horizon Pad.vst3`
 (Debug config → `.../Debug/VST3/...`).
 
-For local dev iteration on macOS, `tools/install_plugin.sh` builds Debug and
-copies straight to `~/Library/Audio/Plug-Ins/VST3/` (per-user folder, no
-admin password prompt, safe to run unattended).
+For local dev iteration on macOS, `tools/install_plugin.sh` builds Release
+(`build-release/`) and copies straight to `~/Library/Audio/Plug-Ins/VST3/`
+(per-user folder, no admin password prompt, safe to run unattended).
+`--debug` installs the Debug build instead - only for a debugger: it costs
+~6x the audio-thread time of Release (measured 2026-10-10), so never judge a
+host's CPU meter on it.
 
 Faster iteration against a local JUCE checkout instead of re-fetching:
 `cmake -B build -DFETCHCONTENT_SOURCE_DIR_JUCE=/path/to/JUCE`.
@@ -271,7 +274,14 @@ sky rises from night, the logo's sun comes up and the knobs sweep up. The
 value a knob shows is eased; the parameter never is. One frame callback
 (`advanceFrame`, driven by `VBlankAttachment`, capped near 60 fps, with a
 30 Hz timer fallback) replaces the old 15 Hz polling timer, and each widget
-repaints only what changed. The palettes keep the panel text near the
+repaints only what changed. Painting is kept cheap (measured 2026-10-14 on a
+Retina M3 Pro): the panel is cached at the screen's pixel density and drawn
+1:1 (full redraw 21 -> 3.7 ms; a 1x cache stretched through a clip was 96% of
+all painting), knobs are buffered images, the pad glows are pre-rendered
+sprites, and motion that runs by itself (pad glows, meter) repaints at about
+30 fps and only for visible steps. The panel fills the window edge to edge,
+square: the design's rounded corners left the host's background showing in
+a rectangular plugin window. The palettes keep the panel text near the
 design's own contrast at the bright end (measured numbers in `HorizonScene.h`)
 and above it everywhere darker - check a change with
 `HorizonPadGuiSnapshot` (`tools/gui_snapshot/`, target not built by default),

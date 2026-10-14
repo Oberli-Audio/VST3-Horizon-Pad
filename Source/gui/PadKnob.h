@@ -42,6 +42,9 @@ private:
     juce::Rectangle<int> haloArea() const;
     juce::Rectangle<int> readoutArea() const;
 
+    void renderGlowSprites (float scale);
+    void drawSprite (juce::Graphics&, const juce::Image&, juce::Point<float> centre, float opacity) const;
+
     const juce::Colour accent;
     const juce::String caption;
     const juce::String subtitle;
@@ -49,7 +52,16 @@ private:
     AnimatedKnob volumeSlider { 8 };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> volumeAttachment;
 
-    motion::Follower levelGlow;   // 0..1, see advance()
+    motion::Follower levelGlow;   // 0..1, follows the layer every frame (see advance())
+    float shownGlow = 0.0f;       // the glow as last drawn
+    double glowShownAt = 0.0;
+
+    // The ring's halo and the dot's light, rendered once at full strength at
+    // the screen's pixel density and drawn with the level as opacity: a 1:1
+    // copy, where a radial gradient per frame was a quarter of the editor's
+    // painting while playing.
+    juce::Image ringGlow, dotLight;
+    float glowScale = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PadKnob)
 };

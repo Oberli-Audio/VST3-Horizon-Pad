@@ -30,10 +30,15 @@ private:
 
     HorizonPadAudioProcessor& processor;
 
-    motion::Follower displayedLevel;   // 0..1 of the meter's dB scale
+    motion::Follower displayedLevel;   // 0..1 of the meter's dB scale, every frame
     float peakLevel = 0.0f;
     double peakHoldUntil = 0.0;
-    int shownPercent = -1;
+
+    // What was last drawn: the meter repaints at the ambient rate
+    // (motion::kAmbientFrameSeconds), and only for a change of a pixel or more.
+    float shownLevel = 0.0f, shownPeak = 0.0f;
+    int shownPercent = 0;
+    double shownAt = 0.0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OutputMeter)
 };

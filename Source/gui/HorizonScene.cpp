@@ -11,8 +11,6 @@ namespace
     constexpr float kRecallOmega  = 4.7f;  // ~1 s
     constexpr float kSunriseOmega = 3.4f;  // ~1.4 s
 
-    constexpr float kPanelCorner = 24.0f;
-
     // The low glow (a sun just behind the ridge): centre 40 px above the
     // window's bottom edge, 640 px across before WIDTH stretches it.
     constexpr float kGlowDiameter = 640.0f;
@@ -199,7 +197,7 @@ void HorizonScene::snapToTargets() noexcept
         s->snapTo (s->target);
 
     rising = recallGlide = false;
-    cacheDirty = true;
+    dirty = Change::all;
 }
 
 void HorizonScene::prepareSunrise() noexcept
@@ -209,7 +207,7 @@ void HorizonScene::prepareSunrise() noexcept
     glowLevel.value = 0.0f;
     glowLevel.velocity = 0.0f;
     rising = true;
-    cacheDirty = true;
+    dirty = Change::all;
 }
 
 HorizonScene::Change HorizonScene::advance (float dt) noexcept
@@ -230,13 +228,12 @@ HorizonScene::Change HorizonScene::advance (float dt) noexcept
     if (timeOfDay.isSettled() && haze.isSettled() && spread.isSettled())
         recallGlide = false;
 
-    if (skyMoved || glowMoved || airMoved)
-        cacheDirty = true;
+    const auto change = skyMoved ? Change::all : ((glowMoved || airMoved) ? Change::lower : Change::none);
 
-    if (skyMoved)
-        return Change::all;
+    if (change == Change::all || (change == Change::lower && dirty == Change::none))
+        dirty = change;
 
-    return (glowMoved || airMoved) ? Change::lower : Change::none;
+    return change;
 }
 
 juce::Rectangle<int> HorizonScene::lowerRegion (juce::Rectangle<int> bounds) noexcept
@@ -263,41 +260,62 @@ void HorizonScene::paint (juce::Graphics& g, juce::Rectangle<float> bounds)
 {
     const auto area = bounds.getSmallestIntegerContainer();
 
-    if (cache.isNull() || cache.getWidth() != area.getWidth() || cache.getHeight() != area.getHeight())
+    // The cache matches the screen's pixel density, so drawing it is a 1:1
+    // copy - no resampling, and no clip (the corners are built in).
+    const auto scale = juce::jlimit (1.0f, 4.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+    const auto pixelWidth = juce::jmax (1, juce::roundToInt ((float) area.getWidth() * scale));
+    const auto pixelHeight = juce::jmax (1, juce::roundToInt ((float) area.getHeight() * scale));
+
+    if (cache.isNull() || cache.getWidth() != pixelWidth || cache.getHeight() != pixelHeight)
     {
-        cache = juce::Image (juce::Image::ARGB, juce::jmax (1, area.getWidth()), juce::jmax (1, area.getHeight()), true);
-        ridgeMasks.clear();
-        cacheDirty = true;
+        if (ridgeBounds.getWidth() != area.getWidth() + 2 * kRidgeSideMargin)
+            ridgeMasks.clear();
+
+        cache = juce::Image (juce::Image::ARGB, pixelWidth, pixelHeight, true);
+        cacheScale = scale;
+        dirty = Change::all;
     }
 
-    if (cacheDirty)
-        renderCache (area.withZeroOrigin());
-
-    juce::Path panelPath;
-    panelPath.addRoundedRectangle (bounds, kPanelCorner);
-
+    if (dirty != Change::none)
     {
-        juce::Graphics::ScopedSaveState save (g);
-        g.reduceClipRegion (panelPath);
-        g.drawImageAt (cache, area.getX(), area.getY());
+        const auto local = area.withZeroOrigin();
+        renderCache (local, dirty == Change::all ? local : lowerRegion (local));
+        dirty = Change::none;
     }
 
-    g.setColour (Palette::panelBorder);
-    g.strokePath (panelPath, juce::PathStrokeType (1.0f));
+    g.drawImageTransformed (cache, juce::AffineTransform::scale (1.0f / cacheScale)
+                                       .translated ((float) area.getX(), (float) area.getY()));
 }
 
-void HorizonScene::renderCache (juce::Rectangle<int> bounds)
+void HorizonScene::renderCache (juce::Rectangle<int> bounds, juce::Rectangle<int> region)
 {
-    cache.clear (cache.getBounds());
-    juce::Graphics g (cache);
-
+    const auto pixelRegion = (region.toFloat() * cacheScale).getSmallestIntegerContainer()
+                                                            .getIntersection (cache.getBounds());
     const auto r = bounds.toFloat();
     const auto p = paletteAt (timeOfDay.value);
 
     // --- Sky: vertical only, the same across any row (PresetBar relies on
-    // that for its fade colour, see skyColourAt()).
-    g.setGradientFill (skyGradient (r.getY(), r.getBottom()));
-    g.fillRect (r);
+    // that for its fade colour, see skyColourAt()) - so it is filled a row
+    // at a time, one colour per row, the same colours a gradient fill gives.
+    // CoreGraphics' own gradient fill took 8.8 ms for the window at 2x.
+    {
+        const auto grad = skyGradient (0.0f, 1.0f);
+        const juce::Image::BitmapData data (cache, pixelRegion.getX(), pixelRegion.getY(),
+                                            pixelRegion.getWidth(), pixelRegion.getHeight(),
+                                            juce::Image::BitmapData::writeOnly);
+
+        for (int y = 0; y < data.height; ++y)
+        {
+            const auto proportion = ((double) (pixelRegion.getY() + y) + 0.5) / (double) cache.getHeight();
+            const auto pixel = grad.getColourAtPosition (proportion).getPixelARGB();
+            auto* line = reinterpret_cast<juce::PixelARGB*> (data.getLinePointer (y));
+            std::fill (line, line + data.width, pixel);
+        }
+    }
+
+    juce::Graphics g (cache);
+    g.addTransform (juce::AffineTransform::scale (cacheScale));
+    g.reduceClipRegion (region);
 
     // --- The low glow, drawn before the ridge so the mountains read as a
     // dark silhouette cut into it. WIDTH stretches it sideways; 40% (the
@@ -327,7 +345,14 @@ void HorizonScene::renderCache (juce::Rectangle<int> bounds)
     g.setColour (mixOklab (Palette::skyline.withAlpha (1.0f), p.lower, lift));
     g.drawImage (ridgeMask, ridgeBounds.toFloat(), juce::RectanglePlacement::stretchToFit, true);
 
-    cacheDirty = false;
+    // --- The border, along the window's edge. The panel fills the window
+    // edge to edge: a host's plugin window is rectangular, and the rounded
+    // corners the design had (on a dark web page) left four unpainted
+    // corners for the host's own background to show through.
+    // Half a pixel wide: the design's 1 px stroke sat centred on the
+    // panel's edge, so only its inner half ever showed.
+    g.setColour (Palette::panelBorder);
+    g.drawRect (r, 0.5f);
 }
 
 void HorizonScene::buildRidgeMasks (juce::Rectangle<int> bounds)

@@ -68,6 +68,10 @@ HorizonPadAudioProcessorEditor::HorizonPadAudioProcessorEditor (HorizonPadAudioP
     addAndMakeVisible (outputMeter);
     addAndMakeVisible (footerBar);
 
+    // The panel (HorizonScene) fills the window edge to edge, so nothing
+    // behind the editor ever shows: the host need not paint or blend it.
+    setOpaque (true);
+
     setResizable (false, false);
     setSize (kWindowWidth, kWindowHeight);
 
