@@ -31,7 +31,7 @@ Pass marks are defaults, not physics (playbook F.0.2) - stated here, in one plac
 The mix-context check needs the brief's `mix_context`, which this brief does not have;
 descriptors.py's "pocket" section is the nearest measurement.
 
-Needs numpy, scipy, the playbook's dspkit (~/.claude/docs/dsp-kit) for BS.1770
+Needs numpy, scipy, the playbook's dspkit (~/bob-skills/sound-design-bob/scripts/dsp-kit, or $DSPKIT) for BS.1770
 loudness and true peak, and afconvert / lame for the codec row (skipped if missing).
 
     python3 tools/measure/translation.py                  # all presets, 3 seeds
@@ -53,7 +53,7 @@ import numpy as np
 from scipy import signal
 
 warnings.filterwarnings("ignore", message="Chunk")   # afconvert/lame write chunks scipy skips
-KIT = Path.home() / ".claude" / "docs" / "dsp-kit"
+KIT = Path(os.environ.get("DSPKIT", Path.home() / "bob-skills" / "sound-design-bob" / "scripts" / "dsp-kit"))
 sys.path.insert(0, str(KIT))
 try:
     import dspkit as K

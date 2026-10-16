@@ -16,7 +16,7 @@ import sys, json, subprocess, tempfile, warnings
 from pathlib import Path
 import numpy as np
 warnings.filterwarnings("ignore")
-sys.path.insert(0, str(Path.home()/".claude/docs/dsp-kit")); import dspkit as K
+import os; sys.path.insert(0, os.environ.get("DSPKIT", str(Path.home()/"bob-skills/sound-design-bob/scripts/dsp-kit"))); import dspkit as K
 sys.path.insert(0, "tools/listening"); import make_session as M
 import argparse
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
