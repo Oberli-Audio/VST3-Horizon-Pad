@@ -1,14 +1,14 @@
 # Tier P gate status
 
 One page: where Horizon Pad stands against the playbook's gates (v3.2: core card
-section 2, F.15.1). Last updated **2026-10-14**.
+section 2, F.15.1). Last updated **2026-10-17**.
 
 Tier **P** (Product), promoted from S on 2026-09-22, which means re-entering at
 G0 and doing every gate the project skipped as a sketch.
 
 | Gate | Status | Artefact |
 |---|---|---|
-| **G0** Brief | **CLOSED** 2026-09-23, owner-confirmed | [`brief.md`](brief.md) + amendments A-001..A-004 |
+| **G0** Brief | **CLOSED** 2026-09-23, owner-confirmed | [`brief.md`](brief.md) + amendments A-001..A-010 (A-010: the register C0-C7, 2026-10-17) |
 | **G1** Algorithm | **CLOSED** 2026-09-24 | [`g1-algorithm.md`](g1-algorithm.md) |
 | **G2** Prototype | **CLOSED** 2026-09-24 | [`g2-prototype.md`](g2-prototype.md), `sound design/four_pads.dsp` |
 | **G3** Measure | **CLOSED** 2026-09-24, two rows short of the brief | [`g3-measurements.md`](g3-measurements.md) |
@@ -23,8 +23,8 @@ G0 and doing every gate the project skipped as a sketch.
 |---|---|
 | Steinberg validator exit 0 | **PASS** - 47/47, 2026-09-24 (v1). Re-run on v2 (`5056369`) 2026-10-03: **47/47**, VST3 SDK 3.8.1 (`3cdf9ca`) |
 | pluginval strictness 10 | **PASS** - 2026-09-24 (v1). Re-run on v2 2026-10-03: **PASS**. Since 2026-10-06 `tools/validate/validate.py` runs it at all six sample rates x seven block sizes with a logged seed (25 test groups incl. parameter fuzzing and thread-safety, 16 s), and CI runs it on the downloaded macOS and Windows artefacts |
-| CTest suite green | **PASS** - 8/8 (v1, 2026-09-24); **19/19 in 55 s** on v2, 2026-10-03 |
-| Real-time safety (rule 35) | **PASS** on v2, 2026-10-03: all 19 tests clean under RealtimeSanitizer (`build-rtsan`, see CLAUDE.md); self-test proves the check fires |
+| CTest suite green | **PASS** - 8/8 (v1, 2026-09-24); 19/19 on v2, 2026-10-03; **25/25** on 2026-10-17 (`register_is_c0_to_c7` added) |
+| Real-time safety (rule 35) | **PASS** on v2, 2026-10-03: all 19 tests clean under RealtimeSanitizer (`build-rtsan`, see CLAUDE.md); self-test proves the check fires. **Stale by six tests** (review 2026-10-17): rebuild `build-rtsan` and re-run |
 | Three hosts, two platforms | **1 of 3.** Ableton Live on macOS confirmed by the owner. Windows Ableton and Waveform outstanding. |
 
 The tests are in `tools/tests/dsp_tests.py`, registered with CTest by
@@ -47,18 +47,38 @@ In rough order of how much each would change (revised 2026-10-03):
    Steinerne Ruhe - the high-pass's phase shift also raised their occasional peaks
    by up to 1.5 dB (output still >= 4 dB under 0 dBTP).
 3. **The listening pass** - see below; the Sternenzelt items were heard 2026-10-03.
-4. **CPU on the target machine** (G3) - and as worst-case block time (rule 37), not
-   the 5.03% average measured on an M3 Pro. Take it during the Windows pass.
-5. **Rule audits not yet done**: event timing (29 - `LayerBase::startNote`'s comment
-   says a stolen note starting up to one block late is "well under the ~2 ms onset
-   JND"; at 512 samples that is 10.7 ms), control mappings and note hygiene (30), the
-   output limiter and `tanh` as nonlinear models (33).
+4. **CPU on the target machine** (G3) - as worst-case block time (rule 37). Measured
+   on the M3 Pro 2026-10-17 (128-sample blocks, default patch): p99 20.3%, max 66.9%
+   of the deadline ([`dsp-review-2026-10-17.md`](dsp-review-2026-10-17.md) section 4).
+   Still owed: 64-sample blocks, and the budget machine during the Windows pass.
+5. **Rule audits** done 2026-10-17 ([`dsp-review-2026-10-17.md`](dsp-review-2026-10-17.md)
+   section 4): 29 passes (sample-offset segments); 30 and 33 partial - three
+   scripted-MIDI tests (velocity, bend, CC1), an automation-sweep zipper test and one
+   sentence declaring the limiter's 1x `tanh` deliberate (rule 4) are owed.
 6. **FILTER response error at 44.1 vs 96 kHz** (G3). Not measured as a swept
    response; mitigated structurally by every filter being TPT/ZDF.
 7. **CI**: ~~pluginval and a pinned VST3 SDK commit~~ - done 2026-10-06 (validation
    matrix on the downloaded artefacts, macOS and Windows). The RTSan job is still local
    only (`validate.py` runs it when `build-rtsan` exists). Automation *during* playback and state loads
    mid-stream are not yet covered by any RTSan-checked test.
+
+## Reviews of 2026-10-17 (Tier P)
+
+- **Sound**: [`dsp-review-2026-10-17.md`](dsp-review-2026-10-17.md) - DoD checklist,
+  the register battery over the new register C0-C7, rule audits 29/30/33/37, descriptor
+  drift since the v2-macros baseline, translation battery PASS on all 17 presets.
+  Baselines frozen in `docs/baselines/*-2026-10-17.json`.
+- **Interface**: [`ui-review-2026-10-17.md`](ui-review-2026-10-17.md) - one grade-3
+  finding (fixed 1080 x 748, no scale choice), eight grade-2 (double-click reset,
+  modified mark, preset arrows, ATTACK/RELEASE in %, keyboard and accessible names,
+  footer contrast, meter scale, host context menu), three cosmetic.
+
+## The register (A-010, 2026-10-17)
+
+C0-C7, set by the owner's listening; silent outside. `register_is_c0_to_c7` guards it
+and fails on `e7dce97`. The register battery now runs C0-C7; its new findings
+(Bloom's roughness at C0, Root's pitch above C5, Clearing at C7) are listening items
+below, not defects.
 
 ## The listening pass, in one place
 
@@ -95,6 +115,9 @@ character decision.
 | G5 | Filter Q values sit below the prototype's Butterworth; Expanse's safety lowpass is 2-pole where the prototype's is 1-pole |
 | G5 | Shimmer blend sits 16 dB below the prototype |
 | G1 #4/#5 | Linear interpolation on the flanger and shimmer grain reads, where the rule wants Lagrange/Hermite |
+| Review 2026-10-17 R-1 | `register_bottom`: each layer solo at C0 and C1, the blend at C0-E0-G0 - music, or a wobble with a pitch? (Bloom 3.63, Root 1.25, Clearing 1.55 roughness at C0) |
+| Review 2026-10-17 R-2/R-3 | `register_top`: Root solo at C6-C7 (sounds an octave low: salience -0.04 at C7), Clearing solo at C7 (roughness 3.73) |
+| Review 2026-10-17 D-1 | `bloom_movement`: Bloom's movement depth halved since the v2-macros baseline (43 -> 25%); DETUNE 0% against 50% |
 
 Reference material for the A/B is committed: `sound design/reference-renders/`
 holds the four per-layer renders and the full blend the sound design was

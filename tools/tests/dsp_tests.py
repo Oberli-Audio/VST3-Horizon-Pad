@@ -671,6 +671,25 @@ def test_detune_spreads_every_stack():
                            f"{level[amount] - level[0.5]:+.2f} LU")
 
 
+def test_register_is_c0_to_c7():
+    """The instrument plays C0 to C7 (MIDI 12-96) and is silent outside that register.
+
+    The register was set by the owner's listening (brief A-010, 2026-10-17):
+    below C0 and above C7 the sound is no longer musical, so a note-on there
+    starts no voice. Both ends must still sound; the first key outside each
+    end, and the extremes of the MIDI range, must render nothing at all.
+    """
+    for note in (12, 96):
+        d = run([f"--notes={note}", "--seed=1", "--hold=1", "--tail=0.5"])
+        if d["levels"]["rmsDb"] < -60.0:
+            raise Fail(f"MIDI {note} is inside the register but renders at {d['levels']['rmsDb']:.1f} dBFS RMS")
+    for note in (0, 11, 97, 127):
+        d = run([f"--notes={note}", "--seed=1", "--hold=1", "--tail=0.5"])
+        if d["levels"]["peak"] > 0.0:
+            raise Fail(f"MIDI {note} is outside the register C0-C7 but renders at "
+                       f"{d['levels']['peakDb']:.1f} dBFS peak")
+
+
 TESTS = {name[5:]: fn for name, fn in sorted(globals().items())
          if name.startswith("test_")}
 

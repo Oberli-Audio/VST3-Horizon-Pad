@@ -1,0 +1,542 @@
+{
+ "grid": {
+  "root": {
+   "centroid_hz": 222.98,
+   "attack_s": 0.65,
+   "lufs": -11.19,
+   "bands_db": {
+    "sub": -14.22,
+    "low": -3.62,
+    "mud": -2.88,
+    "lowmid": -23.18,
+    "presence": -36.02,
+    "high": -66.53,
+    "air": -83.85
+   },
+   "bands_dbfs": {
+    "sub": -27.38,
+    "low": -16.75,
+    "mud": -16.0,
+    "lowmid": -36.3,
+    "presence": -49.15,
+    "high": -79.62,
+    "air": -96.98
+   }
+  },
+  "clearing": {
+   "centroid_hz": 403.24,
+   "attack_s": 0.58,
+   "lufs": -13.23,
+   "bands_db": {
+    "sub": -77.72,
+    "low": -4.88,
+    "mud": -4.3,
+    "lowmid": -6.02,
+    "presence": -13.07,
+    "high": -35.88,
+    "air": -52.73
+   },
+   "bands_dbfs": {
+    "sub": -93.2,
+    "low": -20.4,
+    "mud": -19.8,
+    "lowmid": -21.52,
+    "presence": -28.58,
+    "high": -51.4,
+    "air": -68.25
+   }
+  },
+  "expanse": {
+   "centroid_hz": 706.56,
+   "attack_s": 0.5,
+   "lufs": -21.38,
+   "bands_db": {
+    "sub": -116.62,
+    "low": -110.22,
+    "mud": -11.93,
+    "lowmid": -1.2,
+    "presence": -8.9,
+    "high": -56.07,
+    "air": -80.58
+   },
+   "bands_dbfs": {
+    "sub": -143.4,
+    "low": -134.82,
+    "mud": -36.05,
+    "lowmid": -25.28,
+    "presence": -32.98,
+    "high": -80.18,
+    "air": -104.65
+   }
+  },
+  "bloom": {
+   "centroid_hz": 320.34,
+   "attack_s": 0.31,
+   "lufs": -15.07,
+   "bands_db": {
+    "sub": -73.95,
+    "low": -4.85,
+    "mud": -2.85,
+    "lowmid": -8.75,
+    "presence": -17.33,
+    "high": -42.75,
+    "air": -59.9
+   },
+   "bands_dbfs": {
+    "sub": -91.18,
+    "low": -22.05,
+    "mud": -20.1,
+    "lowmid": -25.98,
+    "presence": -34.52,
+    "high": -59.98,
+    "air": -77.12
+   }
+  }
+ },
+ "keyboard": {
+  "root": {
+   "36": {
+    "lufs": -22.55,
+    "centroid_hz": 72.41
+   },
+   "48": {
+    "lufs": -18.45,
+    "centroid_hz": 122.19
+   },
+   "60": {
+    "lufs": -18.93,
+    "centroid_hz": 228.09
+   },
+   "72": {
+    "lufs": -18.08,
+    "centroid_hz": 450.48
+   },
+   "84": {
+    "lufs": -19.11,
+    "centroid_hz": 911.57
+   },
+   "96": {
+    "lufs": -19.91,
+    "centroid_hz": 1602.36
+   },
+   "span_36_84_db": 4.5
+  },
+  "clearing": {
+   "36": {
+    "lufs": -20.75,
+    "centroid_hz": 117.02
+   },
+   "48": {
+    "lufs": -20.08,
+    "centroid_hz": 282.93
+   },
+   "60": {
+    "lufs": -17.89,
+    "centroid_hz": 425.78
+   },
+   "72": {
+    "lufs": -17.13,
+    "centroid_hz": 688.52
+   },
+   "84": {
+    "lufs": -17.36,
+    "centroid_hz": 1204.09
+   },
+   "96": {
+    "lufs": -18.88,
+    "centroid_hz": 2256.36
+   },
+   "span_36_84_db": 3.6
+  },
+  "expanse": {
+   "36": {
+    "lufs": -28.17,
+    "centroid_hz": 524.83
+   },
+   "48": {
+    "lufs": -28.17,
+    "centroid_hz": 524.83
+   },
+   "60": {
+    "lufs": -28.17,
+    "centroid_hz": 524.83
+   },
+   "72": {
+    "lufs": -27.71,
+    "centroid_hz": 1060.43
+   },
+   "84": {
+    "lufs": -29.94,
+    "centroid_hz": 2120.5
+   },
+   "96": {
+    "lufs": -32.41,
+    "centroid_hz": 4192.59
+   },
+   "span_36_84_db": 2.2
+  },
+  "bloom": {
+   "36": {
+    "lufs": -22.55,
+    "centroid_hz": 110.88
+   },
+   "48": {
+    "lufs": -21.48,
+    "centroid_hz": 210.42
+   },
+   "60": {
+    "lufs": -20.37,
+    "centroid_hz": 332.98
+   },
+   "72": {
+    "lufs": -22.36,
+    "centroid_hz": 686.54
+   },
+   "84": {
+    "lufs": -21.72,
+    "centroid_hz": 1218.83
+   },
+   "96": {
+    "lufs": -21.85,
+    "centroid_hz": 2315.17
+   },
+   "span_36_84_db": 2.2
+  }
+ },
+ "pocket": {
+  "default_patch": {
+   "centroid_hz": 242.5,
+   "lufs": -17.11,
+   "bands_db": {
+    "sub": -14.68,
+    "low": -3.9,
+    "mud": -2.95,
+    "lowmid": -14.85,
+    "presence": -22.57,
+    "high": -46.18,
+    "air": -63.1
+   },
+   "bands_dbfs": {
+    "sub": -33.77,
+    "low": -23.03,
+    "mud": -22.08,
+    "lowmid": -33.92,
+    "presence": -41.65,
+    "high": -65.3,
+    "air": -82.17
+   }
+  }
+ },
+ "stereo": {
+  "root": {
+   "w0": {
+    "corr": 1.0,
+    "mono_loss_db": 0.0
+   },
+   "w1": {
+    "corr": 0.77,
+    "mono_loss_db": -0.54
+   },
+   "width_level_change_db": -0.35
+  },
+  "clearing": {
+   "w0": {
+    "corr": 0.45,
+    "mono_loss_db": -1.4
+   },
+   "w1": {
+    "corr": 0.3,
+    "mono_loss_db": -1.87
+   },
+   "width_level_change_db": -0.02
+  },
+  "expanse": {
+   "w0": {
+    "corr": 1.0,
+    "mono_loss_db": 0.0
+   },
+   "w1": {
+    "corr": 0.32,
+    "mono_loss_db": -1.81
+   },
+   "width_level_change_db": 0.66
+  },
+  "bloom": {
+   "w0": {
+    "corr": 1.0,
+    "mono_loss_db": 0.0
+   },
+   "w1": {
+    "corr": 0.37,
+    "mono_loss_db": -1.67
+   },
+   "width_level_change_db": -0.15
+  }
+ },
+ "movement": {
+  "root": {
+   "note": {
+    "rate_hz": 0.88,
+    "depth_pct": 24.73
+   },
+   "chord": {
+    "rate_hz": 0.88,
+    "depth_pct": 12.45
+   }
+  },
+  "clearing": {
+   "note": {
+    "rate_hz": 0.58,
+    "depth_pct": 28.7
+   },
+   "chord": {
+    "rate_hz": 0.58,
+    "depth_pct": 14.05
+   }
+  },
+  "expanse": {
+   "note": {
+    "rate_hz": 1.38,
+    "depth_pct": 29.07
+   },
+   "chord": {
+    "rate_hz": 0.92,
+    "depth_pct": 16.6
+   }
+  },
+  "bloom": {
+   "note": {
+    "rate_hz": 2.54,
+    "depth_pct": 25.08
+   },
+   "chord": {
+    "rate_hz": 3.17,
+    "depth_pct": 24.17
+   }
+  }
+ },
+ "presets": {
+  "Alpengl\u00fchen": {
+   "lufs": -16.51,
+   "centroid_hz": 393.5,
+   "bands_db": {
+    "sub": -20.0,
+    "low": -5.25,
+    "mud": -3.72,
+    "lowmid": -7.28,
+    "presence": -12.43,
+    "high": -32.67,
+    "air": -48.98
+   }
+  },
+  "Lagerfeuer": {
+   "lufs": -17.11,
+   "centroid_hz": 242.5,
+   "bands_db": {
+    "sub": -14.68,
+    "low": -3.9,
+    "mud": -2.95,
+    "lowmid": -14.85,
+    "presence": -22.57,
+    "high": -46.18,
+    "air": -63.1
+   }
+  },
+  "Talwind": {
+   "lufs": -16.97,
+   "centroid_hz": 344.95,
+   "bands_db": {
+    "sub": -20.3,
+    "low": -5.17,
+    "mud": -3.12,
+    "lowmid": -8.38,
+    "presence": -14.7,
+    "high": -37.67,
+    "air": -54.5
+   }
+  },
+  "Frostklang": {
+   "lufs": -16.78,
+   "centroid_hz": 386.01,
+   "bands_db": {
+    "sub": -19.45,
+    "low": -5.25,
+    "mud": -3.6,
+    "lowmid": -6.95,
+    "presence": -13.2,
+    "high": -33.25,
+    "air": -48.83
+   }
+  },
+  "Funkenflug": {
+   "lufs": -17.12,
+   "centroid_hz": 406.28,
+   "bands_db": {
+    "sub": -18.88,
+    "low": -4.77,
+    "mud": -4.45,
+    "lowmid": -6.75,
+    "presence": -12.05,
+    "high": -30.75,
+    "air": -46.45
+   }
+  },
+  "Steinerne Ruhe": {
+   "lufs": -16.44,
+   "centroid_hz": 267.83,
+   "bands_db": {
+    "sub": -16.07,
+    "low": -3.88,
+    "mud": -3.33,
+    "lowmid": -11.6,
+    "presence": -18.3,
+    "high": -43.92,
+    "air": -61.12
+   }
+  },
+  "Bergecho": {
+   "lufs": -16.95,
+   "centroid_hz": 389.42,
+   "bands_db": {
+    "sub": -19.77,
+    "low": -5.62,
+    "mud": -3.55,
+    "lowmid": -7.4,
+    "presence": -12.03,
+    "high": -37.08,
+    "air": -54.8
+   }
+  },
+  "Kupferglanz": {
+   "lufs": -16.73,
+   "centroid_hz": 368.82,
+   "bands_db": {
+    "sub": -19.33,
+    "low": -4.65,
+    "mud": -3.97,
+    "lowmid": -7.47,
+    "presence": -13.38,
+    "high": -33.98,
+    "air": -50.27
+   }
+  },
+  "Silberpfad": {
+   "lufs": -16.88,
+   "centroid_hz": 306.18,
+   "bands_db": {
+    "sub": -17.25,
+    "low": -4.1,
+    "mud": -3.42,
+    "lowmid": -9.7,
+    "presence": -15.88,
+    "high": -36.62,
+    "air": -53.0
+   }
+  },
+  "Mitternachtsblau": {
+   "lufs": -16.59,
+   "centroid_hz": 241.04,
+   "bands_db": {
+    "sub": -15.27,
+    "low": -3.57,
+    "mud": -3.33,
+    "lowmid": -14.15,
+    "presence": -21.05,
+    "high": -49.3,
+    "air": -66.9
+   }
+  },
+  "Ruhepuls": {
+   "lufs": -16.88,
+   "centroid_hz": 281.56,
+   "bands_db": {
+    "sub": -17.38,
+    "low": -4.3,
+    "mud": -3.08,
+    "lowmid": -10.98,
+    "presence": -18.07,
+    "high": -43.45,
+    "air": -60.7
+   }
+  },
+  "Sturmfront": {
+   "lufs": -17.12,
+   "centroid_hz": 356.31,
+   "bands_db": {
+    "sub": -19.4,
+    "low": -5.22,
+    "mud": -3.23,
+    "lowmid": -8.35,
+    "presence": -13.65,
+    "high": -35.4,
+    "air": -52.12
+   }
+  },
+  "Glasperle": {
+   "lufs": -16.31,
+   "centroid_hz": 390.08,
+   "bands_db": {
+    "sub": -19.38,
+    "low": -5.97,
+    "mud": -3.4,
+    "lowmid": -6.5,
+    "presence": -13.47,
+    "high": -34.5,
+    "air": -50.38
+   }
+  },
+  "Sternenzelt": {
+   "lufs": -18.65,
+   "centroid_hz": 556.13,
+   "bands_db": {
+    "sub": -24.07,
+    "low": -8.52,
+    "mud": -5.42,
+    "lowmid": -4.05,
+    "presence": -8.9,
+    "high": -34.77,
+    "air": -51.55
+   }
+  },
+  "D\u00e4mmerlicht": {
+   "lufs": -16.85,
+   "centroid_hz": 306.06,
+   "bands_db": {
+    "sub": -17.48,
+    "low": -4.33,
+    "mud": -3.4,
+    "lowmid": -9.68,
+    "presence": -15.9,
+    "high": -39.12,
+    "air": -56.15
+   }
+  },
+  "Goldstaub": {
+   "lufs": -17.18,
+   "centroid_hz": 463.57,
+   "bands_db": {
+    "sub": -22.77,
+    "low": -6.85,
+    "mud": -3.83,
+    "lowmid": -5.92,
+    "presence": -10.55,
+    "high": -32.48,
+    "air": -48.82
+   }
+  },
+  "Klarheit": {
+   "lufs": -17.06,
+   "centroid_hz": 302.96,
+   "bands_db": {
+    "sub": -16.7,
+    "low": -4.0,
+    "mud": -3.65,
+    "lowmid": -9.72,
+    "presence": -16.0,
+    "high": -36.92,
+    "air": -53.22
+   }
+  },
+  "_spread_lu": 2.3
+ }
+}

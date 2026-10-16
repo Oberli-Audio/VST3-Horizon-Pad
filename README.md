@@ -43,7 +43,9 @@ mono-safe by construction and does not change the level. The bass stays mono reg
 140 Hz before the reverb, and the reverb itself only receives the band above
 160 Hz. Every layer is also key-tracked and register-aware (see
 `Source/dsp/LayerBase.h`), so it holds its character from the bass to the top
-of the keyboard.
+of the keyboard. The instrument's register is **C0 to C7** (MIDI 12-96), set by
+listening: outside it the sound was no longer musical, so keys below C0 and above
+C7 make no sound at all (`horizon::kRegisterLowestNote`, brief A-010).
 
 ## Global FX chain
 
@@ -257,7 +259,7 @@ cmake --build build-release --target HorizonPadSoundTool -j 8
 ctest --test-dir build-release --output-on-failure
 ```
 
-Twenty-four tests, about a minute, driving the real plugin DSP through
+Twenty-five tests, about a minute, driving the real plugin DSP through
 `HorizonPadSoundTool` ([`tools/tests/dsp_tests.py`](tools/tests/dsp_tests.py)).
 Five assert end-to-end properties — zero reported latency, bit-identical
 renders from a seeded reset, all 36 sample-rate × block-size combinations
@@ -278,6 +280,7 @@ feature, or an instrument-level contract:
 | `width_mono_safe_and_level_flat` | WIDTH collapsing in mono or changing the level |
 | `sustain_pedal_holds` | The sustain pedal being ignored |
 | `low_register_stays_musical` | Roughness in the bass register; Expanse leaving its register |
+| `register_is_c0_to_c7` | A key outside the register C0-C7 making a sound, or C0/C7 themselves falling silent |
 | `bass_is_mono` | Stereo content below ~100 Hz (at WIDTH and DETUNE 100%) |
 | `width_profile_staggered` | WIDTH opening every pad at once instead of air first, foundation last |
 | `detune_spreads_every_stack` | DETUNE not reaching a pad's stack, or changing the level |
@@ -295,7 +298,7 @@ band, and the port-vs-prototype null test. Each prints a markdown table and is
 runnable on its own. `descriptors.py` measures whether it is the sound that was
 designed (layer contrast, keyboard range, mix pocket, stereo, movement, preset
 bank) against the baselines in [`docs/baselines/`](docs/baselines/), and
-`register.py` measures how musical each layer stays from C1 to C5.
+`register.py` measures how musical each layer stays over the whole register, C0 to C7.
 [`tools/listening/make_session.py`](tools/listening/make_session.py) builds a
 blind, loudness-matched A/B/X listening page comparing two builds.
 

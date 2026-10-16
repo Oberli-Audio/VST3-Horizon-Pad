@@ -101,7 +101,7 @@ cmake --build build-release --target HorizonPadSoundTool -j 8
 ctest --test-dir build-release --output-on-failure
 ```
 
-Twenty-four tests (~70 s), `tools/tests/dsp_tests.py`, registered by CMake (plus the two validators, label `validation`). They
+Twenty-five tests (~70 s), `tools/tests/dsp_tests.py`, registered by CMake (plus the two validators, label `validation`). They
 drive the real DSP through `HorizonPadSoundTool` rather than unit-testing
 classes: latency, seeded-reset determinism, the 36 sample-rate x block-size
 combinations, 60 s of silence, all 17 presets; regression guards, one per bug
@@ -112,7 +112,7 @@ feature (`root_sub_present`, `clearing_ensemble_present`,
 `detune_spreads_every_stack`); and instrument-level contracts
 (`keyboard_level_span`, `width_mono_safe_and_level_flat`, `sustain_pedal_holds`,
 `low_register_stays_musical`, `bass_is_mono`, `attack_release_span`,
-`presets_have_worship_envelopes`). **Add a regression test whenever a
+`presets_have_worship_envelopes`, `register_is_c0_to_c7`). **Add a regression test whenever a
 DSP defect is fixed, and show it failing on the build that has the defect**
 (a `git worktree` of the previous commit). Needs python3 + numpy + scipy; CMake
 skips registration if they are missing, so a plain plugin build never fails
@@ -215,6 +215,14 @@ pre-delay) and crossfaded equal-power; the side channel of the finished mix -
 dry and reverb return - is high-passed at 140 Hz, 24 dB/oct, **last** (mono bass,
 rule 26; it ran first until 2026-10-03, and the reverb return rebuilt stereo bass).
 
+### The register
+
+C0-C7 (MIDI 12-96; C4 = 60). Set by the owner's listening (brief A-010, 2026-10-17):
+outside it the sound is not musical, so `noteOn` ignores the key - no voice, no sound.
+`horizon::kRegisterLowestNote` / `kRegisterHighestNote` in `HorizonTypes.h`; every
+measurement that sweeps notes (`register.py`, `alias_check.py`, the listening items)
+stays inside it.
+
 ### Voice allocation
 
 Centralized in `PluginProcessor`, not per-layer: up to `kMaxVoices` (8) voice
@@ -316,4 +324,4 @@ permission, staying inside individual layer `.h`/`.cpp` files.
 
 Invariants load automatically for `Source/**` and `*.dsp` (`~/.claude/rules/dsp-invariants.md`, installed from `~/bob-skills/rules/`). For design, porting, measurement, testing, review or release, and for any defect, use the **sound-design-bob** skill (synced from claude.ai; source and playbook in `~/bob-skills`). It carries the Quelle Music DSP playbook v3.4 (2026-10-06) in its `references/`: the core card `dsp-playbook-core.md` (read whole; section 0 maps tasks to recipes), the reference split into `dsp-selection.md` (S, algorithm choice), `dsp-foundations.md` (F), `dsp-instruments.md` (I), `dsp-effects.md` (E), `dsp-control.md` (C), `dsp-analysis.md` (A) and `dsp-development.md` (D: real-time safety, performance, testing, CI, host contract, licensing, agent workflow, task recipes) - grep them, never read them whole - and `dsp-sound-design-playbook.md` as the index. Its `scripts/dsp-kit/` holds the tested measurement library (`dspkit.py`), the harness contract new products follow, a test scaffold and the document templates. For the plugin editor, ux-ui-design-bob runs alongside on the same tier, gates and parameter table.
 
-The playbook is at v3.4: 37 rules tagged by track. Horizon Pad is an instrument (track I) that also owns control (C: MIDI, pedal, wheels), processing (E: the shimmer, ensemble, reverb), mix and output (F.5-F.6). Its v2 sound-design pass is the playbook's instrument worked example (I.10); see `docs/dsp-review-2026-09-26.md` (findings) and `docs/sound-design-v2.md` (changes, measurements, listening list). Not yet audited against this repo: event timing (rule 29 - JUCE applies automation per block), control mappings and note hygiene (30), nonlinear models (33 - the output limiter and tanh), the translation battery (34 - not yet run), real-time safety verified by RTSan or pluginval `--rtcheck` (35), frozen IDs with a versioned state (36 - **not yet applicable**: Horizon Pad is unreleased and testing-only, so parameters, state and presets change freely with no migration or version flags until the owner announces a release; at that point the state gains a version and golden state files, D.5.3), and worst-case block time (37 - the 5.0% CPU figure in the G7 notes is an average). Rule 32 (bypass) does not apply to an instrument.
+The playbook is at v3.5 (2026-10-17, the register I.2.3): 37 rules tagged by track. Horizon Pad is an instrument (track I) that also owns control (C: MIDI, pedal, wheels), processing (E: the shimmer, ensemble, reverb), mix and output (F.5-F.6). Its v2 sound-design pass is the playbook's instrument worked example (I.10); see `docs/dsp-review-2026-09-26.md` (findings) and `docs/sound-design-v2.md` (changes, measurements, listening list). Not yet audited against this repo: event timing (rule 29 - JUCE applies automation per block), control mappings and note hygiene (30), nonlinear models (33 - the output limiter and tanh), the translation battery (34 - not yet run), real-time safety verified by RTSan or pluginval `--rtcheck` (35), frozen IDs with a versioned state (36 - **not yet applicable**: Horizon Pad is unreleased and testing-only, so parameters, state and presets change freely with no migration or version flags until the owner announces a release; at that point the state gains a version and golden state files, D.5.3), and worst-case block time (37 - the 5.0% CPU figure in the G7 notes is an average). Rule 32 (bypass) does not apply to an instrument.

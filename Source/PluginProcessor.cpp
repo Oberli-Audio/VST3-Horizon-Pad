@@ -564,6 +564,11 @@ void HorizonPadAudioProcessor::releaseSlot (int slot)
 
 void HorizonPadAudioProcessor::noteOn (int midiNote, float velocity)
 {
+    // Outside the register (C0-C7) the instrument is silent: no voice is
+    // started, nothing is stolen for it. See horizon::kRegisterLowestNote.
+    if (! horizon::isInRegister (midiNote))
+        return;
+
     // The same key struck again while its previous note is still held or
     // pedalled: release the old voice into its tail rather than stacking a
     // second copy on top. With the sustain pedal down, repeated notes would

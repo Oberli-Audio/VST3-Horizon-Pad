@@ -313,6 +313,7 @@ else()
         attack_release_span
         presets_have_worship_envelopes
         low_register_stays_musical
+        register_is_c0_to_c7
         bass_is_mono
         width_profile_staggered
         detune_spreads_every_stack)

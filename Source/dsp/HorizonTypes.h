@@ -11,6 +11,21 @@ static constexpr int kNumLayers = 4;
 /** Simple polyphony cap. Ambient pads do not need a huge voice count. */
 static constexpr int kMaxVoices = 8;
 
+/**
+    The register: the keys the instrument plays, C0 to C7 (C4 = MIDI 60, the
+    convention everywhere in this code). Set by the owner's listening, not by
+    the engine's limits (brief A-010, 2026-10-17): below C0 and above C7 the
+    sound is no longer musical, so a note-on there starts no voice and makes no
+    sound. Guarded by the `register_is_c0_to_c7` test.
+*/
+static constexpr int kRegisterLowestNote  = 12;   ///< C0
+static constexpr int kRegisterHighestNote = 96;   ///< C7
+
+static constexpr bool isInRegister (int midiNote) noexcept
+{
+    return midiNote >= kRegisterLowestNote && midiNote <= kRegisterHighestNote;
+}
+
 /** Number of host-automatable global macros: Attack, Release, Filter, Reverb, Width, Detune. */
 static constexpr int kNumGlobalParams = 6;
 

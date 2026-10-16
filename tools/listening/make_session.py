@@ -93,10 +93,11 @@ ITEMS = [
      "Since 2026-10-03 the reverb no longer puts stereo into the bass. Is the low end of the room "
      "still warm, and does the image still feel wide?",
      ["--preset=Steinerne Ruhe", "--notes=48,55,60,64", "--hold=7", "--tail=4"]),
-    ("expanse_top", "Expanse solo, C7-E7-G7 (EX-003 register)",
-     "The top octave, where Expanse aliased in v1 (MIDI 96-108). Any grit, whistle or "
+    ("expanse_top", "Expanse solo, F6-A6-C7 (EX-003, the top of the register)",
+     "The top of the register, where Expanse aliased in v1 (MIDI 96-108 then; the "
+     "instrument stops at C7 = 96 since 2026-10-17). Any grit, whistle or "
      "inharmonic tone? Bright is fine; dirty is not.",
-     ["--solo=expanse", "--notes=96,100,103", "--hold=6", "--tail=3"]),
+     ["--solo=expanse", "--notes=89,93,96", "--hold=6", "--tail=3"]),
     ("blend_high", "Default patch, C6 chord",
      "The whole instrument high up: still one instrument, or shrill and thin?",
      ["--notes=84,88,91", "--hold=6", "--tail=3"]),

@@ -328,6 +328,28 @@ are not needed. Decided by the owner:
 - User presets saved earlier keep their stored knob values and play shorter - no
   migration, the plugin is unreleased.
 
+### A-010 - the register: C0 to C7, set by listening (2026-10-17)
+
+The brief never stated the register the instrument plays (the playbook's brief
+template calls the field `playable_range`; this project says **register**). The
+engine took every MIDI note, and below C0 and above C7 what came out was not
+musical: the owner's listening set the ends. Decided by the owner:
+
+- **The register is C0-C7** (MIDI 12-96, C4 = 60 as everywhere in this code).
+  Outside it the instrument is silent: a note-on there starts no voice and steals
+  nothing (`horizon::kRegisterLowestNote` / `kRegisterHighestNote`,
+  `PluginProcessor::noteOn`). Note-offs, the pedal and the wheels are unaffected.
+- Guarded by `register_is_c0_to_c7` (C0 and C7 sound; MIDI 0, 11, 97 and 127 render
+  exactly nothing), which fails on the build before (`e7dce97`: MIDI 0 rendered at
+  -20 dBFS peak).
+- The register battery (`tools/measure/register.py`) now runs C0-C7 instead of
+  C1-C5, so every number it reports is inside the register the instrument offers;
+  the alias check stops at C7 (it went to MIDI 108, which no longer sounds). The
+  listening item `expanse_top` plays F6-A6-C7 instead of C7-E7-G7.
+- The playbook change this asked for (v3.5): at Tier P and F the register is set by
+  listening, stated in the brief, enforced (silence outside), and the register
+  battery runs over exactly that register.
+
 ## Where the exceptions go
 
 12.5 requires a written, dated, named exception whenever a measurement fails and the

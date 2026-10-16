@@ -46,7 +46,7 @@ from scipy.io import wavfile
 
 SR = 48000
 LAYERS = ["root", "clearing", "expanse", "bloom"]
-NOTES = [24, 36, 48, 60, 72]                  # C1 .. C5
+NOTES = [12, 24, 36, 48, 60, 72, 84, 96]      # C0 .. C7: the whole register (brief A-010)
 CHORDS = {"open5_C2": "36,43,48", "triad_C2": "36,40,43"}
 TOOL = "build-release/HorizonPadSoundTool"
 

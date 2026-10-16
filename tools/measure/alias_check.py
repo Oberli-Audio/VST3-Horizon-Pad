@@ -20,7 +20,8 @@ is aliasing (plus a small amount of genuine sample-rate-dependent filter
 behaviour, which is what makes a few tenths of a dB normal). The reported
 number is the worst bin that carries meaningful energy.
 
-Usage: alias_check.py [--tool PATH] [--notes 60,84,96,108]
+Usage: alias_check.py [--tool PATH] [--notes 60,84,90,96]
+(the register ends at C7 = MIDI 96 since 2026-10-17; above it nothing sounds)
 """
 import argparse, json, subprocess, sys, os, tempfile
 import numpy as np
@@ -77,7 +78,7 @@ def spectrum(x, sr, start_s, dur_s, nfft):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tool", default="./build-release/HorizonPadSoundTool")
-    ap.add_argument("--notes", default="60,84,96,108")
+    ap.add_argument("--notes", default="60,84,90,96")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
