@@ -91,8 +91,8 @@ Logs and `summary.json` land in `build-validation/<timestamp>/`. The Steinberg
 validator is built once from the VST3 SDK commit pinned in
 `tools/validate/versions.json` (with the Command Line Tools only, the script sets
 `XCODE_VERSION`); pluginval is found in /Applications or fetched with
-`--fetch-pluginval`. First full run 2026-10-06: all pass in ~2 min (pluginval L10 16 s). Known gap: not re-validated against either tool
-since the four-layer/12-parameter rewrite (see README "Known gaps").
+`--fetch-pluginval`. First full run 2026-10-06: all pass in ~2 min (pluginval L10 16 s);
+CI runs both on every push to main (L10, both platforms).
 
 ### Tests
 
@@ -112,7 +112,9 @@ feature (`root_sub_present`, `clearing_ensemble_present`,
 `detune_spreads_every_stack`); and instrument-level contracts
 (`keyboard_level_span`, `width_mono_safe_and_level_flat`, `sustain_pedal_holds`,
 `low_register_stays_musical`, `bass_is_mono`, `attack_release_span`,
-`presets_have_worship_envelopes`, `register_is_c0_to_c7`). **Add a regression test whenever a
+`presets_have_worship_envelopes`, `register_is_c0_to_c7`); and the control path
+through real MIDI and host-style automation (`velocity_curve`, `pitch_bend_range`,
+`mod_wheel_adds_movement`, `automation_is_zipper_free`, rule 30). **Add a regression test whenever a
 DSP defect is fixed, and show it failing on the build that has the defect**
 (a `git worktree` of the previous commit). Needs python3 + numpy + scipy; CMake
 skips registration if they are missing, so a plain plugin build never fails
@@ -123,7 +125,7 @@ battery, reverb decay, port-vs-prototype null test), `descriptors.py` (is it the
 sound we designed: layer grid, keyboard, mix pocket, stereo, movement, presets -
 four seeds per figure, `--save`/`--compare` against `docs/baselines/`) and
 `register.py` (roughness, pitch salience, harmonic content and low side energy
-per note, C1-C5 and low voicings), and `translation.py` (playbook F.7 / rule 34:
+per note over the register C0-C7, and low voicings), and `translation.py` (playbook F.7 / rule 34:
 mono sum, phone speaker, -14 LUFS normalisation, AAC/MP3 round trip, stereo bass;
 baseline `docs/baselines/translation-v2.json`; uses the playbook's `dspkit` from
 `~/bob-skills/sound-design-bob/scripts/dsp-kit` (override with `DSPKIT`), plus `afconvert` and `lame`). `tools/listening/make_session.py` renders a
@@ -262,9 +264,18 @@ full thread-safety model before touching processor state.
 
 ### GUI (`Source/gui/`)
 
-Fixed 1080×748 window (`setResizable(false, false)`), pixel-accurate to a
-design handoff — every child paints its own precise layout rather than
-scaling a shared "design surface". `HorizonLookAndFeel` centralizes
+A 1080×748 layout, pixel-accurate to a design handoff — every child paints
+its own precise layout rather than scaling a shared "design surface"; the
+footer's SIZE menu scales the whole editor 75-150% with a transform on top of
+the host's own scale (`setScaleFactor`, remembered per instance and in
+`EditorSettings.xml` beside `UserPresets.xml`). Since the UI review of
+2026-10-17 every knob behaves like a DAW knob (`AnimatedKnob::bindParameter`:
+double-click reset, the host's right-click menu, Tab and arrow keys, an
+accessible name) and no control takes keyboard focus on a click, so the
+space bar keeps reaching the host. ATTACK/RELEASE read as Root's time
+(`dsp/EnvelopeMacro.h`, the same text in the host); OUTPUT reads dBFS; the
+active preset dims to half gold once the sound is edited away from it
+(`isActivePresetModified()`, compared, not tracked). `HorizonLookAndFeel` centralizes
 palette/typography/the ring knob painter; other classes are one widget each
 (`PadKnob` = one layer's VOL knob, `MacrosPanel` = the six macros in three
 rows, `WheelSlider` =
@@ -278,8 +289,9 @@ the ridge; 20% is the designed blur) and WIDTH (the glow's spread; 40% is the
 designed glow); knobs (`AnimatedKnob`) glide after a preset recall or A/B
 switch in a left-to-right wave, but follow a hand on the knob at once, and
 warm on hover/drag; a recalled preset's name and description fade in under
-the wordmark; each pad card glows with its layer's real output; on open the
-sky rises from night, the logo's sun comes up and the knobs sweep up. The
+the wordmark; each pad card glows with its layer's real output; the first
+time an instance's editor opens the sky rises from night, the logo's sun
+comes up and the knobs sweep up (reopening shows it as it is). The
 value a knob shows is eased; the parameter never is. One frame callback
 (`advanceFrame`, driven by `VBlankAttachment`, capped near 60 fps, with a
 30 Hz timer fallback) replaces the old 15 Hz polling timer, and each widget
@@ -322,6 +334,6 @@ permission, staying inside individual layer `.h`/`.cpp` files.
 
 ## DSP work
 
-Invariants load automatically for `Source/**` and `*.dsp` (`~/.claude/rules/dsp-invariants.md`, installed from `~/bob-skills/rules/`). For design, porting, measurement, testing, review or release, and for any defect, use the **sound-design-bob** skill (synced from claude.ai; source and playbook in `~/bob-skills`). It carries the Quelle Music DSP playbook v3.4 (2026-10-06) in its `references/`: the core card `dsp-playbook-core.md` (read whole; section 0 maps tasks to recipes), the reference split into `dsp-selection.md` (S, algorithm choice), `dsp-foundations.md` (F), `dsp-instruments.md` (I), `dsp-effects.md` (E), `dsp-control.md` (C), `dsp-analysis.md` (A) and `dsp-development.md` (D: real-time safety, performance, testing, CI, host contract, licensing, agent workflow, task recipes) - grep them, never read them whole - and `dsp-sound-design-playbook.md` as the index. Its `scripts/dsp-kit/` holds the tested measurement library (`dspkit.py`), the harness contract new products follow, a test scaffold and the document templates. For the plugin editor, ux-ui-design-bob runs alongside on the same tier, gates and parameter table.
+Invariants load automatically for `Source/**` and `*.dsp` (`~/.claude/rules/dsp-invariants.md`, installed from `~/bob-skills/rules/`). For design, porting, measurement, testing, review or release, and for any defect, use the **sound-design-bob** skill (synced from claude.ai; source and playbook in `~/bob-skills`). It carries the Quelle Music DSP playbook (v3.6 at 2026-10-17) in its `references/`: the core card `dsp-playbook-core.md` (read whole; section 0 maps tasks to recipes), the reference split into `dsp-selection.md` (S, algorithm choice), `dsp-foundations.md` (F), `dsp-instruments.md` (I), `dsp-effects.md` (E), `dsp-control.md` (C), `dsp-analysis.md` (A) and `dsp-development.md` (D: real-time safety, performance, testing, CI, host contract, licensing, agent workflow, task recipes) - grep them, never read them whole - and `dsp-sound-design-playbook.md` as the index. Its `scripts/dsp-kit/` holds the tested measurement library (`dspkit.py`), the harness contract new products follow, a test scaffold and the document templates. For the plugin editor, ux-ui-design-bob runs alongside on the same tier, gates and parameter table.
 
-The playbook is at v3.5 (2026-10-17, the register I.2.3): 37 rules tagged by track. Horizon Pad is an instrument (track I) that also owns control (C: MIDI, pedal, wheels), processing (E: the shimmer, ensemble, reverb), mix and output (F.5-F.6). Its v2 sound-design pass is the playbook's instrument worked example (I.10); see `docs/dsp-review-2026-09-26.md` (findings) and `docs/sound-design-v2.md` (changes, measurements, listening list). Not yet audited against this repo: event timing (rule 29 - JUCE applies automation per block), control mappings and note hygiene (30), nonlinear models (33 - the output limiter and tanh), the translation battery (34 - not yet run), real-time safety verified by RTSan or pluginval `--rtcheck` (35), frozen IDs with a versioned state (36 - **not yet applicable**: Horizon Pad is unreleased and testing-only, so parameters, state and presets change freely with no migration or version flags until the owner announces a release; at that point the state gains a version and golden state files, D.5.3), and worst-case block time (37 - the 5.0% CPU figure in the G7 notes is an average). Rule 32 (bypass) does not apply to an instrument.
+The playbook is at v3.6 (2026-10-17): 37 rules tagged by track. Horizon Pad is an instrument (track I) that also owns control (C: MIDI, pedal, wheels), processing (E: the shimmer, ensemble, reverb), mix and output (F.5-F.6). Its v2 sound-design pass is the playbook's instrument worked example (I.10); see `docs/dsp-review-2026-09-26.md` (findings) and `docs/sound-design-v2.md` (changes, measurements, listening list). Audited 2026-10-17 (`docs/dsp-review-2026-10-17.md`, resolution at its end): event timing (29) passes - MIDI splits the block at sample offsets; control mappings (30) are tested through real MIDI; the output limiter's 1x `tanh` (33) is documented as deliberately unoversampled with a rate comparison beside it; the translation battery (34) passes on every preset; the suite runs clean under RTSan (35); worst-case block time (37) is measured with `--profile` (p99 6% of the deadline at 64 samples, M3 Pro) - on the budget machine it is still owed. Frozen IDs with a versioned state (36) is **not yet applicable**: Horizon Pad is unreleased and testing-only, so parameters, state and presets change freely with no migration or version flags until the owner announces a release; at that point the state gains a version and golden state files (D.5.3). Rule 32 (bypass) does not apply to an instrument.

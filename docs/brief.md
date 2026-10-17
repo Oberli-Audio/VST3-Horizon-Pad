@@ -350,6 +350,18 @@ musical: the owner's listening set the ends. Decided by the owner:
   listening, stated in the brief, enforced (silence outside), and the register
   battery runs over exactly that register.
 
+### A-011 - ATTACK/RELEASE show a time (2026-10-17)
+
+The UI review found ATTACK and RELEASE reading "73%" in the editor and the host,
+where a player thinks in time. Decided by the owner: they show a time. Which one
+is ours to pick, since every layer has its own envelope: **Root's**, the foundation
+every chord stands on and the layer A-009 quotes its times by (0.64 s attack, 0.70 s
+release at Lagerfeuer's 73%; 22 ms / 24 ms at 0%, 2.20 s / 2.40 s at 100%). The
+mapping is unchanged - only its text. The editor's readout and the host's value
+string come from one function (`Source/dsp/EnvelopeMacro.h`), and a typed value
+("0.5", "500 ms", or "40 %" for the knob position) maps back through its inverse.
+The tooltips say the other pads scale with Root.
+
 ## Where the exceptions go
 
 12.5 requires a written, dated, named exception whenever a measurement fails and the

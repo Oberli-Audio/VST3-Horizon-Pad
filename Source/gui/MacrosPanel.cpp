@@ -1,5 +1,6 @@
 #include "MacrosPanel.h"
 #include "../PluginProcessor.h"
+#include "../dsp/EnvelopeMacro.h"
 
 namespace horizon::ui
 {
@@ -17,18 +18,21 @@ void MacrosPanel::setUpKnob (Knob& knob, const juce::String& caption, const juce
         processor.getAPVTS(), paramId, knob.slider);
     knob.slider.syncDisplay();
 
+    if (auto* parameter = processor.getAPVTS().getParameter (paramId))
+        knob.slider.bindParameter (*parameter, caption.substring (0, 1) + caption.substring (1).toLowerCase());
+
     knob.slider.onValueChange = [this, &knob] { repaint (knob.valueCell); };
 }
 
 MacrosPanel::MacrosPanel (HorizonPadAudioProcessor& processor)
 {
     setUpKnob (knobs[0], "ATTACK",
-              "How quickly notes fade in - left is fast and percussive, right is slow and gradual "
-              "(scales each layer's own designed attack time).",
+              "How quickly notes fade in - left is fast and percussive, right is slow and gradual. "
+              "Shows Root's attack time; Bloom is about half as long, Clearing and Expanse a little longer.",
               ParamID::attackMacro, Palette::macroAccents[0], processor);
     setUpKnob (knobs[1], "RELEASE",
-              "How long notes take to fade out after you release them - left is short, right is long "
-              "(scales each layer's own designed release time).",
+              "How long notes take to fade out after you release them - left is short, right is long. "
+              "Shows Root's release time before the reverb; Bloom is about two thirds as long.",
               ParamID::releaseMacro, Palette::macroAccents[1], processor);
     setUpKnob (knobs[2], "FILTER",
               "Overall brightness - darker to the left, brighter to the right "
@@ -127,8 +131,12 @@ void MacrosPanel::paint (juce::Graphics& g)
             // the macro's colour while it is hovered or dragged.
             g.setColour (Palette::textDim.interpolatedWith (knob.accent, knob.slider.getHighlight()));
             g.setFont (labelFont (11.0f));
-            g.drawText (juce::String (juce::roundToInt (knob.slider.getDisplayValue() * 100.0)) + "%",
-                       knob.valueCell, juce::Justification::centred);
+            // ATTACK/RELEASE read as a time (Root's, EnvelopeMacro.h), the
+            // others as a percentage - the same text the host shows.
+            const auto shown = (float) knob.slider.getDisplayValue();
+            const auto text = row == 0 ? envelopeMacroText (shown, col == 0 ? kRootAttackSeconds : kRootReleaseSeconds)
+                                       : juce::String (juce::roundToInt (shown * 100.0f)) + "%";
+            g.drawText (text, knob.valueCell, juce::Justification::centred);
         }
     }
 }

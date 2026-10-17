@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "dsp/EnvelopeMacro.h"
 
 #include <limits>
 
@@ -17,6 +18,19 @@ namespace
         return juce::jlimit (0.0f, 1.0f, text.getFloatValue() * 0.01f);
     }
 
+    // The size last chosen in any instance, for the next new one: a small
+    // file beside UserPresets.xml.
+    std::unique_ptr<juce::PropertiesFile> openEditorSettings()
+    {
+        juce::PropertiesFile::Options o;
+        o.storageFormat = juce::PropertiesFile::storeAsXML;
+        return std::make_unique<juce::PropertiesFile> (
+            horizon::UserPresetStore::getPresetFile().getSiblingFile ("EditorSettings.xml"), o);
+    }
+
+    constexpr float kMinEditorScale = 0.75f;
+    constexpr float kMaxEditorScale = 1.5f;
+
     /** FILTER/DETUNE macro mapping: 0.5 = the sound design's own validated
         value (no change), <0.5 halves it, >0.5 doubles it, on a log2 curve so
         the knob feels even in both directions. */
@@ -25,28 +39,8 @@ namespace
         return std::pow (2.0f, (juce::jlimit (0.0f, 1.0f, macroValue) - 0.5f) * 2.0f);
     }
 
-    /** ATTACK/RELEASE macro mapping (brief A-009, 2026-10-14): one
-        exponential curve from 1% of each layer's designed time at 0% to the
-        designed time itself at 100%, so every 10% of travel multiplies the
-        time by the same 1.58 and the short times worship playing lives in get
-        most of the knob - 0-50% leads and plucks (Root attack 22-220 ms),
-        50-80% in-between (0.2-0.9 s), 80-100% pads (0.9-2.2 s).
-
-        0% keeps the old floor: each layer's attack/release in the ~10-25 ms
-        range, short and percussive but clear of the ~1-5 ms where an
-        envelope ramp starts audibly clicking; LayerBase::beginNote()'s
-        jmax(0.001f, ...) floor remains the hard backstop underneath.
-        Written as kMinScale^(1 - x) so that 100% is exactly 1.0 - the
-        designed envelope, bit for bit (the G5 null test runs there).
-
-        Until A-009, 50% was the designed time and 100% double it, with
-        everything below 0.6x squeezed under 15% of the knob; the owner's
-        listening test found the pads cinematic, and longer times unneeded. */
-    float attackReleaseTimeScale (float macroValue) noexcept
-    {
-        constexpr float kMinScale = 0.01f;
-        return std::pow (kMinScale, 1.0f - juce::jlimit (0.0f, 1.0f, macroValue));
-    }
+    // ATTACK/RELEASE: attackReleaseTimeScale() and its text live in
+    // dsp/EnvelopeMacro.h, shared with the editor's readout.
 
     /** The ten (and only ten) host-automatable parameter IDs, in the fixed
         order used everywhere a "vols/macros" array is needed: Root,
@@ -97,6 +91,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout HorizonPadAudioProcessor::cr
                 .withLabel ("%")));
     };
 
+    // ATTACK/RELEASE show Root's time, in the GUI and in the host's lanes
+    // (EnvelopeMacro.h) - the same text both places (owner, 2026-10-17).
+    auto addEnvelopeTime = [&] (const char* id, const char* name, float defaultValue, float referenceSeconds)
+    {
+        layout.add (std::make_unique<juce::AudioParameterFloat> (
+            juce::ParameterID { id, 1 },
+            name,
+            unitRange,
+            defaultValue,
+            juce::AudioParameterFloatAttributes()
+                .withStringFromValueFunction ([referenceSeconds] (float v, int) { return envelopeMacroText (v, referenceSeconds); })
+                .withValueFromStringFunction ([referenceSeconds] (const juce::String& t) { return envelopeMacroFromText (t, referenceSeconds); })));
+    };
+
     // The ten (and only ten) host-automatable parameters: four pad volumes,
     // then the six macros. ATTACK/RELEASE/FILTER/REVERB sit right after the
     // volumes (params 5-8) so a hardware controller that maps its knobs to
@@ -118,8 +126,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout HorizonPadAudioProcessor::cr
     addPercent (ParamID::bloomVolume,    "Bloom",    0.159f);
     // ATTACK/RELEASE: Lagerfeuer's 73.13% on the curve of A-009 (Root
     // attack 0.64 s, release 0.70 s).
-    addPercent (ParamID::attackMacro,    "Attack",   0.7313f);
-    addPercent (ParamID::releaseMacro,   "Release",  0.7313f);
+    addEnvelopeTime (ParamID::attackMacro,  "Attack",  0.7313f, kRootAttackSeconds);
+    addEnvelopeTime (ParamID::releaseMacro, "Release", 0.7313f, kRootReleaseSeconds);
     addPercent (ParamID::filterMacro,    "Filter",   0.30f);
     addPercent (ParamID::reverbMacro,    "Reverb",   0.20f);
     addPercent (ParamID::widthMacro,     "Width",    0.40f);
@@ -207,6 +215,12 @@ HorizonPadAudioProcessor::HorizonPadAudioProcessor()
         apvts.addParameterListener (id, this);
 
     userPresets = horizon::UserPresetStore::load();
+
+    // A new instance opens at the size last chosen in any instance.
+    {
+        editorScale = juce::jlimit (kMinEditorScale, kMaxEditorScale,
+                                    (float) openEditorSettings()->getDoubleValue ("editorScale", 1.0));
+    }
 }
 
 HorizonPadAudioProcessor::~HorizonPadAudioProcessor()
@@ -421,6 +435,61 @@ void HorizonPadAudioProcessor::copyActiveBufferToOtherBuffer()
         dest.macros[(size_t) i].store (source.macros[(size_t) i].load (std::memory_order_relaxed), std::memory_order_relaxed);
 
     sendChangeMessage();
+}
+
+//==============================================================================
+bool HorizonPadAudioProcessor::isActivePresetModified() const
+{
+    const float* vols = nullptr;
+    const float* macros = nullptr;
+    const auto index = getActivePresetIndex();
+
+    switch (getActivePresetKind())
+    {
+        case PresetKind::factory:
+        {
+            const auto& presets = getFactoryPresets();
+            if (! juce::isPositiveAndBelow (index, (int) presets.size()))
+                return false;
+            vols = presets[(size_t) index].volumes.data();
+            macros = presets[(size_t) index].macros.data();
+            break;
+        }
+
+        case PresetKind::user:
+            if (! juce::isPositiveAndBelow (index, (int) userPresets.size()))
+                return false;
+            vols = userPresets[(size_t) index].vols.data();
+            macros = userPresets[(size_t) index].macros.data();
+            break;
+
+        case PresetKind::none:
+            return false;
+    }
+
+    // A thousandth of the knob is below anything a hand sets on purpose,
+    // and above a float round trip through the host or the state.
+    constexpr float kTolerance = 1.0e-3f;
+
+    for (int i = 0; i < kNumLayers; ++i)
+        if (std::abs (volumeParams[(size_t) i]->load (std::memory_order_relaxed) - vols[i]) > kTolerance)
+            return true;
+
+    for (int i = 0; i < kNumGlobalParams; ++i)
+        if (std::abs (macroParams[(size_t) i]->load (std::memory_order_relaxed) - macros[i]) > kTolerance)
+            return true;
+
+    return false;
+}
+
+
+void HorizonPadAudioProcessor::setEditorScale (float newScale)
+{
+    editorScale = juce::jlimit (kMinEditorScale, kMaxEditorScale, newScale);
+
+    auto settings = openEditorSettings();
+    settings->setValue ("editorScale", (double) editorScale);
+    settings->saveIfNeeded();
 }
 
 //==============================================================================
@@ -811,6 +880,17 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     // 100%, eight voices at velocity 127) goes in at +2.0 dBTP and comes out
     // at -0.04 dBFS.
     //
+    // Antialiasing: none, deliberately (rule 4). The tanh runs at 1x because
+    // nothing musical reaches it - no factory preset touches the knee - and
+    // where something does, its aliasing is below what can be measured:
+    // rendered at 48 and 192 kHz (B.5 rate comparison, 2026-10-17) on the
+    // pathological patch above with a C3 and a C5-C7 eight-voice chord (true
+    // peak -0.07 / +0.11 dBTP, the limiter working hard), the energy the
+    // 48 kHz render has beyond the 192 kHz one is -14.5 / -21.1 dB - and
+    // -14.3 / -22.3 dB with every volume 12 dB lower, where the limiter is
+    // linear. The difference is the instrument's own rate-dependent drift,
+    // not folding. Oversampling would buy nothing measurable.
+    //
     // Note the stage is NOT bit-transparent even below the knee: the DC blocker
     // below runs on every sample. It is -0.09 dB at 13.75 Hz and -0.04 dB at
     // 20 Hz, so it is inaudible, but "inaudible" and "bypassed" are different
@@ -892,6 +972,7 @@ void HorizonPadAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     root.setProperty ("activeBuffer", activeBufferIndex.load (std::memory_order_relaxed), nullptr);
     root.setProperty ("activePresetKind", activePresetKind.load (std::memory_order_relaxed), nullptr);
     root.setProperty ("activePresetIndex", activePresetIndex.load (std::memory_order_relaxed), nullptr);
+    root.setProperty ("editorScale", (double) editorScale, nullptr);
     root.appendChild (apvts.copyState(), nullptr);
 
     // Both A/B snapshots, independent of whichever one is currently live in
@@ -944,6 +1025,9 @@ void HorizonPadAudioProcessor::setStateInformation (const void* data, int sizeIn
     activePresetKind.store ((int) root.getProperty ("activePresetKind", (int) PresetKind::factory),
                             std::memory_order_relaxed);
     activePresetIndex.store ((int) root.getProperty ("activePresetIndex", 0), std::memory_order_relaxed);
+
+    if (root.hasProperty ("editorScale"))
+        editorScale = juce::jlimit (kMinEditorScale, kMaxEditorScale, (float) (double) root.getProperty ("editorScale"));
 
     const char* bufferNames[2] { "BufferA", "BufferB" };
     bool haveSavedBuffers = false;

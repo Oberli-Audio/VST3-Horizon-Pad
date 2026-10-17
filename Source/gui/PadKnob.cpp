@@ -36,6 +36,10 @@ PadKnob::PadKnob (HorizonPadAudioProcessor& processorToUse, int layerIndex,
     volumeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         processorToUse.getAPVTS(), volumeParamId, volumeSlider);
     volumeSlider.syncDisplay();
+
+    if (auto* parameter = processorToUse.getAPVTS().getParameter (volumeParamId))
+        volumeSlider.bindParameter (*parameter, caption.substring (0, 1) + caption.substring (1).toLowerCase() + " volume");
+
     volumeSlider.onValueChange = [this] { repaint (readoutArea()); repaint (dotArea()); };
 }
 

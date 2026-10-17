@@ -4,28 +4,94 @@
 namespace horizon::ui
 {
 
+namespace
+{
+    const juce::String dot = juce::String::fromUTF8 (" \xc2\xb7 ");
+
+    juce::String sizeText (float scale)
+    {
+        return "SIZE " + juce::String (juce::roundToInt (scale * 100.0f)) + "%";
+    }
+
+    juce::String formatName (juce::AudioProcessor::WrapperType type)
+    {
+        return type == juce::AudioProcessor::wrapperType_Standalone ? "STANDALONE" : "VST3";
+    }
+}
+
+//==============================================================================
+int FooterBar::SizeButton::preferredWidth() const
+{
+    return juce::roundToInt (juce::GlyphArrangement::getStringWidth (labelFont (12.5f, true), sizeText (1.25f) + " v")) + 6;
+}
+
+void FooterBar::SizeButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    // Footer text that answers a click: gold under the mouse or the keyboard.
+    const auto lit = highlighted || down || hasKeyboardFocus (false);
+    g.setColour (lit ? Palette::gold : Palette::textFooter);
+    g.setFont (labelFont (12.5f, true));
+
+    auto r = getLocalBounds();
+    const auto caret = r.removeFromRight (10).toFloat().withSizeKeepingCentre (7.0f, 4.0f);
+    g.drawText (sizeText (scale), r, juce::Justification::centredRight);
+
+    juce::Path p;
+    p.addTriangle (caret.getX(), caret.getY(), caret.getRight(), caret.getY(), caret.getCentreX(), caret.getBottom());
+    g.fillPath (p);
+}
+
+//==============================================================================
 FooterBar::FooterBar (HorizonPadAudioProcessor& processorToUse)
     : processor (processorToUse)
 {
-    setInterceptsMouseClicks (false, false);
+    sizeButton.setTooltip ("Window size - 75 to 150% of the designed size. Remembered with the session, "
+                           "and used for the next new instance.");
+    sizeButton.setMouseClickGrabsKeyboardFocus (false);
+    sizeButton.onClick = [this] { showSizeMenu(); };
+    addAndMakeVisible (sizeButton);
+}
+
+void FooterBar::showSizeMenu()
+{
+    juce::PopupMenu menu;
+
+    for (auto scale : { 0.75f, 1.0f, 1.25f, 1.5f })
+    {
+        const auto current = std::abs (scale - processor.getEditorScale()) < 0.01f;
+        menu.addItem (juce::String (juce::roundToInt (scale * 100.0f)) + "%", true, current,
+                      [safe = juce::Component::SafePointer<FooterBar> (this), scale]
+                      {
+                          if (safe != nullptr && safe->onScaleChosen != nullptr)
+                              safe->onScaleChosen (scale);
+                      });
+    }
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&sizeButton));
 }
 
 void FooterBar::refreshFromProcessor()
 {
-    const auto buffer = processor.getActiveBufferIndex();
+    const auto scale = processor.getEditorScale();
 
-    if (buffer != shownBuffer)
+    if (! juce::approximatelyEqual (scale, shownScale))
     {
-        shownBuffer = buffer;
-        repaint();
+        shownScale = scale;
+        sizeButton.setScale (scale);
     }
+}
+
+void FooterBar::resized()
+{
+    auto r = getLocalBounds().withTrimmedTop (1).reduced (0, 4);
+    sizeButton.setBounds (r.removeFromRight (sizeButton.preferredWidth()));
 }
 
 void FooterBar::paint (juce::Graphics& g)
 {
     // No background/skyline of its own - the shared panel (HorizonScene)
     // already paints the gradient and mountain silhouette behind the whole
-    // window; this strip only draws the top divider and the three labels.
+    // window; this strip only draws the top divider and the labels.
     auto bounds = getLocalBounds().toFloat();
 
     g.setColour (Palette::dividerColor);
@@ -35,19 +101,12 @@ void FooterBar::paint (juce::Graphics& g)
 
     g.setColour (Palette::textFooter);
     g.setFont (labelFont (12.5f, true));
-    g.drawText ("HORIZON PAD " + juce::String::fromUTF8 ("\xc2\xb7") + " VST3",
-               r, juce::Justification::centredLeft);
+    g.drawText ("HORIZON PAD " JucePlugin_VersionString + dot + formatName (processor.wrapperType),
+                r, juce::Justification::centredLeft);
 
-    const auto bufferLetter = processor.getActiveBufferIndex() == 0 ? "A" : "B";
+    auto right = r.withTrimmedRight (sizeButton.getWidth() + 2);
+    g.drawText ("4 LAYERS" + dot + "6 MACROS" + dot, right, juce::Justification::centredRight);
 
-    g.drawText (juce::String ("BUFFER ") + bufferLetter + " " + juce::String::fromUTF8 ("\xc2\xb7") + " 4 LAYERS "
-               + juce::String::fromUTF8 ("\xc2\xb7") + " 6 MACROS",
-               r, juce::Justification::centredRight);
-
-    // --- Tagline, centred between the two labels above (moved here from
-    // TitleBanner, which now just has the logo and wordmark) - same font as
-    // its neighbours, not the italic treatment it had in the banner.
-    g.setFont (labelFont (12.5f, true));
     // Split after each \xNN escape (as separate literals) so the compiler's
     // greedy hex-escape parsing can't swallow the following letters (e.g.
     // "\xa4be" would otherwise be read as one 4-digit escape, not \xa4 + "be").

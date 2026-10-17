@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LayerBase.h"
+#include "EnvelopeMacro.h"
 
 namespace horizon
 {
@@ -28,10 +29,10 @@ protected:
     void startVoice (int voiceIndex, float frequency, float velocity) override;
     void renderVoice (int voiceIndex, juce::AudioBuffer<float>& target, int numSamples) override;
 
-    float attackSeconds() const noexcept override  { return 2.2f; }
+    float attackSeconds() const noexcept override  { return kRootAttackSeconds; }   // shown by ATTACK (EnvelopeMacro.h)
     float decaySeconds() const noexcept override   { return 0.8f; }
     float sustainLevel() const noexcept override   { return 0.75f; }
-    float releaseSeconds() const noexcept override { return 2.4f; }
+    float releaseSeconds() const noexcept override { return kRootReleaseSeconds; }  // shown by RELEASE
 
     /** The foundation opens last: it stays centred until WIDTH 20% and
         reaches its full spread at WIDTH 100%. Below 140 Hz the output is mono

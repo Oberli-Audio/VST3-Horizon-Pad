@@ -1,127 +1,91 @@
 # Tier P gate status
 
-One page: where Horizon Pad stands against the playbook's gates (v3.2: core card
-section 2, F.15.1). Last updated **2026-10-17**.
+One page: where Horizon Pad stands against the playbook's gates (v3.6: core card
+section 2, F.15.1). Last updated **2026-10-17**. The current state is on top; the
+dated sections under "History" are the record of how it got here.
 
 Tier **P** (Product), promoted from S on 2026-09-22, which means re-entering at
 G0 and doing every gate the project skipped as a sketch.
 
 | Gate | Status | Artefact |
 |---|---|---|
-| **G0** Brief | **CLOSED** 2026-09-23, owner-confirmed | [`brief.md`](brief.md) + amendments A-001..A-010 (A-010: the register C0-C7, 2026-10-17) |
+| **G0** Brief | **CLOSED** 2026-09-23, owner-confirmed | [`brief.md`](brief.md) + amendments A-001..A-011 (A-010 the register C0-C7, A-011 ATTACK/RELEASE show a time) |
 | **G1** Algorithm | **CLOSED** 2026-09-24 | [`g1-algorithm.md`](g1-algorithm.md) |
 | **G2** Prototype | **CLOSED** 2026-09-24 | [`g2-prototype.md`](g2-prototype.md), `sound design/four_pads.dsp` |
 | **G3** Measure | **CLOSED** 2026-09-24, two rows short of the brief | [`g3-measurements.md`](g3-measurements.md) |
 | **G4** Port | **CLOSED** | Clean Release build; constants documented beside the code |
 | **G5** Null test | **CLOSED** on "characterised and declared intentional" | [`g5-null-test.md`](g5-null-test.md) |
-| **G6** Validate | **3 of 4** - hosts outstanding | below |
+| **G6** Validate | **3 of 4** - hosts: the owner's three-DAW play-through | below |
 | **G7** Product | **CLOSED**, compatibility matrix pending hosts | README + below |
 
 ## G6 in detail
 
 | Requirement | Status |
 |---|---|
-| Steinberg validator exit 0 | **PASS** - 47/47, 2026-09-24 (v1). Re-run on v2 (`5056369`) 2026-10-03: **47/47**, VST3 SDK 3.8.1 (`3cdf9ca`) |
-| pluginval strictness 10 | **PASS** - 2026-09-24 (v1). Re-run on v2 2026-10-03: **PASS**. Since 2026-10-06 `tools/validate/validate.py` runs it at all six sample rates x seven block sizes with a logged seed (25 test groups incl. parameter fuzzing and thread-safety, 16 s), and CI runs it on the downloaded macOS and Windows artefacts |
-| CTest suite green | **PASS** - 8/8 (v1, 2026-09-24); 19/19 on v2, 2026-10-03; **25/25** on 2026-10-17 (`register_is_c0_to_c7` added) |
-| Real-time safety (rule 35) | **PASS** on v2, 2026-10-03: all 19 tests clean under RealtimeSanitizer (`build-rtsan`, see CLAUDE.md); self-test proves the check fires. **Stale by six tests** (review 2026-10-17): rebuild `build-rtsan` and re-run |
-| Three hosts, two platforms | **1 of 3.** Ableton Live on macOS confirmed by the owner. Windows Ableton and Waveform outstanding. |
-
-The tests are in `tools/tests/dsp_tests.py`, registered with CTest by
-`CMakeLists.txt`: definition-of-done properties (latency, seeded determinism, the
-36-combination rate/block matrix, 60 s of silence, all presets safe), regression
-guards (one per bug measurement caught), presence tests per defining feature, and
-instrument-level contracts (keyboard span, mono bass, pedal, low register, width).
+| Steinberg validator exit 0 | **PASS** 47/47 (VST3 SDK 3.8.1), in CI on every push to main, macOS and Windows |
+| pluginval strictness 10 | **PASS**, in CI on the downloaded macOS and Windows artefacts, all six sample rates; `tools/validate/validate.py` runs the same locally |
+| CTest suite green | **PASS 29/29** on 2026-10-17 (four control-path tests added: `velocity_curve`, `pitch_bend_range`, `mod_wheel_adds_movement`, `automation_is_zipper_free`) |
+| Real-time safety (rule 35) | **PASS 29/29 under RealtimeSanitizer**, 2026-10-17 (`build-rtsan` rebuilt fresh; the self-test aborts as it must). Covers per-block automation during playback |
+| Three hosts, two platforms | **1 of 3.** Ableton Live on macOS confirmed by the owner. The owner's play-through in three DAWs is the next step |
 
 ## What is outstanding
 
-In rough order of how much each would change (revised 2026-10-03):
+1. **Three hosts, two platforms** (G6) - the owner's play-through; the release gate's
+   interface checks are listed in [`ui-review-2026-10-17.md`](ui-review-2026-10-17.md).
+2. **The listening items** below.
+3. **CPU on the budget machine** (A-004, rule 37). On the M3 Pro, 8 voices at every
+   pad's full volume, measured with `HorizonPadSoundTool --profile`, three runs
+   each: **p99 6% of the deadline** at 64 and at 128 samples. Maxima 16-42%; three
+   single blocks in ~114,000 went over (100-150%), each at a different time in its run -
+   the OS preempting the test thread, not the DSP (D.2.1). The 2017-era i5 the budget is written for is
+   roughly 3-4x slower.
+4. **FILTER response error at 44.1 vs 96 kHz** (G3). Not measured as a swept response;
+   mitigated structurally by every filter being TPT/ZDF.
+5. **CI**: the RTSan job is local only (`validate.py` runs it when `build-rtsan` exists).
 
-1. **Three hosts, two platforms** (G6). Windows Ableton and Waveform, now on the v2
-   build. The only hard gate still open.
-2. ~~Owner decision: stereo bass from the reverb~~ - **fixed 2026-10-03** (owner
-   approved): the side high-pass moved to the end of `FxChain`, after the reverb
-   return. `bass_is_mono` gained a REVERB 100% case (failed at -5.3 dB on the old
-   build, passes now); dry path nulls at -147 dBFS at REVERB 0; loudness -0.05 to
-   -0.15 LU. Listening item: the reverb's low end on Sternenzelt, Bergecho and
-   Steinerne Ruhe - the high-pass's phase shift also raised their occasional peaks
-   by up to 1.5 dB (output still >= 4 dB under 0 dBTP).
-3. **The listening pass** - see below; the Sternenzelt items were heard 2026-10-03.
-4. **CPU on the target machine** (G3) - as worst-case block time (rule 37). Measured
-   on the M3 Pro 2026-10-17 (128-sample blocks, default patch): p99 20.3%, max 66.9%
-   of the deadline ([`dsp-review-2026-10-17.md`](dsp-review-2026-10-17.md) section 4).
-   Still owed: 64-sample blocks, and the budget machine during the Windows pass.
-5. **Rule audits** done 2026-10-17 ([`dsp-review-2026-10-17.md`](dsp-review-2026-10-17.md)
-   section 4): 29 passes (sample-offset segments); 30 and 33 partial - three
-   scripted-MIDI tests (velocity, bend, CC1), an automation-sweep zipper test and one
-   sentence declaring the limiter's 1x `tanh` deliberate (rule 4) are owed.
-6. **FILTER response error at 44.1 vs 96 kHz** (G3). Not measured as a swept
-   response; mitigated structurally by every filter being TPT/ZDF.
-7. **CI**: ~~pluginval and a pinned VST3 SDK commit~~ - done 2026-10-06 (validation
-   matrix on the downloaded artefacts, macOS and Windows). The RTSan job is still local
-   only (`validate.py` runs it when `build-rtsan` exists). Automation *during* playback and state loads
-   mid-stream are not yet covered by any RTSan-checked test.
-
-## Reviews of 2026-10-17 (Tier P)
+## Reviews of 2026-10-17 (Tier P) - integrated the same day
 
 - **Sound**: [`dsp-review-2026-10-17.md`](dsp-review-2026-10-17.md) - DoD checklist,
-  the register battery over the new register C0-C7, rule audits 29/30/33/37, descriptor
-  drift since the v2-macros baseline, translation battery PASS on all 17 presets.
-  Baselines frozen in `docs/baselines/*-2026-10-17.json`.
-- **Interface**: [`ui-review-2026-10-17.md`](ui-review-2026-10-17.md) - one grade-3
-  finding (fixed 1080 x 748, no scale choice), eight grade-2 (double-click reset,
-  modified mark, preset arrows, ATTACK/RELEASE in %, keyboard and accessible names,
-  footer contrast, meter scale, host context menu), three cosmetic.
+  the register battery over C0-C7, rule audits 29/30/33/37, descriptor drift,
+  translation battery PASS on all 17 presets; baselines in
+  `docs/baselines/*-2026-10-17.json`. Its resolution table: four control-path tests,
+  RTSan re-run, block time in the harness, the limiter's 1x `tanh` documented with a
+  rate comparison, listening items for the open questions.
+- **Interface**: [`ui-review-2026-10-17.md`](ui-review-2026-10-17.md) - one grade-3 and
+  eight grade-2 findings, all fixed (SIZE menu, double-click reset, edited preset dims,
+  preset arrows, ATTACK/RELEASE as a time, keyboard and accessible names, footer
+  contrast 3.2-5.9:1, dBFS meter, host context menu); two cosmetic ones left, with
+  reasons.
 
-## The register (A-010, 2026-10-17)
+## The register (A-010)
 
-C0-C7, set by the owner's listening; silent outside. `register_is_c0_to_c7` guards it
-and fails on `e7dce97`. The register battery now runs C0-C7; its new findings
-(Bloom's roughness at C0, Root's pitch above C5, Clearing at C7) are listening items
-below, not defects.
+C0-C7, set by the owner's listening; silent outside. `register_is_c0_to_c7` guards it.
 
-## The listening pass, in one place
+## Open listening items
 
-**How to run it (one blind session closes the whole list).** Compare v1 - `bf17ee8`,
-the signed-off sound before sound-design v2 - with the current `main`, which carries
-v2, the WIDTH/DETUNE macros and the reverb bass fix. One comparison answers every
-item below, because the changes are cumulative:
+Everything measurement has taken as far as it can. One page plays the newest ones:
 
 ```bash
-git worktree add --detach ../hp-v1 bf17ee8
-cmake -S ../hp-v1 -B ../hp-v1/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DFETCHCONTENT_SOURCE_DIR_JUCE="$PWD/build-release/_deps/juce-src"
-cmake --build ../hp-v1/build --target HorizonPadSoundTool
 cmake --build build-release --target HorizonPadSoundTool
-python3 tools/listening/make_session.py --baseline ../hp-v1/build/HorizonPadSoundTool \
-        --candidate build-release/HorizonPadSoundTool --out build-listening
+python3 tools/listening/make_session.py --baseline build-release/HorizonPadSoundTool \
+        --candidate build-release/HorizonPadSoundTool --out build-listening \
+        --only register_bottom_root,register_bottom_bloom,register_bottom_blend,register_top_root,register_top_clearing,bloom_movement
 open build-listening/index.html
 ```
 
-19 items, each loudness-matched to -20 LUFS, "1"/"2"/X randomised per item; export the
-verdicts as JSON at the end and add them here. `expanse_top` is not truly blind: v1's
-Expanse was nearly silent at C7 (+32 dB to match), so judge only whether the current
-one is clean. The GUI item (37 px macro knobs) is judged in the plugin itself.
+Each pairs the end key with the octave inside it (or Bloom at DETUNE 0% with 50%),
+loudness-matched; the preference column records the verdict. The older items compare
+v1 (`bf17ee8`) with `main` - recipe in the history below.
 
-These are the items that measurement has taken as far as it can. Each is a
-character decision.
-
-| From | Item |
-|---|---|
-| EX-001 | The 2 Hz DC blocker's effect on the lowest octave (-0.09 dB at 13.75 Hz, calculated not heard) |
-| EX-002 | ~~Whether to rebalance Sternenzelt into the loudness match~~ - **heard 2026-10-03, owner: "Sternenzelt is ok as is"**; no rebalance |
-| EX-003 | Whether Expanse's alias at MIDI 96-108 is audible at all |
-| G5 | The shimmer now actually transposes - Expanse is substantially brighter than the shipped sound |
-| G5 | Filter Q values sit below the prototype's Butterworth; Expanse's safety lowpass is 2-pole where the prototype's is 1-pole |
-| G5 | Shimmer blend sits 16 dB below the prototype |
-| G1 #4/#5 | Linear interpolation on the flanger and shimmer grain reads, where the rule wants Lagrange/Hermite |
-| Review 2026-10-17 R-1 | `register_bottom`: each layer solo at C0 and C1, the blend at C0-E0-G0 - music, or a wobble with a pitch? (Bloom 3.63, Root 1.25, Clearing 1.55 roughness at C0) |
-| Review 2026-10-17 R-2/R-3 | `register_top`: Root solo at C6-C7 (sounds an octave low: salience -0.04 at C7), Clearing solo at C7 (roughness 3.73) |
-| Review 2026-10-17 D-1 | `bloom_movement`: Bloom's movement depth halved since the v2-macros baseline (43 -> 25%); DETUNE 0% against 50% |
-
-Reference material for the A/B is committed: `sound design/reference-renders/`
-holds the four per-layer renders and the full blend the sound design was
-signed off on.
+| From | Item | Question |
+|---|---|---|
+| Review 2026-10-17 R-1 | `register_bottom_root`, `register_bottom_bloom`, `register_bottom_blend` | C0 against C1: music, or a wobble with a pitch? (roughness at C0: Bloom 3.6, Clearing 1.6, Root 1.25) |
+| Review 2026-10-17 R-2, R-3 | `register_top_root`, `register_top_clearing` | C7 against C6: Root loses its pitch above C5 (sounds an octave low?), Clearing is roughest at C7 |
+| Review 2026-10-17 D-1 | `bloom_movement` | Bloom's measured movement halved since DETUNE's default went to 0%: lost life, or only beating? |
+| A-009 | In the plugin | The pads at worship length now - right, or too abrupt? The in-betweens (Talwind, Sturmfront, Kupferglanz) release longer than the pads - keep? |
+| Pass 2, 2026-10-07 | `blend_high`, the C2 open fifth, Root C1/C2 start, `detune_wide`, Daemmerlicht | Still open from the second pass |
+| Presets, 2026-10-07 | In the plugin | Glasperle still glass; Silberpfad over a pad; the in-betweens speaking in 0.2-0.45 s; the first five |
+| Carried | EX-001's 2 Hz DC blocker; G5's filter Q and Expanse's lowpass order; the shimmer blend 16 dB under the prototype; G1's linear interpolation on flanger and shimmer reads | Character questions with no complaint so far - heard implicitly in every pass, never asked by name |
 
 ## Exceptions on the books
 
@@ -131,13 +95,29 @@ signed off on.
 | EX-002 | Sternenzelt ~4.8 LU below the matched bank | OPEN - accepted; confirmed by ear 2026-10-03 |
 | EX-003 | Expanse aliases at MIDI 96-108 | CLOSED 2026-10-07 - v2's top octave preferred by ear; v1's "not usable" |
 
+# History
+
+**The v1 against `main` session** (the older listening items, and the "recipe above"
+the dated sections below refer to): compare v1 - `bf17ee8`, the signed-off sound
+before sound-design v2 - with the current build.
+
+```bash
+git worktree add --detach ../hp-v1 bf17ee8
+cmake -S ../hp-v1 -B ../hp-v1/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DFETCHCONTENT_SOURCE_DIR_JUCE="$PWD/build-release/_deps/juce-src"
+cmake --build ../hp-v1/build --target HorizonPadSoundTool
+python3 tools/listening/make_session.py --baseline ../hp-v1/build/HorizonPadSoundTool \
+        --candidate build-release/HorizonPadSoundTool --out build-listening
+open build-listening/index.html
+```
+
 ## Sound-design v2 (branch `sound-design-v2`, 2026-09-26)
 
 A second review found the gates green while the design itself had drifted, and
 that a harness bug had invalidated the G5 numbers (corrected in
 [`g5-null-test.md`](g5-null-test.md)). Findings:
 [`dsp-review-2026-09-26.md`](dsp-review-2026-09-26.md); changes and measurements:
-[`sound-design-v2.md`](sound-design-v2.md). On the branch, not merged:
+[`sound-design-v2.md`](sound-design-v2.md). On the branch at the time; merged into `main` as `2724152`:
 
 - **G3/G5 reopen for v2** - measured against v1 with `tools/measure/descriptors.py`
   and `register.py` (baselines in `docs/baselines/`), 17/17 tests. The v2 sound

@@ -177,7 +177,7 @@ namespace
                 // test, the alias and EDR measurements, two regression tests)
                 // measured a different patch than it asked for. Accumulate
                 // instead, in the same ';'-separated form the batch syntax uses.
-                if (key == "param" && args.has ("param"))
+                if ((key == "param" || key == "automate") && args.has (key))
                     args.values[key] = args.values[key] + ";" + value;
                 else
                     args.values[key] = value;
@@ -213,7 +213,10 @@ namespace
             "                         Together these make voice stealing testable, e.g.\n"
             "                         8 notes at 0 plus a 9th at 3s on an 8-slot engine.\n"
             "  --pedal=2,5[,6,8]      Sustain pedal (CC64) down/up times in seconds, in\n"
-            "                         pairs. The render extends past the last pedal-up.\n\n"
+            "                         pairs. The render extends past the last pedal-up.\n"
+            "  --bend=t:v[,t:v]       Pitch-wheel messages: at t seconds, wheel position v\n"
+            "                         (-1..+1, 0 = centre), sent as real 14-bit MIDI.\n"
+            "  --mod=t:v[,t:v]        Mod-wheel (CC1) messages: at t seconds, amount v (0..1).\n\n"
             "Patch selection (applied in this order - each stage can override the last):\n"
             "  --preset=<name|index>  Apply a factory preset first (see --list-presets)\n"
             "  --solo=root,clearing   Zero every OTHER layer's volume, set these to 1.0\n"
@@ -223,7 +226,13 @@ namespace
             "                         --param=filterMacro=0.8 --param=reverbMacro=0\n"
             "                         Accepts either the raw ParamID or a short alias:\n"
             "                         root/clearing/expanse/bloom (volume),\n"
-            "                         attack/release/filter/reverb/width/detune (macros)\n\n"
+            "                         attack/release/filter/reverb/width/detune (macros)\n"
+            "  --automate=id:t0=v0,t1=v1[,...]\n"
+            "                         Host-style automation (harness contract): a linear\n"
+            "                         ramp through the points (seconds = value 0..1),\n"
+            "                         applied once per block the way JUCE hosts deliver\n"
+            "                         it - the worst case for zipper noise. Repeatable;\n"
+            "                         same id aliases as --param.\n\n"
             "Analysis:\n"
             "  --window-ms=50         Envelope RMS window size in ms (default 50)\n"
             "  --fft-size=8192        Spectral analysis window length, rounded to the\n"
@@ -247,7 +256,12 @@ namespace
             "                         Root's sub-octave (0.5), the fundamental (1) and\n"
             "                         Expanse's shimmer octave (2). Narrow it when soloing\n"
             "                         a layer that has no sub or no shimmer, or the alias\n"
-            "                         floor is scored against partials that cannot exist.\n\n"
+            "                         floor is scored against partials that cannot exist.\n"
+            "  --profile              Time every processBlock call (harness contract) and\n"
+            "                         report p50, p99, p99.9 and max as % of the block's\n"
+            "                         deadline under \"profile\" (rule 37). Use a Release\n"
+            "                         build, a long --hold and several runs: a maximum\n"
+            "                         that moves between runs is the OS, not the DSP.\n\n"
             "Output:\n"
             "  --out=<path.wav>       Also write the render to a 32-bit float WAV file\n"
             "  --list-presets         Print the factory preset table as JSON and exit\n"
@@ -1238,20 +1252,132 @@ static int runTool (int argc, char* argv[])
             pedalEvents.push_back ({ (int) std::round (times[i].getDoubleValue() * sampleRate), i % 2 == 0 ? 127 : 0 });
     }
 
+    // Wheels: --bend=t:v (v -1..+1) as 14-bit pitch-wheel messages, --mod=t:v
+    // (v 0..1) as CC1 - through the processor's real MIDI path, so the
+    // control mappings are tested where a keyboard drives them (rule 30).
+    std::vector<std::pair<int, juce::MidiMessage>> wheelEvents;
+    {
+        auto parseTimed = [&] (const char* flag, auto makeMessage)
+        {
+            for (auto& tok : args.getList (flag, ""))
+            {
+                const auto colon = tok.indexOfChar (':');
+                if (colon < 0)
+                    continue;
+
+                const auto t = tok.substring (0, colon).getDoubleValue();
+                const auto v = tok.substring (colon + 1).getFloatValue();
+                wheelEvents.push_back ({ (int) std::round (t * sampleRate), makeMessage (v) });
+            }
+        };
+
+        parseTimed ("bend", [] (float v)
+        {
+            const auto wheel = juce::jlimit (0, 16383, (int) std::round (8192.0f + juce::jlimit (-1.0f, 1.0f, v) * 8191.0f));
+            return juce::MidiMessage::pitchWheel (1, wheel);
+        });
+
+        parseTimed ("mod", [] (float v)
+        {
+            return juce::MidiMessage::controllerEvent (1, 1, juce::jlimit (0, 127, (int) std::round (juce::jlimit (0.0f, 1.0f, v) * 127.0f)));
+        });
+    }
+
+    // Host-style automation, the harness contract's syntax:
+    // --automate=id:t0=v0,t1=v1,... - a linear ramp through the points,
+    // applied at the start of every block (JUCE hosts deliver automation per
+    // block, rule 29). Before the first point the parameter is left alone;
+    // after the last it holds.
+    struct Automation { juce::RangedAudioParameter* param; std::vector<std::pair<double, double>> points; };
+    std::vector<Automation> automations;
+
+    for (auto entry : juce::StringArray::fromTokens (args.getString ("automate", ""), ";", ""))
+    {
+        entry = entry.trim();
+        if (entry.isEmpty())
+            continue;
+
+        const auto colon = entry.indexOfChar (':');
+        auto* p = colon > 0 ? processor.getAPVTS().getParameter (resolveParamId (entry.substring (0, colon))) : nullptr;
+
+        if (p == nullptr)
+        {
+            std::cerr << "error: --automate needs id:t0=v0,t1=v1,... with a known id, got: " << entry.toStdString() << std::endl;
+            return 2;
+        }
+
+        Automation a { p, {} };
+
+        for (auto point : juce::StringArray::fromTokens (entry.substring (colon + 1), ",", ""))
+        {
+            const auto eq = point.indexOfChar ('=');
+            if (eq > 0)
+                a.points.push_back ({ point.substring (0, eq).getDoubleValue(), point.substring (eq + 1).getDoubleValue() });
+        }
+
+        std::sort (a.points.begin(), a.points.end());
+
+        if (a.points.empty())
+        {
+            std::cerr << "error: --automate entry has no t=v points: " << entry.toStdString() << std::endl;
+            return 2;
+        }
+
+        automations.push_back (std::move (a));
+    }
+
+    auto automationValueAt = [] (const Automation& a, double t) -> std::optional<float>
+    {
+        if (t < a.points.front().first)
+            return std::nullopt;
+
+        for (size_t i = 1; i < a.points.size(); ++i)
+        {
+            const auto& [t0, v0] = a.points[i - 1];
+            const auto& [t1, v1] = a.points[i];
+
+            if (t < t1)
+                return (float) juce::jlimit (0.0, 1.0, v0 + (v1 - v0) * (t1 > t0 ? (t - t0) / (t1 - t0) : 1.0));
+        }
+
+        return (float) juce::jlimit (0.0, 1.0, a.points.back().second);
+    };
+
     int lastEventSample = lastOffSample;
     for (auto& [sample, value] : pedalEvents)
         lastEventSample = juce::jmax (lastEventSample, sample);
+    for (auto& ev : wheelEvents)
+        lastEventSample = juce::jmax (lastEventSample, ev.first);
 
     const int totalSamples  = lastEventSample + (int) std::round (tailSeconds * sampleRate);
 
     juce::AudioBuffer<float> render (2, juce::jmax (1, totalSamples));
     render.clear();
 
+    const bool timeBlocks = args.has ("profile");
+    std::vector<double> blockMicros;
+    std::vector<double> blockStartSec;
+
+    if (timeBlocks)
+    {
+        blockMicros.reserve ((size_t) (totalSamples / juce::jmax (1, blockSize) + 1));
+        blockStartSec.reserve (blockMicros.capacity());
+    }
+
+    auto renderAll = [&]
+    {
     int position = 0;
 
     while (position < totalSamples)
     {
         const int blockLen = juce::jmin (blockSize, totalSamples - position);
+
+        for (auto& a : automations)
+        {
+            if (const auto value = automationValueAt (a, (double) position / sampleRate))
+                if (! juce::approximatelyEqual (a.param->convertFrom0to1 (a.param->getValue()), *value))
+                    a.param->setValueNotifyingHost (a.param->convertTo0to1 (*value));
+        }
 
         juce::MidiBuffer midi;
 
@@ -1270,11 +1396,38 @@ static int runTool (int argc, char* argv[])
             if (sample >= position && sample < position + blockLen)
                 midi.addEvent (juce::MidiMessage::controllerEvent (1, 64, value), sample - position);
 
+        for (auto& [sample, message] : wheelEvents)
+            if (sample >= position && sample < position + blockLen)
+                midi.addEvent (message, sample - position);
+
         juce::AudioBuffer<float> block (render.getArrayOfWritePointers(), 2, position, blockLen);
-        processBlockRealtime (processor, block, midi);
+
+        if (timeBlocks)
+        {
+            const auto t0 = juce::Time::getHighResolutionTicks();
+            processBlockRealtime (processor, block, midi);
+            const auto t1 = juce::Time::getHighResolutionTicks();
+            blockMicros.push_back (juce::Time::highResolutionTicksToSeconds (t1 - t0) * 1.0e6);
+            blockStartSec.push_back ((double) position / sampleRate);
+        }
+        else
+        {
+            processBlockRealtime (processor, block, midi);
+        }
 
         position += blockLen;
     }
+    };
+
+    // Profiling times the render on this (normal-priority) thread. Measured
+    // 2026-10-17 on an M3 Pro: a JUCE real-time thread here - flat out or
+    // paced one block per period - made it far worse (p99 45-67% against
+    // 6%), consistent with Apple Silicon placing a real-time thread that has
+    // not joined an audio device's workgroup on efficiency cores. A host's
+    // audio thread has joined one; an offline harness has no device to join.
+    // So: normal priority, several runs, and a maximum read by where it falls
+    // (one that moves between runs is the OS preempting, not the DSP).
+    renderAll();
 
     // ---- Metrics ----------------------------------------------------------
     const auto* readL = render.getReadPointer (0);
@@ -1427,8 +1580,46 @@ static int runTool (int argc, char* argv[])
         if (args.has ("solo"))   config->setProperty ("solo", args.getString ("solo", ""));
         if (args.has ("layer"))  config->setProperty ("solo", args.getString ("layer", ""));
         if (args.has ("param"))  config->setProperty ("paramOverrides", args.getString ("param", ""));
+        if (args.has ("automate")) config->setProperty ("automate", args.getString ("automate", ""));
+        if (args.has ("bend"))   config->setProperty ("bend", args.getString ("bend", ""));
+        if (args.has ("mod"))    config->setProperty ("mod", args.getString ("mod", ""));
 
         root->setProperty ("config", juce::var (config));
+    }
+
+    if (timeBlocks && ! blockMicros.empty())
+    {
+        // Rule 37: worst case against the deadline, never the mean alone.
+        // Blocks shorter than --block (the last one) are excluded.
+        std::vector<double> full;
+        for (size_t i = 0; i + 1 < blockMicros.size(); ++i)
+            full.push_back (blockMicros[i]);
+        if (full.empty())
+            full = blockMicros;
+
+        auto sorted = full;
+        std::sort (sorted.begin(), sorted.end());
+        const auto pct = [&] (double q) { return sorted[(size_t) juce::jlimit (0, (int) sorted.size() - 1, (int) std::ceil (q * (double) sorted.size()) - 1)]; };
+
+        double sum = 0.0;
+        for (auto v : full) sum += v;
+
+        const auto deadlineUs = 1.0e6 * (double) blockSize / sampleRate;
+        const auto worst = (size_t) std::distance (full.begin(), std::max_element (full.begin(), full.end()));
+
+        // Field names from the harness contract (dsp-kit/harness-contract.md).
+        const auto asPct = [&] (double us) { return 100.0 * us / deadlineUs; };
+        auto* bt = new juce::DynamicObject();
+        bt->setProperty ("blocks", (int) full.size());
+        bt->setProperty ("deadline_ms", deadlineUs * 0.001);
+        bt->setProperty ("mean_pct", asPct (sum / (double) full.size()));
+        bt->setProperty ("p50_pct", asPct (pct (0.50)));
+        bt->setProperty ("p99_pct", asPct (pct (0.99)));
+        bt->setProperty ("p999_pct", asPct (pct (0.999)));
+        bt->setProperty ("max_pct", asPct (sorted.back()));
+        bt->setProperty ("worst_block_at_s", blockStartSec[worst]);
+        bt->setProperty ("over_deadline", (int) std::count_if (full.begin(), full.end(), [&] (double v) { return v > deadlineUs; }));
+        root->setProperty ("profile", juce::var (bt));
     }
 
     {

@@ -58,10 +58,11 @@ namespace Palette
     const juce::Colour textValue        { 0xffcaced4 }; // card value readouts
     const juce::Colour textDim          { 0xff7f8793 }; // captions, tagline, macro values
     const juce::Colour textFaint        { 0xff79818d }; // delete/copy/cancel/save-open text
-    const juce::Colour textFooter       { 0xffc9bfa9 }; // footer strip text - light, warm: the footer
-                                                          // strip sits directly on the panel's warm
-                                                          // bottom gradient (no card behind it), where
-                                                          // the old dark blue-grey lost most of its contrast
+    const juce::Colour textFooter       { 0xfff3e6c8 }; // footer strip text - the cream of a recalled
+                                                          // preset's title: the strip sits straight on the
+                                                          // sunset glow (no card behind it). 0xffc9bfa9
+                                                          // measured 2.1-2.2:1 there; this is >= 3:1 in
+                                                          // every palette (UI review 2026-10-17)
     const juce::Colour macroLabel       { 0xffb4b8be };
 
     const juce::Colour dividerColor     { 0x80282e38 };

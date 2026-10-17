@@ -26,9 +26,13 @@
     straight from the handoff's own CSS (panelStyle's padding, presetsRowStyle's
     margin-top, mainGridStyle's gap, ...), scaled 1:1 - not eyeballed.
 
-    A fixed-size window: every child paints its own precise layout rather
-    than scaling a "design surface", so there is no benefit to resizing and
-    real risk of blurring the fine knob artwork.
+    One layout, drawn at a chosen size: every child paints its own precise
+    layout in the designed 1080 x 748 coordinates, and the SIZE menu in the
+    footer scales the whole editor to 75 / 100 / 125 / 150% (a transform on
+    top of whatever scale the host itself applies - setScaleFactor() keeps
+    the two apart). Everything is vector or cached at the screen's pixel
+    density, so no size blurs. Remembered per instance and as the default
+    for the next new one (HorizonPadAudioProcessor::getEditorScale()).
 
     Motion. Everything moves because the sound changed, and only then:
       - the scene follows FILTER (time of day), REVERB (haze) and WIDTH
@@ -37,8 +41,9 @@
         wave, while a hand on a knob is followed at once (AnimatedKnob);
       - a recalled preset's name and description fade in under the wordmark;
       - each pad card glows with its layer's real output;
-      - on open, the sky rises from night, the logo's sun comes up from
-        behind its peaks and the knobs sweep up to their values.
+      - the first time the editor opens on an instance, the sky rises from
+        night, the logo's sun comes up from behind its peaks and the knobs
+        sweep up to their values; reopening the window shows it as it is.
     One frame callback (advanceFrame) drives it all, from the display's
     vertical blank while the editor is on screen, capped near 60 fps; each
     piece repaints only its own changed area, so a quiet editor costs
@@ -54,6 +59,10 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    /** The host's own scale (Windows per-monitor DPI, some Linux hosts); the
+        player's SIZE choice is multiplied on top. */
+    void setScaleFactor (float newScale) override;
+
     /** One animation frame at `nowSeconds` (Time::getMillisecondCounterHiRes()
         timebase): polls the processor and advances every animation. Driven by
         the vertical blank; public so tools/gui_snapshot can step it offline
@@ -66,6 +75,7 @@ private:
     void pullSceneTargets();
     void startWave (double startTime, bool fromZero);
     void showRecalledPresetTitle();
+    void applyScale();
 
     static double clockNow() noexcept { return juce::Time::getMillisecondCounterHiRes() * 0.001; }
 
@@ -111,6 +121,7 @@ private:
     float sceneTime = 0.0f;
     int seenRecallCount = 0, seenSwitchCount = 0;
     bool sunrisePending = true;
+    float hostScale = 1.0f;
 
     // Last, so it can only call advanceFrame() once everything above exists.
     juce::VBlankAttachment vblank;

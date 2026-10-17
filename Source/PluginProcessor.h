@@ -118,6 +118,24 @@ public:
     PresetKind getActivePresetKind() const noexcept { return (PresetKind) activePresetKind.load (std::memory_order_relaxed); }
     int getActivePresetIndex() const noexcept { return activePresetIndex.load (std::memory_order_relaxed); }
 
+    /** True when any of the ten parameters differs from the active preset's
+        stored value - the sound has been edited since the recall (or the
+        other A/B buffer holds something else). Compared, not tracked, so
+        automation, the GUI, an A/B switch and a loaded session all agree.
+        Message thread. */
+    bool isActivePresetModified() const;
+
+    /** The editor's size as a factor of its designed 1080 x 748 (0.75-1.5),
+        per instance and saved with the session; a new instance starts from
+        the size last chosen in any instance (a small settings file beside
+        UserPresets.xml). Message thread. */
+    float getEditorScale() const noexcept { return editorScale; }
+    void setEditorScale (float newScale);
+
+    /** True only the first time an editor opens on this instance: the
+        sunrise plays once, not every time the window is reopened. */
+    bool takeFirstEditorOpen() noexcept { return std::exchange (firstEditorOpen, false); }
+
     /** A/B buffers: two independent snapshots of all 10 parameters. */
     int getActiveBufferIndex() const noexcept { return activeBufferIndex.load (std::memory_order_relaxed); }
     void switchBuffer (int index);
@@ -259,6 +277,10 @@ private:
 
     // --- User preset library (message-thread only - see class-level note).
     std::vector<horizon::UserPreset> userPresets;
+
+    // --- Editor settings (message thread).
+    float editorScale = 1.0f;
+    bool firstEditorOpen = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (HorizonPadAudioProcessor)
 };

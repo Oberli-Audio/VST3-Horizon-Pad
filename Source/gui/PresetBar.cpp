@@ -18,6 +18,21 @@ namespace
     constexpr double kSwapFlashHold = 0.25;
     constexpr float kSwapFlashFade = 0.22f;
 
+    // An active preset whose sound has been edited since: half the gold.
+    constexpr float kEditedHighlight = 0.45f;
+
+    float highlightTarget (bool active, bool edited)
+    {
+        return active ? (edited ? kEditedHighlight : 1.0f) : 0.0f;
+    }
+
+    // Buttons answer a click without taking keyboard focus, so the space bar
+    // keeps reaching the host's transport; Tab still reaches them.
+    void keepFocusWithHost (juce::Button& b)
+    {
+        b.setMouseClickGrabsKeyboardFocus (false);
+    }
+
     int factoryPillWidth (const juce::TextButton& b)
     {
         return juce::jmax (70, b.getButtonText().length() * 9 + 28);
@@ -35,6 +50,7 @@ PresetBar::UserPresetPill::UserPresetPill (juce::String presetName)
     nameButton.setColour (juce::TextButton::textColourOffId, Palette::text);
     nameButton.setTooltip ("Recall \"" + name + "\"");
     nameButton.onClick = [this] { if (onApply != nullptr) onApply(); };
+    keepFocusWithHost (nameButton);
     addAndMakeVisible (nameButton);
 
     deleteButton.setButtonText (juce::String::fromUTF8 ("\xc3\x97")); // "x"
@@ -44,6 +60,8 @@ PresetBar::UserPresetPill::UserPresetPill (juce::String presetName)
     deleteButton.setColour (juce::TextButton::textColourOffId, Palette::cancelBorder); // was textFaint - unreadable against the pill's near-transparent background
     deleteButton.setTooltip ("Delete \"" + name + "\"");
     deleteButton.onClick = [this] { if (onDelete != nullptr) onDelete(); };
+    deleteButton.setTitle ("Delete preset " + name);
+    keepFocusWithHost (deleteButton);
     addAndMakeVisible (deleteButton);
 
     presence.snapTo (1.0f);
@@ -51,7 +69,7 @@ PresetBar::UserPresetPill::UserPresetPill (juce::String presetName)
 
 void PresetBar::UserPresetPill::snapHighlight()
 {
-    highlight.value = active ? 1.0f : 0.0f;
+    highlight.value = highlightTarget (active, modified);
     applyHighlight();
 }
 
@@ -71,7 +89,7 @@ void PresetBar::UserPresetPill::startShrinking()
 
 bool PresetBar::UserPresetPill::advance (float dt)
 {
-    if (highlight.advance (active ? 1.0f : 0.0f, dt, kHighlightIn, kHighlightOut, 2.0e-3f))
+    if (highlight.advance (highlightTarget (active, modified), dt, kHighlightIn, kHighlightOut, 2.0e-3f))
         applyHighlight();
 
     if (! presence.advance (dt, kPresenceOmega, 2.0e-3f))
@@ -151,6 +169,7 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
         // so the toggled-on colour must not add a fill of its own.
         b->setColour (juce::TextButton::buttonOnColourId, juce::Colours::transparentBlack);
         b->onClick = [this, i] { processor.setCurrentProgram (i); refreshFromProcessor(); };
+        keepFocusWithHost (*b);
         presetScrollContent.addAndMakeVisible (b);
     }
 
@@ -162,6 +181,7 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
     saveButton.setColour (juce::TextButton::textColourOffId, Palette::textKnobLabel);
     saveButton.setTooltip ("Save the current sound as a new preset in your library.");
     saveButton.onClick = [this] { beginSavingNewPreset(); };
+    keepFocusWithHost (saveButton);
     addAndMakeVisible (saveButton);
 
     saveNameEditor.setSelectAllWhenFocused (true);
@@ -187,6 +207,7 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
     saveConfirmButton.setColour (juce::TextButton::textColourOffId, Palette::text);
     saveConfirmButton.setTooltip ("Save this preset.");
     saveConfirmButton.onClick = [this] { commitSavingNewPreset(); };
+    keepFocusWithHost (saveConfirmButton);
     saveConfirmButton.setVisible (false);
     addChildComponent (saveConfirmButton);
 
@@ -196,6 +217,7 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
     saveCancelButton.setColour (juce::TextButton::textColourOffId, Palette::cancelBorder);
     saveCancelButton.setTooltip ("Cancel without saving.");
     saveCancelButton.onClick = [this] { cancelSavingNewPreset(); };
+    keepFocusWithHost (saveCancelButton);
     saveCancelButton.setVisible (false);
     addChildComponent (saveCancelButton);
 
@@ -208,8 +230,12 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
         b->setRadioGroupId (0xa5);
         b->setColour (juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
         b->setColour (juce::TextButton::textColourOffId, Palette::textFaint);
+        keepFocusWithHost (*b);
         addAndMakeVisible (b);
     }
+
+    slotAButton.setTitle ("Buffer A");
+    slotBButton.setTitle ("Buffer B");
 
     slotAButton.setToggleState (true, juce::dontSendNotification);
     slotAButton.onClick = [this] { processor.switchBuffer (0); refreshFromProcessor(); };
@@ -231,7 +257,27 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
         swapFlashTimed = false;
         applySwapFlash();
     };
+    swapButton.setTitle ("Copy the active buffer onto the other one");
+    keepFocusWithHost (swapButton);
     addAndMakeVisible (swapButton);
+
+    // --- Previous / next preset: the row shows six of seventeen at once.
+    for (auto* b : { &previousButton, &nextButton })
+    {
+        b->setClickingTogglesState (false);
+        b->getProperties().set ("noBorder", true);
+        b->setColour (juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+        b->setColour (juce::TextButton::textColourOffId, Palette::textKnobLabel);
+        keepFocusWithHost (*b);
+        addAndMakeVisible (b);
+    }
+
+    previousButton.setTitle ("Previous preset");
+    nextButton.setTitle ("Next preset");
+    previousButton.setTooltip ("Previous preset");
+    nextButton.setTooltip ("Next preset - the factory presets, then your own");
+    previousButton.onClick = [this] { stepPreset (-1); };
+    nextButton.onClick = [this] { stepPreset (1); };
 
     syncUserPresetPills();
     refreshFromProcessor();
@@ -239,7 +285,7 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
     // Open on the current state as it is: no fades, no scroll glide.
     for (int i = 0; i < presetButtons.size(); ++i)
     {
-        factoryHighlights[(size_t) i].value = presetButtons[i]->getToggleState() ? 1.0f : 0.0f;
+        factoryHighlights[(size_t) i].value = highlightTarget (presetButtons[i]->getToggleState(), activeModified);
         applyFactoryHighlight (i);
     }
 
@@ -345,8 +391,11 @@ void PresetBar::refreshFromProcessor()
         presetButtons[i]->setToggleState (activeKind == HorizonPadAudioProcessor::PresetKind::factory && i == activeIndex,
                                           juce::dontSendNotification);
 
+    activeModified = processor.isActivePresetModified();
+
     for (int i = 0; i < userPresetPills.size(); ++i)
-        userPresetPills[i]->setActive (activeKind == HorizonPadAudioProcessor::PresetKind::user && i == activeIndex);
+        userPresetPills[i]->setActive (activeKind == HorizonPadAudioProcessor::PresetKind::user && i == activeIndex,
+                                       activeModified);
 
     const auto activeBuffer = processor.getActiveBufferIndex();
     slotAButton.setToggleState (activeBuffer == 0, juce::dontSendNotification);
@@ -423,7 +472,7 @@ void PresetBar::advance (double now, float dt)
 {
     // --- Gold highlight: fades from the old preset to the new one.
     for (int i = 0; i < presetButtons.size(); ++i)
-        if (factoryHighlights[(size_t) i].advance (presetButtons[i]->getToggleState() ? 1.0f : 0.0f,
+        if (factoryHighlights[(size_t) i].advance (highlightTarget (presetButtons[i]->getToggleState(), activeModified),
                                                    dt, kHighlightIn, kHighlightOut, 2.0e-3f))
             applyFactoryHighlight (i);
 
@@ -478,6 +527,35 @@ void PresetBar::advance (double now, float dt)
         if (now >= swapFlashHoldUntil && swapFlash.advance (0.0f, dt, kSwapFlashFade, kSwapFlashFade, 2.0e-3f))
             applySwapFlash();
     }
+}
+
+void PresetBar::stepPreset (int delta)
+{
+    // One list: the factory presets, then the player's own, wrapping round.
+    const auto numFactory = presetButtons.size();
+    const auto total = numFactory + userPresetPills.size();
+
+    if (total <= 0)
+        return;
+
+    auto position = -1;
+
+    switch (processor.getActivePresetKind())
+    {
+        case HorizonPadAudioProcessor::PresetKind::factory: position = processor.getActivePresetIndex(); break;
+        case HorizonPadAudioProcessor::PresetKind::user:    position = numFactory + processor.getActivePresetIndex(); break;
+        case HorizonPadAudioProcessor::PresetKind::none:    break;
+    }
+
+    const auto target = position < 0 ? (delta > 0 ? 0 : total - 1)
+                                     : ((position + delta) % total + total) % total;
+
+    if (target < numFactory)
+        processor.setCurrentProgram (target);
+    else
+        processor.applyUserPreset (target - numFactory);
+
+    refreshFromProcessor();
 }
 
 void PresetBar::applyFactoryHighlight (int index)
@@ -550,6 +628,13 @@ void PresetBar::resized()
     }
 
     r.removeFromRight (14); // gap before the fade zone (see paint())
+
+    // --- Previous / next either side of the scrolling row.
+    constexpr int kArrowWidth = 26;
+    nextButton.setBounds (r.removeFromRight (kArrowWidth));
+    r.removeFromRight (4);
+    previousButton.setBounds (r.removeFromLeft (kArrowWidth));
+    r.removeFromLeft (4);
 
     // --- The scrollable presets row fills whatever's left: factory presets
     // then saved-preset pills, laid out left to right inside

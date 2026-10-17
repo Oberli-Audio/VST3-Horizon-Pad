@@ -125,6 +125,37 @@ ITEMS = [
      "Wider and lusher: still in tune, or seasick? Listen to Clearing, the pad DETUNE moves least.",
      ["--notes=48,55,60,64", "--hold=7", "--tail=3"],
      {"candidate": ["--param=detune=1"]}),
+    # The ends of the register (review 2026-10-17, R-1 to R-3) and Bloom's
+    # movement (D-1). Run these with the SAME build on both sides (--baseline
+    # and --candidate both build-release/HorizonPadSoundTool, --only <ids>):
+    # each pairs the end key with the octave inside it, so the question is
+    # "is the end still music, next to its neighbour?" - X still checks you
+    # can tell them apart, and the preference column records the verdict.
+    ("register_bottom_root", "Root solo: C0 (candidate) against C1",
+     "The lowest key of the register. A note with a pitch, or a wobble? (Roughness 1.25 at C0.)",
+     ["--solo=root", "--hold=6", "--tail=3"],
+     {"baseline": ["--notes=24"], "candidate": ["--notes=12"]}),
+    ("register_bottom_bloom", "Bloom solo: C0 (candidate) against C1",
+     "Bloom is the roughest layer at the bottom (3.6 at C0, 1.8 at C1). Music, or grind?",
+     ["--solo=bloom", "--hold=6", "--tail=3"],
+     {"baseline": ["--notes=24"], "candidate": ["--notes=12"]}),
+    ("register_bottom_blend", "Default patch: open fifth C0-G0-C1 (candidate) against C1-G1-C2",
+     "The whole instrument at the bottom of the register, as a left hand would play it.",
+     ["--hold=6", "--tail=3"],
+     {"baseline": ["--notes=24,31,36"], "candidate": ["--notes=12,19,24"]}),
+    ("register_top_root", "Root solo: C7 (candidate) against C6",
+     "Root loses its pitch above C5 (salience -0.04 at C7): does it sound an octave low, or just thin?",
+     ["--solo=root", "--hold=6", "--tail=3"],
+     {"baseline": ["--notes=84"], "candidate": ["--notes=96"]}),
+    ("register_top_clearing", "Clearing solo: C7 (candidate) against C6",
+     "Clearing is roughest at the top (3.7 at C7): shimmer, or a buzz?",
+     ["--solo=clearing", "--hold=6", "--tail=3"],
+     {"baseline": ["--notes=84"], "candidate": ["--notes=96"]}),
+    ("bloom_movement", "Bloom solo, C3-E4: DETUNE 0% (candidate) against 50%",
+     "Bloom's measured movement halved since DETUNE's default went to 0% (43 -> 25%). "
+     "Did the pad lose its life, or only its beating?",
+     ["--solo=bloom", "--notes=48,55,60,64", "--hold=7", "--tail=3"],
+     {"baseline": ["--param=detune=0.5"], "candidate": ["--param=detune=0"]}),
 ]
 
 _K1 = ([1.53512485958697, -2.69169618940638, 1.19839281085285], [1.0, -1.69065929318241, 0.73248077421585])

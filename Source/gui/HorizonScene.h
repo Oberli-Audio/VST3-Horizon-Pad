@@ -28,10 +28,12 @@ namespace horizon::ui
     The text drawn straight on the panel has to stay readable across the
     whole range. Measured with tools/gui_snapshot (2026-10-07), as designed
     (FILTER 50%) -> golden hour (100%): preset pills 5.3 -> 4.7:1, wordmark
-    3.6 -> 3.35:1 (36 px: large text), footer 2.19 -> 2.12:1 (the design's
-    own weakest spot, which is why golden hour keeps the lower sky and glow
-    at the designed brightness). Every setting below 50% is darker, so
-    higher: at 0% the footer reaches 4.2:1. Re-measure after a palette change.
+    3.6 -> 3.35:1 (36 px: large text). The footer, the design's own weakest
+    spot (2.1-2.2:1 in its original grey-beige), is cream since 2026-10-17:
+    3.8 -> 3.2:1, and 5.9:1 at night - measured against the rows just above
+    and below its glyphs, the brightest pixel. Golden hour still keeps the
+    lower sky and glow at the designed brightness for it. Every setting
+    below 50% is darker, so higher. Re-measure after a palette change.
 
     It fills the window edge to edge, opaque, with a 1 px border along the
     edge. (The design's panel had 24 px rounded corners - right on the dark

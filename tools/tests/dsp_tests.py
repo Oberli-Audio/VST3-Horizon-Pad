@@ -690,6 +690,121 @@ def test_register_is_c0_to_c7():
                        f"{d['levels']['peakDb']:.1f} dBFS peak")
 
 
+def _f0_hz(seg, sr, lo, hi):
+    """The strongest spectral peak between lo and hi Hz, parabolically interpolated."""
+    m = seg.mean(axis=1)
+    spec = np.abs(np.fft.rfft(m * np.hanning(len(m))))
+    f = np.fft.rfftfreq(len(m), 1.0 / sr)
+    k = int(np.argmax(np.where((f > lo) & (f < hi), spec, 0.0)))
+    a, b, c = np.log(spec[k - 1:k + 2] + 1e-30)
+    return (k + 0.5 * (a - c) / (a - 2 * b + c)) * sr / len(m)
+
+
+def test_velocity_curve():
+    """Velocity raises the level at every step, and the softest key is still played (rule 30).
+
+    The curve is 0.35 + 0.65 * sqrt(v) on the voice gain (PluginProcessor::noteOn):
+    gentle for a pad, never silent. Measured 2026-10-17 on the default patch, C4,
+    reverb 0: -31.6 / -27.2 / -25.6 / -24.6 / -23.8 LUFS at velocity 1/127, 0.25,
+    0.5, 0.75, 1 - a 7.8 LU span.
+    """
+    levels = []
+    for v in (1 / 127, 0.25, 0.5, 0.75, 1.0):
+        lv = [lufs(window(render(["--notes=60", f"--seed={seed}", "--param=reverb=0", f"--velocity={v}",
+                                  "--hold=4", "--tail=0.2"])[0], 48000, 2.0, 4.0), 48000) for seed in (3, 4)]
+        levels.append(float(np.mean(lv)))
+    steps = np.diff(levels)
+    if steps.min() < 0.4:
+        raise Fail(f"velocity does not raise the level at every step: {[round(v, 1) for v in levels]} LUFS")
+    span = levels[-1] - levels[0]
+    if not 4.0 <= span <= 12.0:
+        raise Fail(f"velocity 1/127 -> 1 spans {span:.1f} LU (want 4-12: soft keys audible, loud ones not "
+                   f"a jump): {[round(v, 1) for v in levels]}")
+
+
+def test_pitch_bend_range():
+    """The pitch wheel bends +/-2 semitones at its ends, through the real MIDI path (rule 30).
+
+    A 14-bit pitch-wheel message at full throw must move the note by 200
+    cents either way (kPitchBendRangeSemitones). Clearing solo at A3, DETUNE 0,
+    so the fundamental is one clear peak. Measured 2026-10-17: +200.1 / -197.6
+    cents against the unbent note.
+    """
+    common = ["--solo=clearing", "--notes=57", "--seed=3", "--param=reverb=0", "--param=detune=0",
+              "--param=width=0", "--hold=6", "--tail=0.1"]
+    hz = {}
+    for bend in (0.0, 1.0, -1.0):
+        x, sr = render(common + [f"--bend=0:{bend}"])
+        hz[bend] = _f0_hz(window(x, sr, 1.0, 6.0), sr, 150.0, 330.0)
+    for bend, want in ((1.0, 200.0), (-1.0, -200.0)):
+        cents = 1200.0 * np.log2(hz[bend] / hz[0.0])
+        if abs(cents - want) > 5.0:
+            raise Fail(f"pitch wheel at {bend:+.0f} moves the note {cents:+.1f} cents, want {want:+.0f}")
+
+
+def test_mod_wheel_adds_movement():
+    """CC1 (MOD) adds drift on every stack it reaches, sensibly at full throw (rule 30).
+
+    MOD adds kModDriftDepth to each voice's drift. Measured as the pitch spread
+    of one partial of a held C4 (as detune_spreads_every_stack), three seeds,
+    2026-10-17: Root 3.6 -> 12.2, Clearing 6.3 -> 14.5, Bloom 2.5 -> 13.7 cents,
+    level within 0.4 LU. Full MOD must move clearly, stay a drift (under 30
+    cents, not a detuned chorus) and leave the level alone.
+    """
+    partial = {"root": 784.9, "clearing": 1046.5, "bloom": 784.9}
+    for layer, hz in partial.items():
+        spread, level = {}, {}
+        for mod in (0.0, 1.0):
+            s, lv = [], []
+            for seed in (3, 4, 5):
+                x, sr = render([f"--solo={layer}", "--notes=60", f"--seed={seed}", "--param=reverb=0",
+                                "--param=width=0", "--param=filter=0.5", f"--mod=0:{mod}", "--hold=8", "--tail=0.2"])
+                seg = window(x, sr, 3.0, 8.0)
+                s.append(_partial_spread_cents(seg, sr, hz))
+                lv.append(lufs(seg, sr))
+            spread[mod], level[mod] = float(np.mean(s)), float(np.mean(lv))
+        if spread[1.0] < 1.8 * spread[0.0]:
+            raise Fail(f"{layer}: MOD 0 -> 100% only moves the spread from {spread[0.0]:.2f} to {spread[1.0]:.2f} cents")
+        if spread[1.0] > 30.0:
+            raise Fail(f"{layer}: MOD 100% spreads {spread[1.0]:.1f} cents - a detune, not a drift")
+        if abs(level[1.0] - level[0.0]) > 1.0:
+            raise Fail(f"{layer}: MOD 0 -> 100% changes loudness by {level[1.0] - level[0.0]:+.2f} LU")
+
+
+def _hf_db(x, sr, t0, t1, lo=12000.0):
+    from scipy import signal
+    sos = signal.butter(8, lo, "highpass", fs=sr, output="sos")
+    y = signal.sosfilt(sos, window(x, sr, t0, t1).mean(axis=1))[int(0.05 * sr):]
+    return 10 * np.log10(np.mean(y ** 2) + 1e-30)
+
+
+def test_automation_is_zipper_free():
+    """Fast host automation steps per block but sounds smooth (rule 3, definition of done).
+
+    JUCE hosts deliver automation once per block, so a 0.25 s sweep at 512
+    samples is a staircase of ~23 jumps. Every parameter on the audio path is
+    smoothed per sample; an unsmoothed one adds broadband energy at the block
+    rate. Root at C2 has almost nothing above 12 kHz (~-130 dB), so any zipper
+    shows there: during a sweep up and back the band must stay within 3 dB of
+    the louder of the two static ends. Measured 2026-10-17: every sweep sits
+    between its ends, no clicks.
+    """
+    base = ["--notes=48", "--seed=3", "--param=reverb=0", "--hold=6", "--tail=0.1", "--block=512",
+            "--param=clearing=0", "--param=expanse=0", "--param=bloom=0"]
+    for pid, lo, hi in (("root", 0.2, 1.0), ("filter", 0.2, 0.8), ("width", 0.0, 1.0),
+                        ("reverb", 0.0, 0.6), ("detune", 0.0, 1.0)):
+        patch = base + ([] if pid == "root" else ["--param=root=1"])
+        sweep = patch + [f"--param={pid}={lo}", f"--automate={pid}:3.0={lo},3.25={hi},3.5={lo}"]
+        x, sr = render(sweep)
+        d = run(sweep)
+        swept = _hf_db(x, sr, 3.0, 3.5)
+        ends = max(_hf_db(render(patch + [f"--param={pid}={v}"])[0], sr, 3.0, 3.5) for v in (lo, hi))
+        if swept > ends + 3.0:
+            raise Fail(f"{pid}: a fast sweep puts {swept - ends:+.1f} dB above 12 kHz over its static ends (zipper)")
+        if d["safety"]["clickCount"] > 0:
+            raise Fail(f"{pid}: a fast sweep clicks ({d['safety']['clickCount']} discontinuities)")
+
+
 TESTS = {name[5:]: fn for name, fn in sorted(globals().items())
          if name.startswith("test_")}
 

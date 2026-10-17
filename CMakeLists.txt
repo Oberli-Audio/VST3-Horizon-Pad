@@ -314,6 +314,10 @@ else()
         presets_have_worship_envelopes
         low_register_stays_musical
         register_is_c0_to_c7
+        velocity_curve
+        pitch_bend_range
+        mod_wheel_adds_movement
+        automation_is_zipper_free
         bass_is_mono
         width_profile_staggered
         detune_spreads_every_stack)

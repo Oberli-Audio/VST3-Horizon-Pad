@@ -79,15 +79,36 @@ HorizonPadAudioProcessorEditor::HorizonPadAudioProcessorEditor (HorizonPadAudioP
     seenRecallCount = horizonProcessor.getPresetRecallCount();
     seenSwitchCount = horizonProcessor.getBufferSwitchCount();
 
-    // Sunrise on open: everything starts from night and zero here, before
-    // the first paint, so the first frame on screen is already the dark one.
-    // The first advanceFrame() starts the clock.
+    // Sunrise on the first open of this instance: everything starts from
+    // night and zero here, before the first paint, so the first frame on
+    // screen is already the dark one. The first advanceFrame() starts the
+    // clock. Reopening the window later shows the editor as it is.
     pullSceneTargets();
     scene.snapToTargets();
-    scene.prepareSunrise();
-    titleBanner.prepareSunrise();
-    startWave (std::numeric_limits<double>::max(), true);
+
+    if (horizonProcessor.takeFirstEditorOpen())
+    {
+        scene.prepareSunrise();
+        titleBanner.prepareSunrise();
+        startWave (std::numeric_limits<double>::max(), true);
+    }
+    else
+    {
+        sunrisePending = false;
+    }
+
     presetBar.setBackdropColour (scene.skyColourAt (presetRowProportion));
+
+    // Tab walks the controls in reading order: presets, wheels, pads, macros.
+    setFocusContainerType (FocusContainerType::keyboardFocusContainer);
+
+    footerBar.onScaleChosen = [this] (float scale)
+    {
+        horizonProcessor.setEditorScale (scale);
+        applyScale();
+    };
+
+    applyScale();
 
     startTimerHz (30);
 }
@@ -96,6 +117,17 @@ HorizonPadAudioProcessorEditor::~HorizonPadAudioProcessorEditor()
 {
     stopTimer();
     setLookAndFeel (nullptr);
+}
+
+void HorizonPadAudioProcessorEditor::setScaleFactor (float newScale)
+{
+    hostScale = newScale;
+    applyScale();
+}
+
+void HorizonPadAudioProcessorEditor::applyScale()
+{
+    AudioProcessorEditor::setScaleFactor (hostScale * horizonProcessor.getEditorScale());
 }
 
 void HorizonPadAudioProcessorEditor::timerCallback()

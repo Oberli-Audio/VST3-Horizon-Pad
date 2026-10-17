@@ -22,6 +22,14 @@ namespace horizon::ui
         value ring and swell the dot (drawRingKnob()), and getHighlight()
         tells the parent how lit to draw the readout.
 
+    Once bound to its parameter (bindParameter()) it behaves like every
+    DAW knob (UI review 2026-10-17): double-click resets to the parameter's
+    default, right-click opens the host's own menu for that parameter
+    (automation, MIDI mapping; a plain "Reset" menu in the standalone), and
+    it is reachable by Tab with the arrow keys changing it - but a click does
+    not take keyboard focus, so the space bar still reaches the host's
+    transport. Screen readers read its name and the parameter's own text.
+
     The component is `margin` px bigger than the ring on every side so the
     dot's swelling glow is never clipped; hitTest() keeps that margin from
     taking clicks. Message thread only.
@@ -30,6 +38,11 @@ class AnimatedKnob final : public juce::Slider
 {
 public:
     explicit AnimatedKnob (int marginToUse);
+
+    /** Call once the attachment exists: default for double-click, the
+        accessible name, keyboard focus, and the parameter the host's context
+        menu is asked about. */
+    void bindParameter (juce::RangedAudioParameter& parameter, const juce::String& accessibleName);
 
     /** The component bounds for a ring drawn in `ringBounds` (parent coordinates). */
     juce::Rectangle<int> boundsForRing (juce::Rectangle<int> ringBounds) const noexcept { return ringBounds.expanded (margin); }
@@ -61,9 +74,15 @@ public:
 
     void paint (juce::Graphics&) override;
     bool hitTest (int x, int y) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override   { repaint(); }
 
 private:
     void valueChanged() override;
+    void showContextMenu();
+
+    juce::RangedAudioParameter* parameter = nullptr;
 
     const int margin;
 

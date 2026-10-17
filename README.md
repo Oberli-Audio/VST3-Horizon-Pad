@@ -66,7 +66,8 @@ own movement.
 
 ## Parameters
 
-Ten host-automatable parameters (all 0–100%), in this fixed order — four
+Ten host-automatable parameters (all 0–100% of their travel; ATTACK and
+RELEASE read as a time), in this fixed order — four
 volumes, then six macros — so that a controller mapping its first 8 knobs to
 a plugin's first 8 host parameters (e.g. a Launchkey in Live's generic
 Device-knob mode) lands knobs 1–4 on the pad volumes and knobs 5–8 on
@@ -86,10 +87,13 @@ ATTACK/RELEASE/FILTER/REVERB:
 | 10 | Detune | `detuneMacro` |
 
 - **Attack / Release** scale each layer's own designed attack/release time
-  on one exponential curve: 0% is 1% of it (a fast, click-free ~10–25 ms),
-  50% a tenth, 100% the designed time itself. Every 10% of the knob
-  multiplies the time by 1.58, so the short times get most of the travel
-  (since 2026-10-14; before, 50% was the designed time and 100% double).
+  on one exponential curve: from 1% of it at the left end (a fast,
+  click-free ~10–25 ms) to the designed time itself at the right. Every 10%
+  of the knob multiplies the time by 1.58, so the short times get most of
+  the travel. Knob and host show **Root's time** ("0.64 s", "22 ms"; Root
+  goes to 2.20 s attack and 2.40 s release); Bloom is about half as long,
+  Clearing and Expanse a little longer on the attack. You can type a time
+  ("0.5", "500 ms") in the host.
 - **Filter** scales each layer's own cutoff-over-time curve (darker below
   50%, brighter above), ramped per sample rather than stepped once per
   block, so sweeping it under host automation doesn't zipper.
@@ -114,6 +118,27 @@ draggable, and also driven by incoming MIDI pitch-bend / mod wheel (CC1).
 PITCH is spring-loaded (snaps back to centre on release); MOD stays wherever
 it's left. These are intentionally *not* automation lanes — see
 `Source/dsp/PerformanceState.h`.
+
+### The editor
+
+- **Knobs** drag vertically; **double-click** resets to the default;
+  **right-click** opens the host's own menu for that parameter (automation,
+  MIDI mapping) - in the standalone, a "Reset to default" menu. **Tab**
+  walks every control, the arrow keys move the focused one; a mouse click
+  never takes keyboard focus, so the space bar always reaches the host's
+  transport.
+- **Presets**: the arrows either side of the row step through the factory
+  presets and then your own. The active preset is lit gold; once you change
+  the sound it dims to half gold - click it to recall it again.
+- **OUTPUT** reads in dBFS (RMS over 20 ms, ticks at 0 / -6 / -12 / -24 /
+  -48, the line holds the recent peak). It is a reference, not a control;
+  the limiter never lets the output past -0.04 dBFS.
+- **SIZE** (footer, right) scales the window to 75 / 100 / 125 / 150%. The
+  choice is saved with the session and used for the next new instance.
+- The sky follows the sound: FILTER sets the time of day, REVERB hazes the
+  ridge, WIDTH spreads the glow; each pad card glows with its own layer. The
+  first time the editor opens on an instance the sun rises; after that it
+  opens as it is.
 
 ### A/B buffers and user presets
 
@@ -299,6 +324,9 @@ runnable on its own. `descriptors.py` measures whether it is the sound that was
 designed (layer contrast, keyboard range, mix pocket, stereo, movement, preset
 bank) against the baselines in [`docs/baselines/`](docs/baselines/), and
 `register.py` measures how musical each layer stays over the whole register, C0 to C7.
+The sound tool's `--profile` reports worst-case block time against the
+deadline (rule 37), and `--bend`, `--mod` and `--automate` drive the wheels
+and host-style automation through the real MIDI and parameter paths.
 [`tools/listening/make_session.py`](tools/listening/make_session.py) builds a
 blind, loudness-matched A/B/X listening page comparing two builds.
 
@@ -346,24 +374,24 @@ rather than copying them, so it cannot drift from the prototype.
 - **Three hosts, two platforms is 1 of 3.** Ableton Live on macOS is
   confirmed. Windows Ableton and Waveform are outstanding — the last open
   item in G6.
-- **The CPU budget is measured but not met.** 5.03% of one core on an Apple
-  M3 Pro, against a budget written for a 2017-era dual-core i5 where the same
-  load would plausibly be 15–20%. See A-004 in
+- **The CPU budget is not yet checked on its own machine.** On an Apple M3
+  Pro, eight voices at every pad's full volume take 6% of the block deadline
+  at p99 (64 and 128 samples, 2026-10-17); the budget is written for a
+  2017-era dual-core i5, roughly 3-4x slower. See A-004 in
   [`docs/brief.md`](docs/brief.md).
-- **Nothing has been listened to since 2026-09-23**, and several
-  measured-but-unheard changes have landed since — above all Expanse's
-  shimmer, which now transposes and did not before. The full list is in
+- **Listening items are open** - the ends of the register (C0, C7) per
+  layer, and Bloom's movement since DETUNE's default went to 0%. The list
+  and the blind A/B page that plays them are in
   [`docs/gate-status.md`](docs/gate-status.md).
-- **Two open exceptions**, both accepted with written triggers: EX-002
-  (Sternenzelt sits below the loudness-matched bank) and EX-003 (Expanse
-  aliases at MIDI 96–108). See [`docs/exceptions.md`](docs/exceptions.md).
+- **One open exception**, accepted with written triggers: EX-002
+  (Sternenzelt sits below the loudness-matched bank). See
+  [`docs/exceptions.md`](docs/exceptions.md).
 - **Code-signing / notarization**: the macOS `.pkg` is unsigned (no Apple
   Developer ID on this project) — Gatekeeper will warn on first launch (see
   Installing below for the workaround). This needs the project owner's own
   Apple Developer credentials to resolve; out of scope for a code change.
-- **Fixed-size window only** (`setResizable(false, false)`); every child
-  paints its own precise layout rather than scaling a "design surface", so
-  there's no benefit to resizing without a real layout-scaling pass first.
+- **No free resizing**: the window scales in four steps (SIZE, 75-150%),
+  not by dragging its corner.
 - 64-bit (double-precision) audio processing is not implemented —
   `supportsDoublePrecisionProcessing()` is not overridden, so it defaults to
   `false`; hosts running a double-precision graph will process this plugin
@@ -465,7 +493,7 @@ CMakeLists.txt                     JUCE CMake API, FetchContent, juce_add_plugin
 Source/
   PluginProcessor.{h,cpp}          APVTS, voice allocation/stealing, state,
                                     A/B buffers, programs
-  PluginEditor.{h,cpp}             Fixed 1080x748 layout, pixel-accurate to
+  PluginEditor.{h,cpp}             1080x748 layout (scaled by SIZE), pixel-accurate to
                                     the design handoff; the frame loop that
                                     drives every animation
   dsp/
@@ -492,7 +520,7 @@ Source/
     PadKnob.{h,cpp}                One layer's VOL knob, glowing with the layer's level
     MacrosPanel.{h,cpp}            ATTACK/RELEASE/FILTER/REVERB/WIDTH/DETUNE
     WheelSlider.{h,cpp}            PITCH/MOD wheels
-    OutputMeter.{h,cpp}            Live output level (read-only)
+    OutputMeter.{h,cpp}            Live output level in dBFS (read-only)
     FooterBar.{h,cpp}              Bottom strip: wordmark, tagline, buffer/layer/macro counts
 tools/
   install_plugin.sh                Local dev build+install to ~/Library/Audio/Plug-Ins/VST3

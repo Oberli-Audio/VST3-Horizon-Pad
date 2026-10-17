@@ -1,9 +1,12 @@
 # Sound-design v2 - what changed, and what it measured
 
 Branch `sound-design-v2`, started 2026-09-26 from `main` at `bf17ee8`. Answers the
-findings in [`dsp-review-2026-09-26.md`](dsp-review-2026-09-26.md). **Not merged:
-every item here changes the sound and needs the owner's ears first** (playbook
-12.6). The listening list is at the end.
+findings in [`dsp-review-2026-09-26.md`](dsp-review-2026-09-26.md). **Merged into
+`main` on 2026-10-04 (`2724152`)**; the owner's blind passes of 2026-10-06 and
+2026-10-07 then judged it against v1 - verdicts and follow-up changes in
+`gate-status.md`. Kept as
+the record of what v2 changed and measured; the listening list at the end is
+historical.
 
 Reproduce every number with `tools/measure/descriptors.py` (four seeds per figure)
 against `docs/baselines/descriptors-main-bf17ee8.json`, which is `main`'s DSP
@@ -16,7 +19,7 @@ measured with the fixed tool.
 | 1 | Review findings S-1 to S-9 fixed, tests, preset loudness restored | **done** (below) |
 | 2 | Low register: measure why low notes stop being musical, fix it | **done** (below) |
 | 3 | Playbook v2.2 (review lessons + drums, bass, harmonic, melodic, register) | **done** (below) |
-| 4 | Blind A/B listening kit | pending |
+| 4 | Blind A/B listening kit | **done** (`tools/listening/make_session.py`, used 2026-10-06 and 2026-10-07) |
 
 ## Step 1 - what changed
 

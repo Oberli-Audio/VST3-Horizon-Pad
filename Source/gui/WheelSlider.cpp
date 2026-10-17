@@ -31,6 +31,12 @@ WheelSlider::WheelSlider (HorizonPadAudioProcessor& processorToUse, Kind kindToU
 
     slider.setDoubleClickReturnValue (true, 0.0);
 
+    // Reachable by Tab and read by screen readers; a click does not take
+    // keyboard focus, so the space bar still reaches the host's transport.
+    slider.setTitle (kind == Kind::pitch ? "Pitch bend" : "Mod wheel");
+    slider.setWantsKeyboardFocus (true);
+    slider.setMouseClickGrabsKeyboardFocus (false);
+
     slider.setTooltip (kind == Kind::pitch
         ? "Pitch bend - drag to bend, springs back to centre on release (also follows an external MIDI pitch wheel)."
         : "Mod wheel - adds extra analog-style pitch drift on top of each layer's own baseline (also follows an external MIDI mod wheel, CC1).");

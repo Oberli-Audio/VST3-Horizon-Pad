@@ -23,7 +23,8 @@ psychoacoustic reasons, each measured here per layer and per note:
                  pitch; it falls when unresolved harmonics and slow phasing
                  blur the period, which is how a low note stops sounding like
                  a note.
-  side_low_db    Energy of the side signal (L-R)/2 below 150 Hz relative to the
+  side_low_db    (null when the note has nothing below 150 Hz)
+                 Energy of the side signal (L-R)/2 below 150 Hz relative to the
                  mid below 150 Hz. Bass should be mono: a PA sums it, and a
                  stereo sub reads as phasey.
 
@@ -124,13 +125,22 @@ def describe(x, f0):
     b, a = signal.butter(4, 150, fs=SR)
     lo_mid = signal.lfilter(b, a, mono)
     lo_side = signal.lfilter(b, a, side)
-    side_low = float(10 * np.log10((lo_side ** 2).mean() / ((lo_mid ** 2).mean() + 1e-20) + 1e-12))
+    # A note from about C5 up has nothing of its own below 150 Hz: what the
+    # 4th-order low-pass lets through is the fundamental's skirt, 40+ dB
+    # down, and the side/mid ratio of that is not a bass measurement
+    # (review 2026-10-17, R-5: Clearing read +3.7 dB at C7). n/a then.
+    low_share = (lo_mid ** 2).mean() / ((mono ** 2).mean() + 1e-20)
+    side_low = (float(10 * np.log10((lo_side ** 2).mean() / ((lo_mid ** 2).mean() + 1e-20) + 1e-12))
+                if low_share > 1e-4 else None)
     return {"roughness": roughness(fr, am), "wobble_pct": wobble(mono), "salience": salience(mono, f0),
             "harmonics": centroid / f0, "mud_share_db": mud, "side_low_db": side_low}
 
 
 def mean_of(dicts):
-    return {k: round(float(np.mean([d[k] for d in dicts])), 3) for k in dicts[0]}
+    def avg(k):
+        vals = [d[k] for d in dicts if d[k] is not None]
+        return round(float(np.mean(vals)), 3) if vals else None   # None: n/a (see side_low_db)
+    return {k: avg(k) for k in dicts[0]}
 
 
 def main():

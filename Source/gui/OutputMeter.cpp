@@ -20,12 +20,27 @@ namespace
     constexpr float kFallSeconds = 0.30f;
     constexpr double kPeakHoldSeconds = 1.2;
     constexpr float kPeakFallPerSecond = 0.33f;
+
+    // Ticks on the scale, dBFS. The labels sit left of the track.
+    constexpr std::array<float, 5> kTicksDb { 0.0f, -6.0f, -12.0f, -24.0f, -48.0f };
+    constexpr int kTickLabelWidth = 26;
+
+    const juce::String minus = juce::String::fromUTF8 ("\xe2\x88\x92");   // a real minus sign
+
+    juce::String dbText (int db)
+    {
+        if (db == std::numeric_limits<int>::min())
+            return minus + juce::String::fromUTF8 ("\xe2\x88\x9e") + " dB";   // "-inf dB"
+
+        return (db < 0 ? minus + juce::String (-db) : juce::String (db)) + " dB";
+    }
 }
 
 OutputMeter::OutputMeter (HorizonPadAudioProcessor& processorToUse)
     : processor (processorToUse)
 {
-    setTooltip ("Live output level (RMS) - a reference only, not a control.");
+    setTooltip ("Output level in dBFS - RMS over 20 ms, with a line holding the recent peak. "
+                "A reference only, not a control; the output never goes over -0.04 dBFS.");
 }
 
 juce::Rectangle<float> OutputMeter::trackArea() const
@@ -65,7 +80,7 @@ void OutputMeter::advance (double now, float dt)
     const auto levelMoved = std::abs (level - shownLevel) * pixels >= 1.0f || (level <= 0.0f && shownLevel > 0.0f);
     const auto peakMoved = std::abs (peakLevel - shownPeak) * pixels >= 1.0f
                          || peakVisible (peakLevel, level) != peakVisible (shownPeak, shownLevel);
-    const auto percent = juce::roundToInt (level * 100.0f);
+    const auto db = level > 0.0f ? juce::roundToInt (level * -kFloorDb + kFloorDb) : std::numeric_limits<int>::min();
 
     if (levelMoved || peakMoved)
     {
@@ -75,9 +90,9 @@ void OutputMeter::advance (double now, float dt)
         repaint (track.getSmallestIntegerContainer().expanded (1));
     }
 
-    if (percent != shownPercent)
+    if (db != shownDb)
     {
-        shownPercent = percent;
+        shownDb = db;
         shownAt = now;
         repaint (computeColumnSlots (getLocalBounds()).value);
     }
@@ -105,6 +120,25 @@ void OutputMeter::paint (juce::Graphics& g)
     g.setColour (Palette::meterBg);
     g.fillRoundedRectangle (track, 11.0f);
 
+    // --- dB scale: short ticks and labels left of the track.
+    {
+        const auto inner = track.reduced (1.0f);
+        g.setFont (labelFont (11.0f));
+
+        for (auto tick : kTicksDb)
+        {
+            const auto y = inner.getBottom() - inner.getHeight() * (tick - kFloorDb) / -kFloorDb;
+            g.setColour (Palette::textDim);
+            g.fillRect (juce::Rectangle<float> (track.getX() - 6.0f, y - 0.5f, 4.0f, 1.0f));
+
+            const auto label = juce::Rectangle<float> (track.getX() - 8.0f - (float) kTickLabelWidth,
+                                                       y - 7.0f, (float) kTickLabelWidth, 14.0f)
+                                   .withY (juce::jlimit (inner.getY() - 3.0f, inner.getBottom() - 11.0f, y - 7.0f));
+            g.drawText (tick < 0.0f ? minus + juce::String (juce::roundToInt (-tick)) : juce::String ("0"),
+                        label.toNearestInt(), juce::Justification::centredRight);
+        }
+    }
+
     const auto level = shownLevel;
     auto fill = track.reduced (1.0f);
     const auto inner = fill;
@@ -129,7 +163,7 @@ void OutputMeter::paint (juce::Graphics& g)
 
     g.setColour (Palette::textValue);
     g.setFont (labelFont (TypeScale::value, true));
-    g.drawText (juce::String (shownPercent) + "%", slots.value, juce::Justification::centred);
+    g.drawText (dbText (shownDb), slots.value, juce::Justification::centred);
 }
 
 } // namespace horizon::ui

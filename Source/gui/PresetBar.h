@@ -27,6 +27,14 @@ namespace horizon::ui
     stay in fixed slots outside that viewport so they're always reachable,
     never pushed off by how many presets exist.
 
+    Since the UI review of 2026-10-17: arrows either side of the row step
+    to the previous and next preset (factory, then your own) - the row shows
+    six of seventeen at once; the active preset's pill dims to half its gold
+    once the sound is edited away from it (isActivePresetModified()), and a
+    click on it recalls it again; and no button here takes keyboard focus on
+    a click, so the space bar keeps reaching the host's transport (Tab still
+    reaches every one).
+
     Motion (advance(), one call per editor frame): the gold highlight fades
     from the old preset to the new one, the row scrolls the active preset
     into view when it changes from elsewhere (the host, a save), a saved
@@ -67,7 +75,7 @@ private:
         void paint (juce::Graphics&) override;
         void resized() override;
 
-        void setActive (bool shouldBeActive) noexcept { active = shouldBeActive; }
+        void setActive (bool shouldBeActive, bool edited) noexcept { active = shouldBeActive; modified = edited; }
         void snapHighlight();
 
         void startGrowing();
@@ -93,7 +101,7 @@ private:
         // corner afterthought.
         static constexpr int kDeleteButtonWidth = 34;
 
-        bool active = false, shrinking = false;
+        bool active = false, modified = false, shrinking = false;
         motion::Follower highlight;    // 0..1, the gold
         motion::Spring presence;       // 0..1, width and opacity while growing/shrinking
         juce::TextButton nameButton, deleteButton;
@@ -110,6 +118,7 @@ private:
     void scrollToShow (juce::Component* target, bool animate);
     void applyFactoryHighlight (int index);
     void applySwapFlash();
+    void stepPreset (int delta);
 
     HorizonPadAudioProcessor& processor;
 
@@ -132,6 +141,10 @@ private:
     juce::TextButton slotAButton { "A" };
     juce::TextButton slotBButton { "B" };
     juce::TextButton swapButton { juce::String::fromUTF8 ("\xe2\x87\x84") }; // unicode left-right arrows
+
+    juce::TextButton previousButton { juce::String::fromUTF8 ("\xe2\x80\xb9") };   // single angle quotes
+    juce::TextButton nextButton { juce::String::fromUTF8 ("\xe2\x80\xba") };
+    bool activeModified = false;
 
     // --- Motion state.
     int shownPresetKind = -1, shownPresetIndex = -1;

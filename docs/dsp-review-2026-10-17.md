@@ -157,3 +157,15 @@ below -0.9 dBTP from a -1 dBTP master, MP3 without clipped samples.
 | register_bottom | Each layer solo at C0 and C1, and the blend at C0-E0-G0: music, or a wobble with a pitch? (R-1) |
 | register_top | Clearing solo at C7 and Root solo at C6-C7: Root sounding an octave low, Clearing's 3.7 roughness. (R-2, R-3) |
 | bloom_movement | Bloom with DETUNE 0% against 50%: did the pad lose its life, or only its beating? (D-1) |
+
+## Resolution (2026-10-17, same day)
+
+| Item | Done | Evidence |
+|---|---|---|
+| Rule 30 - mappings untested | Four tests through the real MIDI and parameter paths: `velocity_curve` (each step louder, 7.8 LU from 1/127 to 127), `pitch_bend_range` (+200.1 / -197.6 cents at full throw, within 5), `mod_wheel_adds_movement` (drift spread x2.3-x5.5, under 30 cents, level within 1 LU), `automation_is_zipper_free` (five parameters swept at full speed in 512-sample steps stay within their static ends above 12 kHz, no clicks). The sound tool gained `--bend`, `--mod` and `--automate` for them | Each fails on a scratch build with the matching defect (velocity ignored, bend range 12, MOD depth 0, volume unsmoothed: +43.6 dB above 12 kHz) |
+| Rule 35 - RTSan stale | Rebuilt from a fresh JUCE copy; suite re-run under it | Gate status, G6 row |
+| Rule 37 - block time | `--profile` in the sound tool (the harness contract's name) (the scratch harness of 2026-10-14 is gone; its 20% p99 is superseded). 8 voices, every pad at full volume, REVERB 50%, 30 s, M3 Pro, three runs: **p99 6% of the deadline at 64 and at 128 samples** (81 / 158 us). Maxima 16-42% in most runs; single blocks reached 100-150% once per ~25,000, at a different time in every run - a non-realtime test thread being preempted, not the DSP | Budget machine still owed (A-004) |
+| Rules 4, 33 - limiter at 1x | Documented as deliberate beside the code, with a B.5 rate comparison on the pathological patch: the 48 kHz render's excess over 192 kHz is the same with the limiter working (-14.5 / -21.1 dB) and linear (-14.3 / -22.3 dB) - the instrument's own rate-dependent drift, not folding | `PluginProcessor.cpp`, output stage |
+| R-5 - side metric on high notes | `register.py` reports n/a where the band below 150 Hz is only the fundamental's filter skirt (40 dB or more down): Clearing C5-C7 | - |
+| R-1, R-2, R-3, D-1 | Listening items in `make_session.py` (`register_bottom_root`, `register_bottom_bloom`, `register_bottom_blend`, `register_top_root`, `register_top_clearing`, `bloom_movement`), each the end key against the octave inside it, same build both sides | Owner |
+| No zipper test | `automation_is_zipper_free` above | - |

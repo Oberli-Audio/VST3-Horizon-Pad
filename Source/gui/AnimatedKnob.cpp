@@ -35,6 +35,52 @@ AnimatedKnob::AnimatedKnob (int marginToUse)
     setBufferedToImage (true);
 }
 
+void AnimatedKnob::bindParameter (juce::RangedAudioParameter& parameterToUse, const juce::String& accessibleName)
+{
+    parameter = &parameterToUse;
+
+    setDoubleClickReturnValue (true, (double) parameter->convertFrom0to1 (parameter->getDefaultValue()));
+    setTitle (accessibleName);
+    setWantsKeyboardFocus (true);
+    setMouseClickGrabsKeyboardFocus (false);
+}
+
+void AnimatedKnob::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu() && parameter != nullptr)
+    {
+        showContextMenu();
+        return;
+    }
+
+    juce::Slider::mouseDown (e);
+}
+
+void AnimatedKnob::showContextMenu()
+{
+    if (auto* editor = findParentComponentOfClass<juce::AudioProcessorEditor>())
+    {
+        if (auto* host = editor->getHostContext())
+        {
+            if (auto menu = host->getContextMenuForParameter (parameter))
+            {
+                menu->showNativeMenu (editor->getMouseXYRelative());
+                return;
+            }
+        }
+    }
+
+    // No host menu (the standalone, or a host without one): reset is the
+    // one thing every knob offers.
+    juce::PopupMenu menu;
+    menu.addItem ("Reset to default", [safe = juce::Component::SafePointer<AnimatedKnob> (this)]
+    {
+        if (safe != nullptr)
+            safe->setValue (safe->getDoubleClickReturnValue(), juce::sendNotificationSync);
+    });
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
 void AnimatedKnob::syncDisplay()
 {
     display.snapTo ((float) valueToProportionOfLength (getValue()));
@@ -99,6 +145,13 @@ void AnimatedKnob::paint (juce::Graphics& g)
                   findColour (juce::Slider::rotarySliderFillColourId),
                   findColour (juce::Slider::rotarySliderOutlineColourId),
                   hover.value, drag.value);
+
+    // Keyboard focus (Tab): a thin ring just outside the knob, in its colour.
+    if (hasKeyboardFocus (false))
+    {
+        g.setColour (findColour (juce::Slider::rotarySliderFillColourId).withAlpha (0.85f));
+        g.drawEllipse (getLocalBounds().reduced (margin).toFloat().expanded ((float) margin - 1.5f), 1.5f);
+    }
 }
 
 bool AnimatedKnob::hitTest (int x, int y)
