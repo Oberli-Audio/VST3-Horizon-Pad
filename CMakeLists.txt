@@ -105,7 +105,7 @@ target_link_libraries(HorizonPad
 # HorizonPadSoundTool
 #
 # An offline render+analysis CLI for the sound-design iteration loop (see
-# tools/sound_tool/Main.cpp and .claude/agents/sound-designer.md). It links
+# tools/sound_tool/Main.cpp). It links
 # directly against the "HorizonPad" target - the same static "SharedCode"
 # library (its build output is literally named libHorizon Pad_SharedCode.a,
 # via juce_add_plugin()'s internal _juce_set_output_name call) that the VST3

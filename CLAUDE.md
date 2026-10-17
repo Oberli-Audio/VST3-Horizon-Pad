@@ -318,20 +318,6 @@ playbook 12.5 log. **A failed measurement is either fixed or gets a dated,
 named exception** — it is not negotiable by whoever wrote the code. `brief.md`
 is owner-confirmed: do not edit the YAML, add a dated amendment beneath it.
 
-## Working on DSP sound quality
-
-For "make layer X sound like Y" / artifact-hunting / tone-shaping tasks on
-the four layers or `FxChain`, prefer the `sound-designer` subagent
-(`.claude/agents/sound-designer.md`) — it drives the render→measure→edit→
-rebuild→re-render loop against `HorizonPadSoundTool` with defined tolerances
-for run-to-run variance (each layer seeds its RNG from system entropy per
-voice, so renders are not bit-identical run to run; `levels.rms` is the
-stable metric, `levels.peak` and spectral ratios can swing widely and need
-2–3 renders averaged). It treats `Source/PluginProcessor.h/.cpp`,
-`Source/dsp/LayerBase.h`, `Source/dsp/FxChain.h/.cpp`,
-`Source/presets/Presets.h`, and `Source/gui/` as off-limits without explicit
-permission, staying inside individual layer `.h`/`.cpp` files.
-
 ## DSP work
 
 Invariants load automatically for `Source/**` and `*.dsp` (`~/.claude/rules/dsp-invariants.md`, installed from `~/bob-skills/rules/`). For design, porting, measurement, testing, review or release, and for any defect, use the **sound-design-bob** skill (synced from claude.ai; source and playbook in `~/bob-skills`). It carries the Quelle Music DSP playbook (v3.6 at 2026-10-17) in its `references/`: the core card `dsp-playbook-core.md` (read whole; section 0 maps tasks to recipes), the reference split into `dsp-selection.md` (S, algorithm choice), `dsp-foundations.md` (F), `dsp-instruments.md` (I), `dsp-effects.md` (E), `dsp-control.md` (C), `dsp-analysis.md` (A) and `dsp-development.md` (D: real-time safety, performance, testing, CI, host contract, licensing, agent workflow, task recipes) - grep them, never read them whole - and `dsp-sound-design-playbook.md` as the index. Its `scripts/dsp-kit/` holds the tested measurement library (`dspkit.py`), the harness contract new products follow, a test scaffold and the document templates. For the plugin editor, ux-ui-design-bob runs alongside on the same tier, gates and parameter table.

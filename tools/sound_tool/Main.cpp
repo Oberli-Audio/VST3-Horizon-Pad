@@ -12,8 +12,7 @@
 
     This exists so a sound-design iteration loop (change DSP source -> build
     -> render -> analyze -> compare -> repeat) can run unattended, without a
-    human listening to every candidate render. See .claude/agents/sound-designer.md
-    for the agent that drives this tool.
+    human listening to every candidate render.
 
     Usage examples
     --------------
