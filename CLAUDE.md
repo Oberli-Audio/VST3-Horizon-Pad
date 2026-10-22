@@ -236,10 +236,13 @@ slot each block, so a chord stays coherent across all four layers.
 
 ### Parameters and thread-safety model
 
-Ten host-automatable APVTS parameters (all 0–100%) in fixed order: 4
-volumes, 6 macros (Attack/Release/Filter/Reverb/Width/Detune, `MacroIndex`) — see
-`Source/presets/Presets.h` for the parameter IDs and README's Parameters
-table for the full semantics of each macro. All are smoothed
+Ten host-automatable APVTS parameters (all 0-100, raw values in the host and
+the state since state version 2) in fixed order: 4 volumes, 6 macros
+(Attack/Release/Filter/Reverb/Width/Detune, `MacroIndex`). `parameters.csv` is
+the source: it generates `Source/Params.h` (IDs, tooltips, smoothing) and
+`docs/parameters.md`; the layout itself is hand-written (EX-005) and checked
+against it by `parameter_table_matches_plugin`. DEVELOPING.md's Parameters
+section has the full semantics of each macro; the friends' README is D.9.9's. All are smoothed
 (`juce::SmoothedValue`) somewhere on their path to audio.
 
 - Host parameters live in an `AudioProcessorValueTreeState`; audio thread

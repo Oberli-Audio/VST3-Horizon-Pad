@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [main]
+    tags: ["v*"]          # a version tag builds the release (ship-bob github-releases.md)
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -61,7 +62,9 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ matrix.generator }}-fetchcontent-
 
       - name: Configure
-        run: cmake -B build -G "${{ matrix.generator }}" ${{ matrix.generator_args }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+        # The release settings of CMakePresets.json `release`: symbols kept beside the
+        # binary and the shipped binary stripped, the static MSVC runtime.
+        run: cmake -B build -G "${{ matrix.generator }}" ${{ matrix.generator_args }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DHORIZON_RELEASE_SYMBOLS=ON "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded" 
 
       - name: Build VST3
         run: cmake --build build --target HorizonPad_VST3 --config ${{ env.BUILD_TYPE }}
@@ -94,6 +97,47 @@ jobs:
         with:
           name: HorizonPad-VST3-${{ matrix.name }}
           path: ${{ matrix.vst3_path }}
+          if-no-files-found: error
+
+      # Release assets (ship-bob release-recipe.md steps 5-7): version-free names, the
+      # licence files inside each zip, the symbols of this build, build-info per platform.
+      - name: Sign, zip and record (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd build/HorizonPad_artefacts/Release
+          rm -rf stage && mkdir -p stage
+          for b in VST3/*.vst3; do
+            xattr -cr "$b"
+            codesign --force --sign - "$b"
+            codesign --verify --deep --strict --verbose=2 "$b"
+            lipo -archs "$b/Contents/MacOS/"*
+            cp -R "$b" stage/
+          done
+          cp "$GITHUB_WORKSPACE/LICENSE" "$GITHUB_WORKSPACE/THIRD_PARTY_NOTICES.md" stage/
+          ditto -c -k --norsrc --noextattr stage "$GITHUB_WORKSPACE/HorizonPad-macOS.zip"
+          ditto -c -k --norsrc --noextattr --keepParent VST3/*.dSYM "$GITHUB_WORKSPACE/HorizonPad-symbols-macOS.zip"
+          python3 "$GITHUB_WORKSPACE/scripts/ship/buildinfo.py" emit --repo "$GITHUB_WORKSPACE" --build "$GITHUB_WORKSPACE/build" \
+            --platform macos --symbols VST3/*.dSYM --out "$GITHUB_WORKSPACE/build-info-macOS.json"
+
+      - name: Zip and record (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build/HorizonPad_artefacts/Release/VST3/Horizon Pad.vst3", LICENSE, THIRD_PARTY_NOTICES.md -DestinationPath HorizonPad-Windows-x64.zip
+          $pdbs = Get-ChildItem build/HorizonPad_artefacts/Release -Recurse -Filter *.pdb
+          if (-not $pdbs) { throw "no PDB: the release build must keep symbols (HORIZON_RELEASE_SYMBOLS)" }
+          Compress-Archive -Path $pdbs.FullName -DestinationPath HorizonPad-symbols-Windows.zip
+          Copy-Item scripts/ship/enable-crashdumps.reg .
+          python scripts/ship/buildinfo.py emit --repo . --build build --platform windows --symbols $pdbs.FullName --out build-info-Windows.json
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.name }}
+          path: |
+            HorizonPad-*.zip
+            build-info-*.json
+            enable-crashdumps.reg
           if-no-files-found: error
 
   package-macos:
@@ -301,3 +345,40 @@ jobs:
 
       - name: Run the test suite
         run: ctest --test-dir build -LE validation --output-on-failure
+
+  # A version tag (v*) becomes a draft GitHub Release with the assets above
+  # (ship-bob github-releases.md, release-recipe.md step 8); publishing it stays a click.
+  release:
+    name: Draft release (tags only)
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, validate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true          # flat: dist/HorizonPad-macOS.zip, not dist/release-macOS/...
+      - name: Checksums by basename
+        run: |
+          cd dist
+          for f in *.zip *.pkg; do [ -f "$f" ] && sha256sum "$f"; done > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Assets are what the README promises
+        run: python3 scripts/ship/shipcheck.py release-assets dist --repo .
+      - name: Release notes from the changelog
+        run: python3 scripts/ship/shipcheck.py changelog-section . > dist/RELEASE_NOTES.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: ${{ contains(github.ref, '-') }}
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/*.zip
+            dist/enable-crashdumps.reg
+            dist/SHA256SUMS.txt
+            dist/build-info-*.json
+
