@@ -39,12 +39,16 @@ here (the owner fixes the skills).
 9. [x] U.4 About panel (Diagnostics, AboutPanel, DocsData; test about_copy_is_fourteen_lines).
 10. [x] U.5 code ok (Live row: owner); U.6 Browse menu + import/export/drop (test
     preset_file_round_trip); U.7 --reopen=20 flat at 47 MB (Live row: owner); U.8 German quick start.
-11. [ ] R.1 pass, R.2 clean-clone preset build ok (lipo x86_64 arm64), R.3 only "not tagged",
-    R.4 blocked only by shipcheck's removed-parameter false positives, R.5 README from D.9.9 +
-    DEVELOPING.md, R.9 message ok, R.10 docs/feedback.md, R.11 Issues off + main protected.
-    R.6/R.7: dry run v0.0.0-test (second run after the MSVC fix, 0a23018) - check the draft's
-    assets with release-assets, then DELETE the draft and the tag. R.8: owner (Live 10.1 Rosetta).
-12. [ ] Findings table into the Round 14 doc; skill-bug list for the owner.
+11. [x] R.1 pass, R.2 fixed, R.3 pass, R.4 open (shipcheck's removed-parameter false positives),
+    R.5 fixed, R.6 fixed (dry run v0.0.0-test, second run after an MSVC fix in AboutPanel), R.7
+    fixed (release-assets OK; found and fixed the deployment target: CI built for macOS 14.0,
+    now 10.13 / 11.0, test vst3_runs_on_macos_10_13; build-info clean), R.8 open (owner, Live),
+    R.9 pass, R.10 fixed, R.11 fixed. Draft releases and the test tag deleted.
+12. [x] Findings table in the Round 14 doc (rev 5), with the skill-bug list and the owner's items.
+
+Round 14 is done on the repo side. Open for the owner: the Live checks (U.1, U.5, U.7, R.8),
+EX-010 (cream text on the active pill), EX-011 (+/-1 LU or a 1 LU span), the README's feedback
+mail address; the skill fixes in ~/bob-skills.
 
 Notes: caffeinate -i every long run (the Mac idle-sleeps and CTest times out); the tool's LTO link
 takes ~10 min; scratch preset root via HORIZON_PRESET_ROOT; x86_64 harness wrapper exec's
