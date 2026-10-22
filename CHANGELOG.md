@@ -20,7 +20,7 @@ The first versioned build for friends.
 ### Changed
 - **State format 2:** the ten parameters are saved in 0..100 (they were 0..1), with the format and sound version in every session and preset. Sessions saved with earlier test builds are migrated when they open; projects saved with 0.1.0 will not open correctly in older versions.
 - Lagerfeuer is the Init preset and opens first in the bank.
-- The active preset's name is cream on its gold pill, easier to read than gold on gold.
+- The active preset's pill is darker, with its gold border and a cream name, so it reads on every sky (gold on gold was hard to read).
 - The host sees one program; the presets live in the plugin's own preset row.
 - Built with JUCE 8.0.16, whose VST 3 SDK is MIT-licensed. No sound change: all 17 factory presets null against the previous build within -130 dBFS.
 

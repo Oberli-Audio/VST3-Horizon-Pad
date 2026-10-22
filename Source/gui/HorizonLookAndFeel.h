@@ -42,6 +42,9 @@ namespace Palette
     // Pills (preset/user-preset/tab/save buttons).
     const juce::Colour pillBorder       { 0xb22d333d };
     const juce::Colour pillActiveBg     { 0x29f5ae39 };
+    // Under the active pill's gold tint: the card colour, so the pill stays dark enough for
+    // its cream text on the brightest skies (EX-010, owner 2026-10-22); scaled by the highlight.
+    const juce::Colour pillActiveShade  { 0x9910141b };
     const juce::Colour pillInactiveUserBg { 0x08ffffff };
     const juce::Colour saveInputBg      { 0x0affffff };
     const juce::Colour saveConfirmBorder{ 0xff5bbd74 };

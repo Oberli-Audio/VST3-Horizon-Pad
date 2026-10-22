@@ -496,6 +496,20 @@ above 7:1 on every sky) - a change to the pill's look, the owner's call.
 
 - **Unacceptable if:** any sky takes the active pill below 3.5:1.
 
+### Resolution
+
+**Closed 2026-10-22, owner: the active pill gets a darker fill.** Under its 16 % gold tint the
+active pill now lays a card-coloured shade (`Palette::pillActiveShade`, #10141B at 60 %, scaled
+by the highlight); the gold border and the cream name stay. Pill text against its own fill,
+direct pixel reading (`snapshot_contrast.py` medians agree):
+
+| Sky | Pill | Cream on the gold tint | Cream on the shade (now) |
+|---|---|---|---|
+| Init, FILTER 30 % (default) | active | 5.02:1 | **8.04:1** |
+| FILTER 0 % (dusk) | edited | 10.0:1 | 11.11:1 |
+| FILTER 100 % (golden hour) | edited | 4.0-4.3:1 | **5.95:1** |
+| Goldstaub, FILTER 80 % | active | 3.85:1 | **7.22:1** |
+
 ---
 
 ## EX-011 - The factory bank spans 1.54 LU; presetlint's Tier P limit is a 1.00 LU span

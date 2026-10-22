@@ -124,7 +124,12 @@ void PresetBar::UserPresetPill::paint (juce::Graphics& g)
     const auto corner = juce::jmin (bounds.getHeight(), bounds.getWidth()) * 0.5f;
     const auto amount = highlight.value;
 
-    g.setColour (Palette::pillInactiveUserBg.interpolatedWith (Palette::pillActiveBg, amount));
+    // As a factory pill: the card-coloured shade under the gold tint when active (EX-010).
+    g.setColour (Palette::pillInactiveUserBg.withMultipliedAlpha (1.0f - amount));
+    g.fillRoundedRectangle (bounds, corner);
+    g.setColour (Palette::pillActiveShade.withMultipliedAlpha (amount));
+    g.fillRoundedRectangle (bounds, corner);
+    g.setColour (Palette::pillActiveBg.withMultipliedAlpha (amount));
     g.fillRoundedRectangle (bounds, corner);
 
     g.setColour (Palette::pillBorder.interpolatedWith (Palette::gold, amount));

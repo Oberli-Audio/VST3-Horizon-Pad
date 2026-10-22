@@ -64,6 +64,11 @@ void HorizonLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& 
 
         if (amount > 0.001f)
         {
+            // A card-coloured shade first, then the gold tint: the sky behind can be
+            // golden-hour bright, and the cream name must stay readable (EX-010).
+            g.setColour (Palette::pillActiveShade.withMultipliedAlpha (amount));
+            g.fillRoundedRectangle (bounds, corner);
+
             auto activeFill = Palette::pillActiveBg.withMultipliedAlpha (amount);
 
             if (shouldDrawButtonAsDown)
