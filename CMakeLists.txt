@@ -5,6 +5,14 @@ cmake_minimum_required(VERSION 3.25)
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" PRODUCT_VERSION LIMIT_COUNT 1)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
 
+# The oldest macOS the plugin runs on (ship-bob versioning-and-provenance.md: 10.13;
+# arm64 cannot go below 11.0). Must be set before project(): after it, an entry CMake has
+# already created empty wins, and every build took the build machine's own macOS (14.0
+# on the CI runner, 26.0 locally) until 2026-10-22 (test vst3_runs_on_macos_10_13).
+if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version" FORCE)
+endif()
+
 project(HorizonPad VERSION ${PRODUCT_VERSION} LANGUAGES C CXX)
 
 math(EXPR HORIZON_VERSION_CODE
@@ -44,8 +52,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if (APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
-
     # Universal binary: one .vst3 bundle that runs natively on both Apple
     # Silicon and Intel Macs (CMake/lipo does the fat-binary linking). Only
     # set a default if the caller hasn't already picked architectures
@@ -452,6 +458,14 @@ else()
         set_tests_properties(harness_contract_${tier} PROPERTIES TIMEOUT 900 LABELS ${tier} RUN_SERIAL TRUE
                              ENVIRONMENT "HARNESS=$<TARGET_FILE:HorizonPadSoundTool>;HORIZON_PRESET_ROOT=${CMAKE_CURRENT_BINARY_DIR}/test-presets")
     endforeach()
+endif()
+
+# The shipped binary runs on the macOS the README promises (10.13, arm64 11.0).
+if (APPLE AND Python3_Interpreter_FOUND)
+    add_test(NAME vst3_runs_on_macos_10_13
+             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/tests/check_deployment_target.py"
+                     "$<TARGET_FILE:HorizonPad_VST3>")
+    set_tests_properties(vst3_runs_on_macos_10_13 PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 
 # Host-compatibility validation (playbook G6, D.3-D.5): the Steinberg validator and

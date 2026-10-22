@@ -59,3 +59,12 @@ desktop.ini
 # ---- Python ----------------------------------------------------------------
 __pycache__/
 *.pyc
+
+# ---- Release assets CI writes into the checkout (a release is built from a clean tree:
+# untracked files here made buildinfo.py record the tag's build as dirty) ----
+/HorizonPad-*.zip
+/build-info-*.json
+/SHA256SUMS.txt
+/RELEASE_NOTES.md
+/enable-crashdumps.reg
+/dist/

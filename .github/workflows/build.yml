@@ -111,6 +111,7 @@ jobs:
             codesign --force --sign - "$b"
             codesign --verify --deep --strict --verbose=2 "$b"
             lipo -archs "$b/Contents/MacOS/"*
+            python3 "$GITHUB_WORKSPACE/tools/tests/check_deployment_target.py" "$b/Contents/MacOS/"*
             cp -R "$b" stage/
           done
           cp "$GITHUB_WORKSPACE/LICENSE" "$GITHUB_WORKSPACE/THIRD_PARTY_NOTICES.md" stage/

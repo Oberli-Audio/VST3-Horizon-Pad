@@ -24,4 +24,5 @@ The first versioned build for friends.
 - Built with JUCE 8.0.16, whose VST 3 SDK is MIT-licensed. No sound change: all 17 factory presets null against the previous build within -130 dBFS.
 
 ### Fixed
+- The macOS plugin needed the newest macOS of the machine that built it (14.0 from the release build); it runs on macOS 10.13 and newer again.
 - A host block larger than the size announced to the plugin rendered silence for the rest of that block; it now renders in full.

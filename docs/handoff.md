@@ -13,7 +13,7 @@ here (the owner fixes the skills).
   corrupted-state test, goldens replaced only after a null test shows the audio unchanged;
   changelog carries a state-format note, not "Sounds different". ATTACK/RELEASE keep their
   hand-written time display (paramgen has no display column yet; the owner fixes the skill).
-- Plugin codes stay Qumu / Hzpd / com.quellemusic.horizonpad (README codes table: STILL TO ADD, S.2).
+- Plugin codes stay Qumu / Hzpd / com.quellemusic.horizonpad (README codes table added with the D.9.9 rewrite).
 - dspVersion in the state, getNumPrograms() = 1, editor scale machine-local only.
 - Presets as files now (S.4): .quellepreset per preset, Factory/ per version, User/.
 
@@ -33,17 +33,17 @@ here (the owner fixes the skills).
 7. [x] S.7 perf under Rosetta -> EX-007; docs/perf.md. S.8 goldens tools/tests/golden (x86_64,
    bit-identical to the pre-round build). S.9 test output_dc_and_knee. S.10 CHANGELOG.md.
    S.11 EX-002 amended, EX-004..EX-007 written.
-8. [x] U.1 200 % step, tooltip fixed (EX-008 still to write: content-component transform, the plugin
+8. [x] U.1 200 % step, tooltip fixed (EX-008: content-component transform, the plugin
    drives setScaleFactor). U.2 docs/brand-sheet.md (EX-009 footer 3.54:1, EX-010 active pill
-   3.19:1 still to write). U.3 tooltips from Params::tooltipFor (+ setHelpText).
-9. [ ] U.4 About panel: Source/Diagnostics.*, Source/gui/AboutPanel.*, footer AboutButton, DocsData;
-   snapshot --about/--licences, tool --diagnostics, test about_copy_is_fourteen_lines.
-   HorizonPadGuiSnapshot BUILT OK (exit 0); NEXT: build HorizonPadSoundTool + VST3, run the
-   test, snapshot --about to look at the panel, full ctest.
-10. [ ] U.5 (code ok; host row is the owner's), U.6 (plan: a presets menu - categories, Factory/User,
-    Import..., Export...), U.7 (plan: snapshot --reopen=20 proxy), U.8 German quick start
-    (load writing-bob first).
-11. [ ] R.1-R.11 (R.6 test tag and R.11 repo settings are outward-facing: ask first; R.8 needs Live).
+   3.19:1); EX-011 bank loudness span. U.3 tooltips from Params::tooltipFor (+ setHelpText).
+9. [x] U.4 About panel (Diagnostics, AboutPanel, DocsData; test about_copy_is_fourteen_lines).
+10. [x] U.5 code ok (Live row: owner); U.6 Browse menu + import/export/drop (test
+    preset_file_round_trip); U.7 --reopen=20 flat at 47 MB (Live row: owner); U.8 German quick start.
+11. [ ] R.1 pass, R.2 clean-clone preset build ok (lipo x86_64 arm64), R.3 only "not tagged",
+    R.4 blocked only by shipcheck's removed-parameter false positives, R.5 README from D.9.9 +
+    DEVELOPING.md, R.9 message ok, R.10 docs/feedback.md, R.11 Issues off + main protected.
+    R.6/R.7: dry run v0.0.0-test (second run after the MSVC fix, 0a23018) - check the draft's
+    assets with release-assets, then DELETE the draft and the tag. R.8: owner (Live 10.1 Rosetta).
 12. [ ] Findings table into the Round 14 doc; skill-bug list for the owner.
 
 Notes: caffeinate -i every long run (the Mac idle-sleeps and CTest times out); the tool's LTO link
