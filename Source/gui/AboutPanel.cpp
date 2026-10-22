@@ -52,7 +52,11 @@ AboutPanel::AboutPanel()
     {
         juce::SystemClipboard::copyTextToClipboard (lines.joinIntoString ("\n"));
         copyButton.setButtonText ("Copied");
-        juce::Timer::callAfterDelay (1500, [safe = juce::Component::SafePointer<AboutPanel> (this)]
+
+        // Made here, not as an init-capture of the inner lambda: MSVC reads
+        // `this` there as the outer lambda (C2440).
+        juce::Component::SafePointer<AboutPanel> safe (this);
+        juce::Timer::callAfterDelay (1500, [safe]
         {
             if (safe != nullptr)
                 safe->copyButton.setButtonText ("Copy diagnostics");

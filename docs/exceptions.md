@@ -474,3 +474,30 @@ reading the text, and the same name is shown again, larger, under the wordmark o
 
 Cream text (#F3E6C8, the preset title's colour) on the active pill, keeping the gold border and
 fill: about 4.9:1 on the same background by calculation, to be confirmed on the renders.
+
+---
+
+## EX-011 - The factory bank spans 1.54 LU; presetlint's Tier P limit is a 1.00 LU span
+
+- **Date:** 2026-10-22
+- **Raised by:** Claude, Round 14 (S.4, `presetlint.py render`)
+- **Rule / target:** presetlint render at Tier P: loudness max minus min within 1.00 LU; the
+  owner-confirmed brief: every preset within +/-1 LU of the bank
+- **Status:** OPEN - the two targets disagree; the owner decides which one the bank answers to
+
+### What failed, and by how much
+
+`presetlint.py render presets.csv parameters.csv --tier P` (one seeded render each, chord
+48-55-60-64, 6 s, gate 4 s): spread **1.54 LU**; farthest Frostklang +0.70 and Glasperle
++0.99 LU from the bank. Against the brief every preset is inside +/-1 LU, Glasperle at the edge.
+
+### Why shipping this way is acceptable for now
+
+The brief's +/-1 LU is the owner's target and the bank meets it on this measurement; the
+skill's help says "within 1 LU" while its code applies a 1 LU span, which is a skill question.
+
+### What would make it unacceptable
+
+- Any preset more than 1.0 LU from the bank median on presetlint's render, or more than
+  3.0 LU for Sternenzelt (EX-002).
+- The owner adopting the 1.00 LU span: then Glasperle and Frostklang are rebalanced first.

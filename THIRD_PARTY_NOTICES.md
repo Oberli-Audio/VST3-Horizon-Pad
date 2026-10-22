@@ -1,6 +1,6 @@
 # Third-party notices - Horizon Pad
 
-Generated 2026-10-21 by ship-bob notices.py from notices.toml. Do not edit by hand; edit the manifest.
+Generated 2026-10-22 by ship-bob notices.py from notices.toml. Do not edit by hand; edit the manifest.
 
 This product bundles or is built with the components below. Each keeps its own licence; the full texts follow. The product's own terms are in `LICENSE`.
 
