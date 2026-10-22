@@ -60,6 +60,7 @@ def read_max(runs, block, fs):
 
 
 def measure_cell(harness, preset, fs, block, a):
+    K.ARCH = a.arch or K.ARCH        # a native harness is started under `arch -x86_64`; Python stays native
     runs = [profile(harness, preset, fs, block, a) for _ in range(a.runs)]
     archs = {r["arch"] for r in runs}
     if a.arch and archs != {a.arch}:
@@ -234,7 +235,7 @@ def main(argv=None):
     s.add_argument("--budget-p999", type=float, default=25.0)
     s.add_argument("--budget-max", type=float, default=50.0)
     s.add_argument("--idle-pct", type=float, default=2.0)
-    s.add_argument("--arch", help="assert applied.build.arch, e.g. x86_64")
+    s.add_argument("--arch", help="the slice the host runs, e.g. x86_64: the harness is started under `arch -x86_64` on macOS and applied.build.arch is asserted; Python itself stays native")
     s.add_argument("--machine", help="machine tag for the baseline (default hostname)")
     s.add_argument("--baseline")
     s.add_argument("--write-baseline", action="store_true")

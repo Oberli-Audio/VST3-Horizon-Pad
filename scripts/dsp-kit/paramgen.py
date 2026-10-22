@@ -29,7 +29,7 @@ CONTRACT = 1
 TYPES = {"float", "int", "choice", "bool"}
 KINDS = {"plain", "macro", "modtarget", "bypass"}
 FORMAT_KINDS = {"time", "hz", "db", "percent", "cents", "semitones", "note", "ratio",
-                "choice", "bool", "plain"}
+                "choice", "bool", "plain", "custom"}   # custom: the project supplies Display::custom (id, v) and parse
 SMOOTHING_DOMAINS = {"linear", "log", "db", "crossfade", ""}
 CONTROL_RATES = {"sample", "block", "event", ""}
 REQUIRED = ["id", "name", "type", "min", "max", "default"]          # Tier S minimum
@@ -38,6 +38,7 @@ OPTIONAL_DEFAULTS = {
     "centre": "", "bipolar": "N", "choices": "", "steps": "", "format_kind": "", "precision": "",
     "parse_aliases": "", "automatable": "Y", "smoothing": "", "smoothing_domain": "",
     "control_rate": "block", "meaning": "", "tooltip": "", "notes": "",
+    "display_scale": "",   # shown value = raw * display_scale (raw 0..1 shown as 0..100 %: 100); default 1
 }
 ID_RE = re.compile(r"^[a-z][a-zA-Z0-9]*$")
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -121,6 +122,13 @@ def read_table(path: Path | str | io.TextIOBase) -> list[dict]:
             p["format_kind"] = _guess_format(p)
         if p["format_kind"] not in FORMAT_KINDS:
             errors.append(f"{where}: format_kind must be one of {sorted(FORMAT_KINDS)}")
+        try:
+            p["fscale"] = float(p["display_scale"]) if str(p["display_scale"]).strip() else 1.0
+            if p["fscale"] <= 0:
+                raise ValueError
+        except ValueError:
+            errors.append(f"{where}: display_scale must be a positive number")
+            p["fscale"] = 1.0
         if p["smoothing_domain"] not in SMOOTHING_DOMAINS:
             errors.append(f"{where}: smoothing_domain must be one of {sorted(SMOOTHING_DOMAINS - {''})}")
         if p["control_rate"] not in CONTROL_RATES:
@@ -177,7 +185,7 @@ def _guess_format(p):
 
 def _default_precision(p):
     return {"time": 2, "hz": 1, "db": 1, "percent": 0, "cents": 0, "semitones": 0,
-            "note": 0, "ratio": 2, "plain": 2, "choice": 0, "bool": 0}[p["format_kind"]]
+            "note": 0, "ratio": 2, "plain": 2, "choice": 0, "bool": 0, "custom": 2}[p["format_kind"]]
 
 
 def juce_vst3_param_id(sid: str) -> int:
@@ -235,6 +243,9 @@ def string_from_value(p, v: float) -> str:
         return p["choice_list"][int(round(v))]
     if k == "bool":
         return "On" if v >= 0.5 else "Off"
+    if k == "custom":        # the project's hook owns the text; the table only knows the raw value
+        return f"{sign}{_fmt(v * p['fscale'], n)}{(' ' + p['unit']) if p['unit'] else ''}"
+    v = v * p["fscale"]      # display scale: raw 0..1 shown as 0..100 %
     if k == "time":          # table values in seconds (unit s) or ms (unit ms); display switches
         secs = v / 1000.0 if p["unit"].lower() == "ms" else v
         if abs(secs) < 1.0:
@@ -323,10 +334,11 @@ def value_from_string(p, text: str) -> float | None:
             return None
     elif k == "ratio":
         v = x
-    elif k in ("db", "percent", "cents", "semitones", "plain"):
+    elif k in ("db", "percent", "cents", "semitones", "plain", "custom"):
         v = x
     else:
         return None
+    v = v / p["fscale"]
     return snap(p, v)
 
 
@@ -371,7 +383,10 @@ def emit_juce(params, namespace="Params") -> str:
     for p in params:
         w(f'inline constexpr const char* {p["id"]} = "{p["id"]}";')
     w("")
-    w("inline juce::String fmt (double v, int decimals) { return juce::String (v, decimals); }")
+    if any(p["format_kind"] == "custom" for p in params):
+        w("// format_kind custom: the project defines these two (one translation unit), e.g. a root-time readout for ATTACK")
+        w("namespace Display { juce::String custom (const char* id, float raw); float parse (const char* id, const juce::String& text); }")
+    w("inline juce::String fmt (double v, int decimals) { return decimals <= 0 ? juce::String (juce::roundToInt (v)) : juce::String (v, decimals); }   // decimals 0 = rounded integer, as paramgen's Python prints it")
     w("")
     w("inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()")
     w("{")
@@ -453,6 +468,12 @@ def cppf(x: float) -> str:
 def _cpp_string_lambda(p) -> str:
     k, n = p["format_kind"], p["precision_n"]
     sign = 'juce::String (v > 0 ? "+" : "") + ' if p["bipolar"] == "Y" else ""
+    if k == "custom":
+        return f'[] (float v, int) {{ return Display::custom ("{p["id"]}", v); }}'
+    scale = f" * {cppf(p['fscale'])}" if p["fscale"] != 1.0 else ""
+    if k not in ("time", "hz", "db", "note", "choice", "bool") and scale:
+        unit = {"percent": " %", "cents": " ct", "semitones": " st", "ratio": ":1"}.get(k, f" {p['unit']}" if p["unit"] else "")
+        return f"[] (float v, int) {{ return {sign}fmt (v{scale}, {n}) + \"{unit}\"; }}"
     if k == "time":
         to_s = "v / 1000.0" if p["unit"].lower() == "ms" else "v"
         return (f"[] (float v, int) {{ double s = {to_s}; return std::abs (s) < 1.0 ? "
@@ -472,6 +493,8 @@ def _cpp_string_lambda(p) -> str:
 
 def _cpp_parse_lambda(p) -> str:
     k = p["format_kind"]
+    if k == "custom":
+        return f'[] (const juce::String& s) {{ return Display::parse ("{p["id"]}", s); }}'
     body = ['juce::String t = s.trim().replace (",", ".").toLowerCase();']
     if k == "db":
         body.append(f'if (t == "-inf" || t == "-inf db" || t == "off") return {cppf(p["fmin"])};')
@@ -487,7 +510,7 @@ def _cpp_parse_lambda(p) -> str:
                 'for (int i = 0; i < 12; ++i) if (t.toLowerCase().startsWith (n[i])) return (float) ((t.getTrailingIntValue() + 1) * 12 + i); '
                 'return (float) t.getFloatValue();']
     else:
-        body.append("return (float) x;")
+        body.append("return (float) x;" if p["fscale"] == 1.0 else f"return (float) (x / {cppf(p['fscale'])});")
     return "[] (const juce::String& s) { " + " ".join(body) + " }"
 
 
@@ -652,11 +675,14 @@ def check_frozen(params, frozen_params) -> list[str]:
     return errors
 
 
-def check_table(params) -> list[str]:
-    """Lints that are policy, not validity."""
+def check_table(params, kind="effect") -> list[str]:
+    """Lints that are policy, not validity. kind: effect (default) or instrument (no bypass expected)."""
     warnings = []
-    if not any(p["kind"] == "bypass" for p in params):
-        warnings.append("no bypass row: JUCE will add its own with an ID you do not control (D.5.1)")
+    if kind != "instrument" and not any(p["kind"] == "bypass" for p in params):
+        warnings.append("no bypass row: JUCE will add its own with an ID you do not control (D.5.1); an instrument passes --kind instrument")
+    for p in params:
+        if p["format_kind"] == "percent" and p["fmax"] <= 1.0 and p["fscale"] == 1.0:
+            warnings.append(f"{p['id']}: percent with range {p['min']}..{p['max']} shows '0.5 %'; set display_scale 100 (raw stays 0..1) or make the range 0..100")
     core = [p for p in params if p["core"] == "Y"]
     if not 3 <= len(core) <= 5:
         warnings.append(f"{len(core)} core controls; the brief asks for 3-5")
@@ -706,6 +732,24 @@ def selftest() -> int:
     params = read_table(io.StringIO(SAMPLE_CSV))
     errs = check_roundtrip(params)
     warn = check_table(params)
+    # display_scale: raw 0..1 shown as percent, round trip through the text, C++ carries the scale
+    scaled = SAMPLE_CSV.replace("tooltip,notes", "tooltip,notes,display_scale").replace(
+        "mix,1,float,plain,Mix,Mix,Output,Y,%,0,100,35,,N,,0,percent,0,,Y,20,linear,block,dry / balanced / wet,Dry to wet balance (equal power),",
+        "mix,1,float,plain,Mix,Mix,Output,Y,%,0,1,0.35,,N,,0,percent,0,,Y,20,linear,block,dry / balanced / wet,Dry to wet balance (equal power),,100")
+    sp = {q["id"]: q for q in read_table(io.StringIO(scaled))}
+    assert string_from_value(sp["mix"], 0.477) == "48 %", string_from_value(sp["mix"], 0.477)
+    assert abs(value_from_string(sp["mix"], "48 %") - 0.48) < 1e-9
+    assert "Range 0 % to 100 %, default 35 %." in tooltip_suffix(sp["mix"])
+    cpp_scaled = emit_juce(list(sp.values()))
+    assert "v * 100.0f" in cpp_scaled and "x / 100.0f" in cpp_scaled and "roundToInt" in cpp_scaled
+    plain = read_table(io.StringIO(SAMPLE_CSV.replace("mix,1,float,plain,Mix,Mix,Output,Y,%,0,100,35", "mix,1,float,plain,Mix,Mix,Output,Y,%,0,1,0.35")))
+    assert any("display_scale 100" in w for w in check_table(plain)), "0..1 percent without a scale must warn"
+    assert not any("bypass" in w for w in check_table([q for q in params if q["kind"] != "bypass"], "instrument"))
+    # custom: the hook is declared, the lambdas call it
+    custom = SAMPLE_CSV.replace("preDelay,1,float,plain,Pre-delay,PreDly,Space,N,ms,0,120,15,20,N,,0,time,1,s,",
+                                "preDelay,1,float,plain,Pre-delay,PreDly,Space,N,ms,0,120,15,20,N,,0,custom,1,s,")
+    cpp_custom = emit_juce(read_table(io.StringIO(custom)))
+    assert 'Display::custom ("preDelay", v)' in cpp_custom and "namespace Display" in cpp_custom
     # a broken table must be refused
     broken = SAMPLE_CSV.replace("size,1,float", "Size,1,float")
     try:
@@ -772,7 +816,7 @@ def selftest() -> int:
         print("paramgen selftest FAILED:\n  " + "\n  ".join(errs), file=sys.stderr)
         return 1
     print(f"paramgen selftest OK: {len(params)} sample parameters, round trip at 101 points, "
-          f"lint rejects bad tables, frozen and harness diffs catch defects, {len(warn)} policy warning(s) on the sample")
+          f"lint rejects bad tables, frozen and harness diffs catch defects, display_scale and custom formats round-trip, {len(warn)} policy warning(s) on the sample")
     return 0
 
 
@@ -794,6 +838,7 @@ def main(argv=None) -> int:
             s.add_argument("--frozen", help="parameters.csv of the last shared build")
             s.add_argument("--strict", action="store_true", help="policy warnings fail too")
             s.add_argument("--manual", help="committed docs/parameters.md; fails when stale")
+            s.add_argument("--kind", choices=("effect", "instrument"), default="effect", help="instrument: no bypass row expected")
     sub.add_parser("selftest")
     sub.add_parser("sample").add_argument("-o", "--out")
     a = ap.parse_args(argv)
@@ -813,7 +858,7 @@ def main(argv=None) -> int:
         text = emit_manual(params, a.product)
     else:
         errors = check_roundtrip(params)
-        warnings = check_table(params)
+        warnings = check_table(params, getattr(a, 'kind', 'effect'))
         if a.list_params:
             with open(a.list_params, encoding="utf-8") as f:
                 errors += check_harness(params, json.load(f))

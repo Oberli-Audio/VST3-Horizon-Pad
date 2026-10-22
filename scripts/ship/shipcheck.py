@@ -23,8 +23,9 @@ Checks (references/shipcheck.md):
               THIRD_PARTY_NOTICES.md equals what the manifest generates.
   presets     presets/<slug>.* files on disk equal presets.csv (slugs, no extras, no missing);
               docs/presets.md (if present) names every preset.
-  params      no parameter ID absent from parameters.csv is referenced in README, CHANGELOG
-              or docs/*.md as `id` in backticks (a removed parameter must not survive in prose).
+  params      no parameter ID absent from parameters.csv is referenced in README, CHANGELOG,
+              docs/parameters.md or docs/presets.md as `id` in backticks (a removed parameter
+              must not survive in the friend-facing prose; engineering notes are not scanned).
   version     VERSION is x.y.z; the git tag v<VERSION>, if any, points at HEAD.
   license     a LICENSE file exists and carries the four things the README promises: free to use,
               the music is yours, presets you save are yours, all other rights reserved; no warranty.
@@ -210,7 +211,8 @@ def check_params(repo):
         return ["parameters.csv missing"]
     ids = {r["id"].strip() for r in read_csv(csvp)}
     errs = []
-    files = [repo / "README.md", repo / "CHANGELOG.md"] + sorted((repo / "docs").glob("*.md")) if (repo / "docs").exists() else [repo / "README.md", repo / "CHANGELOG.md"]
+    # friend-facing documents only: engineering notes under docs/ are full of code names that are not parameters
+    files = [repo / "README.md", repo / "CHANGELOG.md", repo / "docs" / "parameters.md", repo / "docs" / "presets.md"]
     for f in files:
         if not f.exists():
             continue
@@ -442,13 +444,20 @@ def message_text(repo):
     name = cfg.get("product", {}).get("name", "the plugin")
     gh = cfg.get("product", {}).get("repo", "<owner>/<repo>")
     sec = changelog_section(repo, version) or ""
-    bullets = [l.strip()[2:].strip() for l in sec.splitlines() if l.strip().startswith(("- ", "* "))]
+    bullets = []
+    for l in sec.splitlines():
+        s = l.strip()
+        if s.startswith(("- ", "* ")):
+            bullets.append(s[2:].strip())
+        elif s and bullets and not s.startswith("#") and (l.startswith((" ", "\t"))):
+            bullets[-1] += " " + s                      # a wrapped bullet continues on indented lines
+    bullets = [b.rstrip(".") for b in bullets]
     sounds = [b for b in bullets if "sounds different" in b.lower()]
     new = [b for b in bullets if b not in sounds][:3]
     state_bump = cfg.get("release", {}).get("state_version_bumped")
     lines = ["%s %s is out: https://github.com/%s/releases/latest" % (name, version, gh), ""]
     if new:
-        lines.append("New: " + "; ".join(new))
+        lines.append("New: " + "; ".join(new) + ".")
     if sounds:
         lines.append(re.sub(r"\*\*", "", sounds[0]))
     lines += ["",

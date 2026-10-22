@@ -14,8 +14,10 @@ Profiles - pick by tier and occasion (playbook D.3.6):
   quick   every change that touches the host interface: DSP tests, Steinberg
           validator, pluginval strictness 5 (the host-compatibility floor)
   full    before a merge or release - Tier P's G6: DSP tests, Steinberg
-          validator, pluginval strictness 10 at all six sample rates and seven
-          block sizes, with a fixed, logged seed; RTSan suite if built
+          validator, pluginval strictness 10 at all six sample rates and eight
+          block sizes, with a fixed, logged seed; RTSan suite if built. The
+          release gate runs it twice: plain, and --sanitizer asan against the
+          asan build (D.1.6)
   soak    nightly or before a Tier F release: everything in full, plus pluginval
           strictness 10 repeated 5x in random order with a fresh seed (fuzzing
           state and parameters; the seed is logged so any failure reproduces)
@@ -240,7 +242,8 @@ def count_pluginval(out):
     """Tests started and the verdict line, parsed from the 1.x log (D.5.7): the summary names
     them, so a run that silently tested nothing is visible."""
     started = len(re.findall(r"^Starting test", out, re.M))
-    passed = bool(re.search(r"ALL TESTS PASSED", out))
+    # pluginval 1.0.x prints "SUCCESS" (and "FAILED" on failure); older builds "ALL TESTS PASSED"
+    passed = bool(re.search(r"^(SUCCESS|ALL TESTS PASSED)\b", out, re.M))
     return started, passed
 
 
@@ -260,7 +263,7 @@ def step_pluginval(a, logs, prof):
     ok = code == 0 and verdict and started > 0
     return ok, "strictness %d, seed %s, %d tests started%s%s%s" % (prof["level"], a.seed, started,
         ", rates %s" % prof["rates"] if prof["rates"] else ", default rates",
-        "" if verdict else ", no ALL TESTS PASSED line",
+        "" if verdict else ", no SUCCESS line",
         ("; " + " | ".join(fails)) if fails else "")
 
 
@@ -304,12 +307,16 @@ def main():
     ap.add_argument("--timeout-ms", type=int, default=60000, help="pluginval: max silence per test")
     ap.add_argument("--sanitizer", choices=("none", "asan", "tsan"), default="none",
                     help="the plugin and pluginval are built with this sanitizer: timeouts x10, PLUGINVAL must point at a "
-                         "from-source build (the signed download cannot load the runtime); Tier F")
+                         "from-source build (the signed download cannot load the runtime). Tier P's release gate runs "
+                         "the full profile once plain and once with --sanitizer asan (D.1.6); tsan is Tier F")
     ap.add_argument("--step-timeout", type=int, default=3600, help="seconds per pluginval run")
     ap.add_argument("--out", help="log folder (default build-validation/<timestamp>)")
     ap.add_argument("--strict", action="store_true",
                     help="a skipped step is a failure (CI: a missing tool must not pass silently)")
-    a = ap.parse_args()
+    argv = sys.argv[1:]
+    if argv and argv[0] in PROFILES:          # `validate_plugin.py full --plugin ...` reads as --profile full
+        argv = ["--profile", argv[0]] + argv[1:]
+    a = ap.parse_args(argv)
 
     prof = PROFILES[a.profile]
     if a.pins:

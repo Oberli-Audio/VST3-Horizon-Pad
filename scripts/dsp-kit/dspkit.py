@@ -11,6 +11,7 @@ Run `python3 test_dspkit.py` after any change.
 Requires numpy and scipy. Python 3.9+.
 """
 import json
+import os
 import math
 import subprocess
 import sys
@@ -351,7 +352,42 @@ def max_click_db(x, fs=None):
     step = float(np.max(np.abs(np.diff(x, axis=0)))) if x.shape[0] > 1 else 0.0
     return float(db(step / pk))
 
+def dropout_db(ref, x, fs, win_s=0.005, floor_dbfs=-60.0):
+    """Largest level drop of x against ref over short windows, in dB (positive = x quieter).
+
+    Both signals framed into win_s windows; windows where ref is below floor_dbfs are ignored
+    (silence is allowed to differ). A block-size bug that renders part of a block silent shows
+    as a drop of 20 dB or more in one window while the whole-file RMS barely moves; that is why
+    this is windowed. Returns 0.0 when x is never quieter than ref."""
+    ref, x = as_2d(ref), as_2d(x)
+    n = min(ref.shape[0], x.shape[0])
+    w = max(int(win_s * fs), 8)
+    worst = 0.0
+    for i in range(0, n - w + 1, w):
+        r = float(np.sqrt(np.mean(ref[i:i + w] ** 2)))
+        if r <= 0 or db(r) < floor_dbfs:
+            continue
+        s = float(np.sqrt(np.mean(x[i:i + w] ** 2)))
+        worst = max(worst, float(db(r) - db(max(s, 1e-12))))
+    return worst
+
+
 # ---------------------------------------------------------------- harness contract
+
+ARCH = None   # set to "x86_64" (perf.py --arch, presetlint --arch, DSPKIT_ARCH) to run a native harness under Rosetta
+
+
+def harness_cmd(harness):
+    """The command that starts the harness. On macOS, when ARCH names a slice other than the one
+    Python runs on, the harness is started through `arch -<slice>`; Python itself stays native
+    (numpy is arm64-only on an Apple Silicon machine, so `arch -x86_64 python3` cannot work)."""
+    cmd = [sys.executable, str(harness)] if str(harness).endswith(".py") else [str(harness)]
+    import platform
+    want = ARCH or os.environ.get("DSPKIT_ARCH")
+    if want and sys.platform == "darwin" and want != platform.machine():
+        cmd = ["arch", "-" + want] + cmd
+    return cmd
+
 
 def render(harness, params=None, **flags):
     """Run an offline renderer that follows harness-contract.md; return its JSON.
@@ -362,9 +398,7 @@ def render(harness, params=None, **flags):
     Exit 3 (NaN/Inf, contract) returns the JSON with res["_exit"] = 3 so a test can assert
     on health; any other failure raises.
     """
-    cmd = [str(harness)]
-    if str(harness).endswith(".py"):
-        cmd = [sys.executable, str(harness)]
+    cmd = harness_cmd(harness)
     for k, v in flags.items():
         for one in (v if isinstance(v, (list, tuple)) else [v]):
             cmd.append("--%s=%s" % (k.replace("_", "-"), one))
@@ -382,7 +416,7 @@ def render(harness, params=None, **flags):
 
 def list_presets(harness):
     """`--list-presets` as the contract defines it: [{"slug", "name", "category"}, ...]."""
-    cmd = ([sys.executable, str(harness)] if str(harness).endswith(".py") else [str(harness)]) + ["--list-presets"]
+    cmd = harness_cmd(harness) + ["--list-presets"]
     out = subprocess.run(cmd, capture_output=True, text=True, check=True)
     return json.loads(out.stdout)
 
@@ -402,3 +436,43 @@ def assert_echo(result, params=None, arch=None, **flags):
         if got is not None and str(got) != str(v):
             raise AssertionError("harness applied %s=%r, asked for %r" % (k, got, v))
     return True
+
+
+# ---------------------------------------------------------------- command line
+
+def smoke(harness, arch=None):
+    """`dspkit.py smoke <harness> [--arch x86_64]`: the contract's minimum, in one go. Lists the presets,
+    renders one second of the first preset at 48 k/64 with a profile, checks the echo (rule 28), the
+    arch, and that the output is finite and not silent. The real harness passes this before
+    presetlint and perf are worth running."""
+    global ARCH
+    if arch:
+        ARCH = arch
+    presets = list_presets(harness)
+    assert presets and all(k in presets[0] for k in ("slug", "name", "category")), "--list-presets must return [{slug,name,category}]"
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        out = os.path.join(d, "s.wav")
+        flags = dict(seed=1, sample_rate=48000, block=64, seconds=1.0, profile=1, out=out, preset=presets[0]["slug"], notes="60,64")
+        res = render(harness, **flags)       # --notes is a contract flag; an effect harness renders its own test input and echoes it
+        assert_echo(res, arch=arch, seed=1, sample_rate=48000, block=64)
+        x, fs = read_wav(out)
+        assert fs == 48000, "wrote %d Hz, asked 48000" % fs
+        assert np.isfinite(x).all(), "NaN/Inf in the render"
+        assert float(np.max(np.abs(x))) > 1e-6, "silent render of the first preset"
+        for k in ("p999_pct", "max_pct", "over_deadline", "worst_block_at_s", "first_block_pct"):
+            assert k in res.get("profile", {}), "profile lacks %s (contract v3)" % k
+        assert res.get("applied", {}).get("build", {}).get("arch"), "applied.build.arch missing"
+    print("dspkit smoke OK: %d presets, %s rendered on %s, profile p99.9 %.1f %%" % (
+        len(presets), presets[0]["slug"], res["applied"]["build"]["arch"], res["profile"]["p999_pct"]))
+    return 0
+
+
+if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="dspkit: a library; `smoke <harness>` checks a harness against the contract")
+    ap.add_argument("cmd", choices=("smoke",))
+    ap.add_argument("harness")
+    ap.add_argument("--arch", help="the slice the host runs (x86_64 under Rosetta); the harness is started under arch -<slice>")
+    a = ap.parse_args()
+    sys.exit(smoke(a.harness, a.arch))

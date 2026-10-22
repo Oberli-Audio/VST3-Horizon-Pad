@@ -91,8 +91,18 @@ class RateAndBlock(Timed):
         self.assertEqual(res["health"]["nan"], 0)
 
     def test_block_larger_than_announced(self):                            # D.5.1
-        res = run(block=1024, max_block=256, seconds=0.5)
-        self.assertEqual(res["health"]["nan"], 0)
+        # NaN-free is not enough: a plugin that renders only the announced part of an oversized
+        # block leaves a silent gap. Compare, window by window, against the same render in
+        # announced-size blocks (Horizon Pad, Round 14: a 6 dB drop in one window, whole-file
+        # RMS within 1 dB).
+        with tempfile.TemporaryDirectory() as d:
+            a, b = Path(d) / "ref.wav", Path(d) / "big.wav"
+            run(block=256, max_block=256, seconds=0.5, out=a)
+            res = run(block=1024, max_block=256, seconds=0.5, out=b)
+            self.assertEqual(res["health"]["nan"], 0)
+            xa, fs = K.read_wav(a)
+            xb, _ = K.read_wav(b)
+            self.assertLess(K.dropout_db(xa, xb, fs), 3.0, "an oversized block rendered quieter than its announced-size twin")
 
 
 class Health(Timed):

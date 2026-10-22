@@ -11,8 +11,8 @@
 bank    the CSV alone: columns, slug and name rules, one init, categories, edge presets, bank
         size by tier; with --harness also that --list-presets equals the CSV in order.
 render  per preset through the harness: Init equals the parameter table's defaults; seeded
-        loudness spread (P: one render each, within 1 LU; F: --n renders each, mean, within
-        0.35 LU); true peak under the ceiling; health (NaN, clipping, click on note-off);
+        loudness spread (P: one render each, every preset within +/-1 LU of the bank median;
+        F: --n renders each, mean, within +/-0.35 LU); true peak under the ceiling; health (NaN, clipping, click on note-off);
         CPU worst block per preset (rule 37); state round trip (state out, in, out: bytewise
         and render-identical); drift against a baseline (F.13.10). Writes the Markdown
         preset list for docs/presets.md and a JSON report.
@@ -46,7 +46,7 @@ import paramgen as PG  # noqa: E402
 CATEGORIES = ["Bed", "Motion", "Dark", "Bright", "Keys-like", "FX"]
 BANK_SIZE = {("P", "instrument"): (12, 20), ("P", "effect"): (8, 12),
              ("F", "instrument"): (30, 60), ("F", "effect"): (30, 60), ("S", "instrument"): (1, 1), ("S", "effect"): (1, 1)}
-SPREAD_LU = {"P": 1.0, "F": 0.35}
+SPREAD_LU = {"P": 1.0, "F": 0.35}   # +/- around the bank median (the brief's "+/-1 LU"), not loudest minus quietest
 NAME_MAX = 24
 SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 COLUMNS = ["slug", "name", "category", "tags", "edge", "author", "notes"]
@@ -189,28 +189,42 @@ def check_loudness(harness, rows, a):
             errs.append("%s: max_click_db %.1f dB above %.1f (click on note-off? D.10)" % (r["slug"], max(clicks), a.click_db))
     lufs = {s: v["lufs"] for s, v in table.items() if s != "init"} or {s: v["lufs"] for s, v in table.items()}
     med = statistics.median(lufs.values())
-    spread = max(lufs.values()) - min(lufs.values())
+    spread = max(abs(v - med) for v in lufs.values())          # the farthest preset from the bank median
+    span = max(lufs.values()) - min(lufs.values())
     limit = SPREAD_LU[a.tier if a.tier in SPREAD_LU else "P"]
     for s, v in table.items():
         v["offset"] = v["lufs"] - med
     if spread > limit:
         worst = sorted(lufs.items(), key=lambda kv: abs(kv[1] - med))[-2:]
-        errs.append("loudness spread %.2f LU across the bank, Tier %s allows %.2f (max minus min, integrated over the hold); farthest: %s"
-                    % (spread, a.tier, limit, ", ".join("%s %+.2f" % (s, v - med) for s, v in worst)))
-    return errs, {"median_lufs": med, "spread_lu": spread, "limit_lu": limit, "presets": table}
+        errs.append("loudness: the farthest preset is %.2f LU from the bank median, Tier %s allows +/-%.2f (integrated over the hold; span %.2f LU); farthest: %s"
+                    % (spread, a.tier, limit, span, ", ".join("%s %+.2f" % (s, v - med) for s, v in worst)))
+    return errs, {"median_lufs": med, "spread_lu": spread, "span_lu": span, "limit_lu": limit, "presets": table}
 
 
 def check_cpu(harness, rows, a):
+    """p99.9 per preset against the budget; a maximum over the budget counts only when it recurs at the
+    same position in three runs (perf.py's reading: a moving maximum is the scheduler, not the DSP)."""
+    import perf as P
     errs, table = [], {}
+    fs, block = int(getattr(a, "sample_rate", 48000) or 48000), int(getattr(a, "block", 64) or 64)
     for r in rows:
         res = K.render(harness, preset=r["slug"], profile=1, warmup=200, **_render_args(a))
         prof = res.get("profile")
         if not prof:
             return ["harness returned no profile block (contract --profile)"], {}
         table[r["slug"]] = {k: prof.get(k) for k in ("p99_pct", "p999_pct", "max_pct", "over_deadline", "first_block_pct")}
-        if prof.get("p999_pct", 0) > a.budget_p999 or prof.get("max_pct", 0) > a.budget_max:
-            errs.append("%s: p99.9 %.1f %% / max %.1f %% of the deadline at 48 k/64; budget %.0f / %.0f (rule 37)"
-                        % (r["slug"], prof.get("p999_pct", 0), prof.get("max_pct", 0), a.budget_p999, a.budget_max))
+        if prof.get("p999_pct", 0) > a.budget_p999:
+            errs.append("%s: p99.9 %.1f %% of the deadline at %d/%d; budget %.0f (rule 37)"
+                        % (r["slug"], prof.get("p999_pct", 0), fs, block, a.budget_p999))
+        if prof.get("max_pct", 0) > a.budget_max:
+            runs = [prof] + [K.render(harness, preset=r["slug"], profile=1, warmup=200, **_render_args(a)).get("profile", prof) for _ in range(2)]
+            rm = P.read_max(runs, block, fs)
+            table[r["slug"]]["max_reading"] = rm["reading"]
+            if rm["reading"] == "DSP":
+                errs.append("%s: recurring max %.1f %% of the deadline at %.2f s in three runs; budget %.0f (rule 37)"
+                            % (r["slug"], rm["max_pct"], rm["at_s"], a.budget_max))
+            else:
+                table[r["slug"]]["note"] = "max %.1f %% moved between runs: scheduling, not DSP (perf.py)" % rm["max_pct"]
     if table:
         heaviest = max(table.items(), key=lambda kv: kv[1]["max_pct"] or 0)[0]
         table["_heaviest"] = heaviest
@@ -368,7 +382,7 @@ def selftest():
             expect("spread shrinks with the offset", loud2["spread_lu"] < loud["spread_lu"])
         with env(FAKE_LOUD="warm:+20"):
             e3, _ = check_loudness(harness, rows, a)
-            expect("spread failure", any("loudness spread" in e for e in e3))
+            expect("spread failure", any("from the bank median" in e for e in e3))
         with env(FAKE_NAN=1):
             e4, _ = check_loudness(harness, rows, a)
             expect("nan failure", any("NaN" in e for e in e4))
@@ -391,7 +405,7 @@ def selftest():
     if fails:
         print("presetlint selftest FAILED:\n  " + "\n  ".join(fails), file=sys.stderr)
         return 1
-    print("presetlint selftest OK: bank rules, harness listing, Init = defaults, loudness spread, NaN, click, CPU budget, round trip - each shown failing on a planted defect")
+    print("presetlint selftest OK: bank rules, harness listing, Init = defaults, loudness distance from the median, NaN, click, recurring CPU maximum, round trip - each shown failing on a planted defect")
     return 0
 
 

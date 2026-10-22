@@ -350,6 +350,13 @@ round the malloc trap runs in every Release test.
 - The skills settling ASan at Tier P: then an `asan` preset and pluginval from source
   before the next shared build.
 
+### Trigger fired (2026-10-22)
+
+sound-design-bob 4.15.0 settles the ASan run at Tier P (`validate_plugin.py` says so too). Per the
+trigger above: an `asan` CMake preset and pluginval built from source with ASan are due **before
+the next shared build**. `validate_plugin.py full`, as Round 14 writes it, passes otherwise
+(Steinberg 47/0, pluginval L10 at six rates, 17 s).
+
 ---
 
 ## EX-007 - Blocks over the deadline at 32 samples under Rosetta, idle CPU above 2 %
@@ -385,6 +392,22 @@ OS preempts (see the note in `tools/sound_tool/Main.cpp`); a host's audio thread
 - A friend reporting dropouts at a buffer of 64 samples or more.
 
 Friends: If Live 10 crackles at a 32-sample buffer on an Apple-silicon Mac, set the buffer to 64 or more.
+
+### Rerun with the fixed tools (2026-10-22)
+
+`perf.py run --harness build-release/HorizonPadSoundTool --arch x86_64 --presets funkenflug
+--config 48000/64,44100/32 --runs 3` (sound-design-bob 4.15.0): "perf OK: 3 cell(s), every p99.9
+and recurring max within budget".
+
+| fs / block | p50 | p99 | p99.9 | max | reading | over deadline |
+|---|---|---|---|---|---|---|
+| 48000 / 64 | 5.2 % | 6.0 % | 14.3 % | 468.7 % | scheduling | 2 |
+| 44100 / 32 | 4.9 % | 5.7 % | 8.1 % | 545.0 % | scheduling | 8 |
+
+Idle 1.2 % - inside the 2 % budget now. What stays open is only `over_deadline`: D.2.1 still asks
+for 0, while perf.py passes overruns whose maximum moves between runs (OS preemption of the
+harness's normal-priority thread, D.10). The two texts of the skill disagree; until they agree
+this entry stays open on that one point, its triggers unchanged.
 
 
 ---
@@ -445,6 +468,11 @@ different sky, a design decision.
 - Any palette taking the footer below 3.0:1.
 - The footer carrying information shown nowhere else (since this round the version line opens
   the About box, which shows the version at 11.7:1 on a card).
+
+### Owner decision (2026-10-22)
+
+**Leave the footer as is.** Accepted by the owner at 3.2-3.8:1 (5.9:1 at night); the triggers
+above stay.
 
 ---
 

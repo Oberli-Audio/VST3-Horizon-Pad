@@ -18,7 +18,7 @@ inline constexpr const char* reverbMacro = "reverbMacro";
 inline constexpr const char* widthMacro = "widthMacro";
 inline constexpr const char* detuneMacro = "detuneMacro";
 
-inline juce::String fmt (double v, int decimals) { return juce::String (v, decimals); }
+inline juce::String fmt (double v, int decimals) { return decimals <= 0 ? juce::String (juce::roundToInt (v)) : juce::String (v, decimals); }   // decimals 0 = rounded integer, as paramgen's Python prints it
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
 {

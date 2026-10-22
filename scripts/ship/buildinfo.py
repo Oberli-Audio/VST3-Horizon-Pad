@@ -12,8 +12,9 @@ emit   reads VERSION, git (sha, dirty, branch, tag at HEAD), the CMake cache (bu
        (versioning-and-provenance.md). Missing pieces are null, never invented.
 check  fails when the tree was dirty, the config is not Release, a required slice is missing,
        the MSVC runtime is not MT on Windows, the version does not match --expect-version
-       or the tag at HEAD, or JUCE is older than 8.0.11 (its VST3 SDK then is not the MIT
-       one). Exit 0 pass, 1 fail, 2 unusable.
+       or the tag at HEAD, JUCE is older than 8.0.11 (its VST3 SDK then is not the MIT
+       one), or the macOS deployment target is missing or above 11.0. Untracked files
+       (build outputs) do not make the tree dirty. Exit 0 pass, 1 fail, 2 unusable.
 """
 import argparse
 import json
@@ -125,7 +126,7 @@ def emit(a):
         "version": version,
         "tag": git(repo, "describe", "--tags", "--exact-match"),
         "git": {"sha": git(repo, "rev-parse", "--short=12", "HEAD"),
-                "dirty": bool(git(repo, "status", "--porcelain")),
+                "dirty": bool(git(repo, "status", "--porcelain", "--untracked-files=no")),   # build outputs in the tree are not edits
                 "branch": git(repo, "rev-parse", "--abbrev-ref", "HEAD")},
         "built": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "machine": a.machine or platform.node(),
@@ -158,6 +159,17 @@ def check_info(info, expect_version=None, require_archs=None, plat=None):
         errs.append("missing slice(s) %s (archs: %s); Live 10.1 under Rosetta needs x86_64, a native Live needs arm64" % (",".join(missing), ",".join(info.get("archs") or [])))
     if plat == "windows" and info.get("msvc_runtime") != "MT":
         errs.append("MSVC runtime is %r, not MT: the DLL would need the friend's redistributable" % info.get("msvc_runtime"))
+    dt = info.get("deployment_target")
+    if plat == "macos":
+        if not dt:
+            errs.append("no deployment target recorded: without CMAKE_OSX_DEPLOYMENT_TARGET in the cache the binary needs the macOS it was built on (Round 14 found 26.0)")
+        else:
+            try:
+                major = tuple(int(x) for x in dt.split(".")[:2])
+                if major > (11, 0):
+                    errs.append("deployment target %s: friends on older macOS cannot load the plugin; the release preset sets 10.13 (arm64 implies 11.0)" % dt)
+            except ValueError:
+                errs.append("deployment target %r is not a version" % dt)
     v = info.get("version")
     if expect_version and v != expect_version:
         errs.append("version %r does not match expected %r" % (v, expect_version))
@@ -210,6 +222,10 @@ def selftest():
         expect("juce version read", info["juce_version"] == "8.0.12")
         bad = dict(info); bad["juce_version"] = "8.0.10"
         expect("old JUCE caught", any("pin JUCE 8.0.11" in e for e in check_info(bad, "1.2.0")))
+        bad = dict(info); bad["deployment_target"] = "14.0"
+        expect("high deployment target caught", any("older macOS" in e for e in check_info(bad, "1.2.0")))
+        bad = dict(info); bad["deployment_target"] = None
+        expect("missing deployment target caught", any("no deployment target" in e for e in check_info(bad, "1.2.0")))
         bad = dict(info); bad["juce_version"] = None
         expect("unknown JUCE caught", any("JUCE version unknown" in e for e in check_info(bad, "1.2.0")))
         expect("version mismatch", any("does not match" in e for e in check_info(info, "1.3.0")))
@@ -232,7 +248,7 @@ def selftest():
     if fails:
         print("buildinfo selftest FAILED:\n  " + "\n  ".join(fails), file=sys.stderr)
         return 1
-    print("buildinfo selftest OK: emit from the fixture with the symbols file and the JUCE version recorded; version, Debug, missing slice, MD runtime, dirty tree, tag mismatch, untagged HEAD, JUCE older than 8.0.11 and unknown JUCE each caught")
+    print("buildinfo selftest OK: emit from the fixture with the symbols file and the JUCE version recorded; version, Debug, missing slice, MD runtime, dirty tree, tag mismatch, untagged HEAD, JUCE older than 8.0.11, unknown JUCE, a deployment target above 11.0 and a missing one each caught")
     return 0
 
 

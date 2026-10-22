@@ -6,6 +6,11 @@ analytic result before any product trusts it (rule 31, F.13.11).
 """
 import math
 import unittest
+import os
+from pathlib import Path
+import tempfile
+import sys
+import subprocess
 
 import numpy as np
 from scipy import signal
@@ -267,6 +272,21 @@ class HarnessContract(unittest.TestCase):
 
 class PresetAndPerfTools(unittest.TestCase):
     """The two bank and budget tools prove their checks on planted defects (D.3.8)."""
+
+    def test_dropout_catches_a_silent_gap(self):                           # D.5.1, Round 14
+        self.h = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_harness.py")
+        with tempfile.TemporaryDirectory() as d:
+            a, b = Path(d) / "a.wav", Path(d) / "b.wav"
+            K.render(self.h, notes="60", seconds=0.5, block=256, max_block=256, out=a)
+            K.render(self.h, notes="60", seconds=0.5, block=1024, max_block=256, out=b)
+            xa, fs = K.read_wav(a)
+            xb, _ = K.read_wav(b)
+            self.assertLess(K.dropout_db(xa, xb, fs), 1.0)
+            env = dict(os.environ, FAKE_BLOCK_GAP="1")
+            subprocess.run([sys.executable, self.h, "--notes=60", "--seconds=0.5", "--block=1024", "--max-block=256", "--out=%s" % b],
+                           check=True, capture_output=True, env=env)
+            xg, _ = K.read_wav(b)
+            self.assertGreater(K.dropout_db(xa, xg, fs), 20.0)
 
     def test_presetlint_selftest(self):
         import subprocess, sys, os

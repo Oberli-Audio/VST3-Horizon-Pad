@@ -18,6 +18,7 @@ Environment switches (so the kit can prove its checks fail, D.3.8):
   FAKE_STATE_DRIFT=1   --state-in loads gain 1 % off (round-trip failure)
   FAKE_CLICK=1         a step at the gate (click on note-off)
   FAKE_NO_IDLE=1       block cost stays at 4 % after the tail (idle failure)
+  FAKE_BLOCK_GAP=1     a block larger than --max-block renders only its first max-block samples (silent gap)
 """
 import json
 import os
@@ -132,6 +133,11 @@ def main(argv):
         x = 10 ** (float(dbfs) / 20.0) * np.sin(2 * np.pi * float(hz) * t)
     tone = 1.0 - 0.3 * (1.0 - params["tone"])
     y = np.concatenate([np.zeros(32), x])[:n] * 10.0 ** (gain_db(params["gain"]) / 20.0) * tone
+    if os.environ.get("FAKE_BLOCK_GAP") and block_nominal > max_block:
+        pos = 0                                                # Horizon Pad, Round 14: the rest of an oversized block stayed silent
+        for b in sizes:
+            y[pos + max_block: pos + b] = 0.0
+            pos += b
     loud = os.environ.get("FAKE_LOUD", "")
     if loud and applied_preset and loud.split(":")[0] == applied_preset:
         y *= 10.0 ** (float(loud.split(":")[1]) / 20.0)

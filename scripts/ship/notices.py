@@ -116,7 +116,8 @@ def check(repo, manifest=None, quiet=False):
         if c.get("kind") and c["kind"] not in KINDS:
             errs.append("notices.toml: %s has kind %r, expected one of %s" % (n, c["kind"], ", ".join(KINDS)))
         spdx = c.get("spdx", "")
-        if COPYLEFT.match(spdx):
+        alternatives = [s.strip() for s in re.split(r"\s+OR\s+", spdx) if s.strip()] or [spdx]
+        if alternatives and all(COPYLEFT.match(s) for s in alternatives):
             errs.append("%s is %s: copyleft code cannot ship in this product (sound-design-bob D.6.1); replace it or make the product GPL" % (n, spdx))
         lf = c.get("license_file")
         if lf:
@@ -124,9 +125,10 @@ def check(repo, manifest=None, quiet=False):
             if not p.exists():
                 errs.append("%s: license_file %s does not exist" % (n, lf))
             else:
-                marker = MARKERS.get(spdx)
-                if marker and marker.lower() not in p.read_text(encoding="utf-8", errors="replace").lower():
-                    errs.append("%s: %s does not look like the %s text (expected %r in it)" % (n, lf, spdx, marker))
+                markers = [MARKERS[s] for s in alternatives if s in MARKERS]
+                text_l = p.read_text(encoding="utf-8", errors="replace").lower()
+                if markers and not any(m.lower() in text_l for m in markers):
+                    errs.append("%s: %s does not look like the %s text (expected one of %r in it)" % (n, lf, spdx, markers))
         elif spdx.startswith("LicenseRef-"):
             if not c.get("note"):
                 errs.append("%s: a LicenseRef licence needs a note saying under what terms it is used" % n)
@@ -252,6 +254,12 @@ def selftest():
         planted("FetchContent without entry", lambda r: (r / "CMakeLists.txt").write_text((r / "CMakeLists.txt").read_text() + "\nFetchContent_Declare(chowdsp_wdf GIT_REPOSITORY x GIT_TAG y)\n"), "chowdsp_wdf")
         planted("font without entry", lambda r: (r / "CMakeLists.txt").write_text((r / "CMakeLists.txt").read_text().replace("Inter-Regular.ttf", "Inter-Regular.ttf fonts/Inter-Bold.ttf")), "Inter-Bold.ttf")
         planted("GPL rejected", lambda r: toml(r).write_text(toml(r).read_text() + '\n[[component]]\nname = "zita"\nkind = "faust"\nspdx = "GPL-2.0-or-later"\ncopyright = "x"\nnote = "x"\n'), "copyleft")
+        # an OR expression with a permissive alternative passes (JUCE's ASIO: LicenseRef-Steinberg-ASIO OR GPL-3.0)
+        with tempfile.TemporaryDirectory() as d4:
+            r4 = Path(d4) / "repo"
+            shutil.copytree(repo, r4)
+            toml(r4).write_text(toml(r4).read_text() + '\n[[component]]\nname = "asio"\nkind = "sdk"\nspdx = "LicenseRef-Steinberg-ASIO OR GPL-3.0-only"\ncopyright = "Steinberg"\nlicense_file = "LICENSES/MIT.txt"\nnote = "used under the Steinberg ASIO licence"\n')
+            expect("OR expression with a permissive side passes", not any("copyleft" in e for e in check(r4, quiet=True)))
         planted("wrong licence text", lambda r: (r / "LICENSES" / "MIT.txt").write_text("not the text\n"), "does not look like the MIT text")
         planted("missing licence file", lambda r: toml(r).write_text(toml(r).read_text().replace('license_file = "LICENSES/OFL-1.1.txt"', "")), "no license_file")
         planted("trademark note missing", lambda r: toml(r).write_text(toml(r).read_text().replace("VST is a registered trademark", "VST is a mark")), "registered trademark")
@@ -266,7 +274,7 @@ def selftest():
     if fails:
         print("notices selftest FAILED:\n  " + "\n  ".join(fails), file=sys.stderr)
         return 1
-    print("notices selftest OK: the fixture manifest passes and its notices are in sync with full MIT and OFL texts, font files and the trademark line; an unlisted FetchContent, an unlisted font, a GPL component, a wrong licence text, a missing licence file, a missing trademark note and a stale notices file are each caught; generate restores sync")
+    print("notices selftest OK: the fixture manifest passes and its notices are in sync with full MIT and OFL texts, font files and the trademark line; an unlisted FetchContent, an unlisted font, a GPL component, a wrong licence text, a missing licence file, a missing trademark note and a stale notices file are each caught; an OR expression with a permissive side passes; generate restores sync")
     return 0
 
 
