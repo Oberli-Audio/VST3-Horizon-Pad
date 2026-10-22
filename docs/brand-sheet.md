@@ -22,7 +22,7 @@ Contrast measured with WCAG 2 luminance, text on the card colour `cardBg` unless
 | `ink` | `text` / `textKnobLabel` | #EBEFF5 / #E4E8EF | wordmark, card labels | 16.0:1 / 15.0:1 |
 | `ink` (values) | `textValue` | #CACED4 | card value readouts | 11.7:1 |
 | `muted` | `textDim` / `textFaint` | #7F8793 / #79818D | captions, tagline, secondary buttons | 5.1:1 / 4.7:1 |
-| `accent` | `gold` | #F5AE39 | active preset, wheel thumbs, the logo's sun | 9.7:1 |
+| `accent` | `gold` | #F5AE39 | active preset border and fill, wheel thumbs, the logo's sun (the active pill's text is `presetTitle` cream) | 9.7:1 |
 | per layer | Root / Clearing / Expanse / Bloom | #5BBD74 / #F0BB3B / #2FB5D8 / #ED76B3 | VOL rings and glows | 7.9 / 10.4 / 7.7 / 6.9:1 |
 | per macro | Detune (the one not shared with a layer) | #A98BF0 | DETUNE ring | 6.7:1 |
 | `modified` | `gold` at half alpha | - | the active preset after an edit | - |
@@ -67,7 +67,7 @@ bundled face is a design decision for the owner (it would make Windows and macOS
 |---|---|---|---|
 | Footer left, "HORIZON PAD 0.1.0 · VST3" | 3.54:1 | 4.81:1 | below 4.5:1 at the sky's brightest row (EX-009) |
 | Inactive pill "Talwind" | 4.99:1 | 6.86:1 | AA |
-| Active pill "Lagerfeuer" (gold on gold tint) | 3.19:1 | 3.19:1 | below 4.5:1 (EX-010) |
+| Active pill "Lagerfeuer", cream text since 2026-10-22 (was gold, 3.19:1) | - | 5.02:1 | AA at the default sky; 3.85:1 on Goldstaub's bright sky (EX-010) |
 | Metrics: glow 1.1 %, halation 0 %, darkest surface #101018 | - | - | ok |
 | Metric: palette colours | 18-19 | - | over 12: the sky gradient's steps count as colours |
 

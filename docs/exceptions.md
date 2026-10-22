@@ -475,6 +475,27 @@ reading the text, and the same name is shown again, larger, under the wordmark o
 Cream text (#F3E6C8, the preset title's colour) on the active pill, keeping the gold border and
 fill: about 4.9:1 on the same background by calculation, to be confirmed on the renders.
 
+### Owner's decision and the measurement (2026-10-22)
+
+The owner chose cream. Implemented (`PresetBar`: the active pill's text blends to
+`Palette::presetTitle`; border and fill stay gold) and measured on the renders, pill text against
+its own fill (`snapshot_contrast.py` median, confirmed by a direct pixel reading):
+
+| Sky | Pill | Gold text (before) | Cream text (now) |
+|---|---|---|---|
+| Init, FILTER 30 % (default) | active | 3.19:1 | **5.02:1** |
+| FILTER 0 % (dusk) | edited | - | 10.0:1 |
+| Goldstaub, FILTER 80 % | active | - | **3.85:1** |
+| FILTER 100 % (golden hour) | edited | - | 4.0-4.3:1 |
+
+Cream passes at the default and every darker sky; under the bright skies (FILTER from about
+70 %) the gold-lit fill is itself light and the text stays below 4.5:1, still well above 3:1.
+**Status stays OPEN** for that range. The next smallest change, if wanted: let the active pill's
+fill blend toward the card colour instead of gold, keeping the gold border (cream would then read
+above 7:1 on every sky) - a change to the pill's look, the owner's call.
+
+- **Unacceptable if:** any sky takes the active pill below 3.5:1.
+
 ---
 
 ## EX-011 - The factory bank spans 1.54 LU; presetlint's Tier P limit is a 1.00 LU span
@@ -501,3 +522,11 @@ skill's help says "within 1 LU" while its code applies a 1 LU span, which is a s
 - Any preset more than 1.0 LU from the bank median on presetlint's render, or more than
   3.0 LU for Sternenzelt (EX-002).
 - The owner adopting the 1.00 LU span: then Glasperle and Frostklang are rebalanced first.
+
+### Resolution
+
+**Closed 2026-10-22, owner: the tool was wrong.** The brief's +/-1 LU is a 2 LU window around the
+bank median; presetlint coded "within 1 LU" as a 1 LU total span, twice as strict and never what
+was decided. The bank's 1.54 LU span is inside the brief. The owner changes presetlint and the
+playbook to "+/-1 LU around the bank median at Tier P, +/-0.35 LU at Tier F"; this repo's copy of
+`scripts/dsp-kit/presetlint.py` follows when it is next refreshed from the skill.

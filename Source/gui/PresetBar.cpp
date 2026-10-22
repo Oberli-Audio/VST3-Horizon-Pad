@@ -103,7 +103,8 @@ bool PresetBar::UserPresetPill::advance (float dt)
 
 void PresetBar::UserPresetPill::applyHighlight()
 {
-    nameButton.setColour (juce::TextButton::textColourOffId, Palette::text.interpolatedWith (Palette::gold, highlight.value));
+    // Cream, not gold: gold text on the gold-lit pill read 3.19:1 (EX-010).
+    nameButton.setColour (juce::TextButton::textColourOffId, Palette::text.interpolatedWith (Palette::presetTitle, highlight.value));
     repaint();
 }
 
@@ -673,7 +674,9 @@ void PresetBar::applyFactoryHighlight (int index)
 {
     auto& b = *presetButtons[index];
     const auto amount = factoryHighlights[(size_t) index].value;
-    const auto textColour = Palette::text.interpolatedWith (Palette::gold, amount);
+    // The pill's border and fill carry the gold; its text turns cream, the colour the
+    // preset's name has under the wordmark (gold on the gold-lit pill read 3.19:1, EX-010).
+    const auto textColour = Palette::text.interpolatedWith (Palette::presetTitle, amount);
 
     b.getProperties().set ("activeAmount", amount);
     b.setColour (juce::TextButton::textColourOffId, textColour);
