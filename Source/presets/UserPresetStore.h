@@ -1,44 +1,41 @@
 #pragma once
 
-#include "../dsp/HorizonTypes.h"
+#include "Presets.h"
 
+#include <optional>
 #include <vector>
 
 namespace horizon
 {
 
 /**
-    A user-saved preset (the "+Save preset" library). Unlike the five factory
-    Preset entries, these are created by the player and must survive across
-    projects/DAW sessions/plugin instances - so, like a real commercial
-    plugin, they live in one shared file on disk rather than in the host's
-    per-project state.
-*/
-struct UserPreset
-{
-    juce::String name;
+    The player's own presets: one .quellepreset per preset in the User folder
+    (PresetFile::userFolder(), D.6.4/D.6.5), shared by every instance in every
+    host and never touched by an update. Message thread only.
 
-    /** Root, Clearing, Expanse, Bloom. 0..1. */
-    std::array<float, (size_t) kNumLayers> vols {};
-
-    /** Attack, Release, Filter, Reverb, Width, Detune (MacroIndex). 0..1. */
-    std::array<float, (size_t) kNumGlobalParams> macros {};
-};
-
-/**
-    Reads/writes the shared user-preset library, mirroring the reference
-    design's localStorage-based persistence with a small XML file in the
-    per-user application-data directory (shared by every instance of the
-    plugin, in every DAW, exactly like the design's browser storage was
-    shared across every tab).
+    Before 0.1.0 they lived in one UserPresets.xml; scan() moves those into
+    files once and keeps the old file beside them as UserPresets-before-0.1.0.xml.
 */
 class UserPresetStore
 {
 public:
-    static juce::File getPresetFile();
+    /** Every readable file in the User folder, oldest first (a new save
+        appends), after migrating a legacy UserPresets.xml if there is one. */
+    static std::vector<Preset> scan();
 
-    static std::vector<UserPreset> load();
-    static void save (const std::vector<UserPreset>& presets);
+    /** Writes `preset` as a new file (a unique ASCII slug from its name) and
+        returns it with `file` and `slug` set; nullopt and `error` on failure. */
+    static std::optional<Preset> saveNew (Preset preset, juce::String& error);
+
+    /** Moves the preset's file to the trash: a friend's preset is never
+        deleted outright. */
+    static bool remove (const Preset& preset);
+
+    /** Writes the bank into the Factory folder on the first run of each
+        plugin version (Factory/.version), so a changed factory preset reaches
+        every friend; nothing else in the preset folder is touched. Once per
+        process. */
+    static void syncFactoryFolder();
 };
 
 } // namespace horizon

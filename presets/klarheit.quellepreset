@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Klarheit" author="Quelle Music" category="In-between"
+              description="Clear, present and simple - quick enough for rhythm parts."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="38.3"/>
+      <PARAM id="clearingVolume" value="31.3"/>
+      <PARAM id="expanseVolume" value="24.4"/>
+      <PARAM id="bloomVolume" value="20.9"/>
+      <PARAM id="attackMacro" value="47.71"/>
+      <PARAM id="releaseMacro" value="77.54"/>
+      <PARAM id="filterMacro" value="55"/>
+      <PARAM id="reverbMacro" value="25"/>
+      <PARAM id="widthMacro" value="45"/>
+      <PARAM id="detuneMacro" value="50"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

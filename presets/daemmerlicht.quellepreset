@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Dämmerlicht" author="Quelle Music" category="Pad"
+              description="Warm dusk light, gently settling."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="39.4"/>
+      <PARAM id="clearingVolume" value="36.1"/>
+      <PARAM id="expanseVolume" value="22.9"/>
+      <PARAM id="bloomVolume" value="19.7"/>
+      <PARAM id="attackMacro" value="77.65"/>
+      <PARAM id="releaseMacro" value="79.15"/>
+      <PARAM id="filterMacro" value="40"/>
+      <PARAM id="reverbMacro" value="40"/>
+      <PARAM id="widthMacro" value="55"/>
+      <PARAM id="detuneMacro" value="50"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

@@ -42,11 +42,30 @@ void FooterBar::SizeButton::paintButton (juce::Graphics& g, bool highlighted, bo
 }
 
 //==============================================================================
+int FooterBar::AboutButton::preferredWidth() const
+{
+    return juce::roundToInt (juce::GlyphArrangement::getStringWidth (labelFont (12.5f, true), text)) + 4;
+}
+
+void FooterBar::AboutButton::paintButton (juce::Graphics& g, bool highlighted, bool down)
+{
+    g.setColour (highlighted || down || hasKeyboardFocus (false) ? Palette::gold : Palette::textFooter);
+    g.setFont (labelFont (12.5f, true));
+    g.drawText (text, getLocalBounds(), juce::Justification::centredLeft);
+}
+
+//==============================================================================
 FooterBar::FooterBar (HorizonPadAudioProcessor& processorToUse)
     : processor (processorToUse)
 {
-    sizeButton.setTooltip ("Window size - 75 to 150% of the designed size. Remembered with the session, "
-                           "and used for the next new instance.");
+    aboutButton.setText ("HORIZON PAD " JucePlugin_VersionString + dot + formatName (processor.wrapperType));
+    aboutButton.setTooltip ("About Horizon Pad: the version, the details to copy into a report, and the licences.");
+    aboutButton.setMouseClickGrabsKeyboardFocus (false);
+    aboutButton.onClick = [this] { if (onAboutClicked != nullptr) onAboutClicked(); };
+    addAndMakeVisible (aboutButton);
+
+    sizeButton.setTooltip ("Window size, 75 to 200% of the designed size; every Horizon Pad on this "
+                           "computer opens at the size you chose last.");
     sizeButton.setMouseClickGrabsKeyboardFocus (false);
     sizeButton.onClick = [this] { showSizeMenu(); };
     addAndMakeVisible (sizeButton);
@@ -56,7 +75,7 @@ void FooterBar::showSizeMenu()
 {
     juce::PopupMenu menu;
 
-    for (auto scale : { 0.75f, 1.0f, 1.25f, 1.5f })
+    for (auto scale : { 0.75f, 1.0f, 1.25f, 1.5f, 2.0f })
     {
         const auto current = std::abs (scale - processor.getEditorScale()) < 0.01f;
         menu.addItem (juce::String (juce::roundToInt (scale * 100.0f)) + "%", true, current,
@@ -85,6 +104,7 @@ void FooterBar::resized()
 {
     auto r = getLocalBounds().withTrimmedTop (1).reduced (0, 4);
     sizeButton.setBounds (r.removeFromRight (sizeButton.preferredWidth()));
+    aboutButton.setBounds (r.removeFromLeft (aboutButton.preferredWidth()));
 }
 
 void FooterBar::paint (juce::Graphics& g)
@@ -101,8 +121,6 @@ void FooterBar::paint (juce::Graphics& g)
 
     g.setColour (Palette::textFooter);
     g.setFont (labelFont (12.5f, true));
-    g.drawText ("HORIZON PAD " JucePlugin_VersionString + dot + formatName (processor.wrapperType),
-                r, juce::Justification::centredLeft);
 
     auto right = r.withTrimmedRight (sizeButton.getWidth() + 2);
     g.drawText ("4 LAYERS" + dot + "6 MACROS" + dot, right, juce::Justification::centredRight);

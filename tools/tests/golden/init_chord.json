@@ -1,0 +1,17 @@
+{
+  "about": "The Init preset (Lagerfeuer), full mix with the shared reverb",
+  "flags": {
+    "seed": 1,
+    "sample_rate": 48000,
+    "block": 512,
+    "seconds": 4.0,
+    "gate": 2.5,
+    "preset": "init",
+    "notes": "48,55,60,64"
+  },
+  "params": {},
+  "arch": "x86_64",
+  "feedback": true,
+  "commit": "26664b052f07",
+  "rendered": "2026-10-22"
+}

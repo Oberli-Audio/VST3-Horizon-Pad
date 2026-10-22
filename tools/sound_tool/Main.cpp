@@ -41,14 +41,20 @@
 */
 
 #include <JuceHeader.h>
+#include "BuildInfo.h"
 
 #include "PluginProcessor.h"
+#include "Diagnostics.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <cerrno>
+#include <new>
+#include <atomic>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -87,6 +93,80 @@ static void rtsanSelfTestAllocation()
 }
 #endif
 
+// The malloc trap (playbook D.1.6, the Tier P check; RTSan above is Tier F):
+// in every other macOS build this executable defines malloc, calloc, realloc,
+// posix_memalign and operator new/delete itself, forwarding to the default
+// malloc zone, and an allocation made by the thread inside processBlock aborts
+// the run with a message - so every test that renders through this tool is
+// also an allocation test. The plugin and JUCE are linked in statically, so
+// their calls bind to these definitions. (A hook on malloc_default_zone()'s
+// function pointers, the playbook's suggestion, saw none of them on macOS 26:
+// the allocator's fast path bypasses the zone table - measured 2026-10-22.)
+// Armed only around processBlock; HORIZON_MALLOC_TRAP=0 switches it off,
+// HORIZON_MALLOC_TRAP_SELFTEST=1 allocates inside the armed region once and
+// must abort (rule 28: the check is live). Misses what the playbook says it
+// misses: locks, system calls, page faults, unbounded loops.
+#if JUCE_MAC && ! HORIZON_HAS_RTSAN
+ #include <malloc/malloc.h>
+ #include <pthread.h>
+ #include <unistd.h>
+
+namespace mallocTrap
+{
+    static std::atomic<bool> armed { false };   // constant-initialised: safe before main()
+    static pthread_t owner;
+
+    [[noreturn]] static void trip (const char* what) noexcept
+    {
+        armed.store (false);
+        static const char prefix[] = "malloc trap: ";
+        static const char suffix[] = " inside processBlock (rule 1: no allocation on the audio thread)\n";
+        ::write (2, prefix, sizeof (prefix) - 1);
+        ::write (2, what, std::strlen (what));
+        ::write (2, suffix, sizeof (suffix) - 1);
+        std::abort();
+    }
+
+    static inline void check (const char* what) noexcept
+    {
+        if (armed.load (std::memory_order_relaxed) && pthread_equal (pthread_self(), owner))
+            trip (what);
+    }
+
+    static bool enabled()
+    {
+        const char* v = std::getenv ("HORIZON_MALLOC_TRAP");
+        return v == nullptr || std::strcmp (v, "0") != 0;
+    }
+
+    static const bool selfTest = std::getenv ("HORIZON_MALLOC_TRAP_SELFTEST") != nullptr;
+    static void* volatile selfTestSink = nullptr;
+}
+
+extern "C"
+{
+    void* malloc (size_t n)            { mallocTrap::check ("malloc");  return malloc_zone_malloc (malloc_default_zone(), n); }
+    void* calloc (size_t c, size_t n)  { mallocTrap::check ("calloc");  return malloc_zone_calloc (malloc_default_zone(), c, n); }
+    void* realloc (void* p, size_t n)  { mallocTrap::check ("realloc"); return malloc_zone_realloc (malloc_default_zone(), p, n); }
+
+    int posix_memalign (void** out, size_t alignment, size_t n)
+    {
+        mallocTrap::check ("posix_memalign");
+        *out = malloc_zone_memalign (malloc_default_zone(), alignment, n);
+        return *out != nullptr ? 0 : ENOMEM;
+    }
+}
+
+void* operator new (size_t n)                  { mallocTrap::check ("operator new");   if (auto* p = malloc_zone_malloc (malloc_default_zone(), n ? n : 1)) return p; throw std::bad_alloc(); }
+void* operator new[] (size_t n)                { mallocTrap::check ("operator new[]"); if (auto* p = malloc_zone_malloc (malloc_default_zone(), n ? n : 1)) return p; throw std::bad_alloc(); }
+void* operator new (size_t n, const std::nothrow_t&) noexcept   { mallocTrap::check ("operator new");   return malloc_zone_malloc (malloc_default_zone(), n ? n : 1); }
+void* operator new[] (size_t n, const std::nothrow_t&) noexcept { mallocTrap::check ("operator new[]"); return malloc_zone_malloc (malloc_default_zone(), n ? n : 1); }
+void operator delete (void* p) noexcept                { std::free (p); }
+void operator delete[] (void* p) noexcept              { std::free (p); }
+void operator delete (void* p, size_t) noexcept        { std::free (p); }
+void operator delete[] (void* p, size_t) noexcept      { std::free (p); }
+#endif
+
 static void processBlockRealtime (juce::AudioProcessor& processor,
                                   juce::AudioBuffer<float>& block,
                                   juce::MidiBuffer& midi) HORIZON_NONBLOCKING
@@ -95,6 +175,24 @@ static void processBlockRealtime (juce::AudioProcessor& processor,
     if (rtsanSelfTest)
         rtsanSelfTestAllocation();
    #endif
+
+   #if JUCE_MAC && ! HORIZON_HAS_RTSAN
+    static const bool trapOn = mallocTrap::enabled();
+
+    if (trapOn)
+    {
+        mallocTrap::owner = pthread_self();
+        mallocTrap::armed.store (true, std::memory_order_relaxed);
+
+        if (mallocTrap::selfTest)
+            mallocTrap::selfTestSink = std::malloc (64);
+
+        processor.processBlock (block, midi);
+        mallocTrap::armed.store (false, std::memory_order_relaxed);
+        return;
+    }
+   #endif
+
     processor.processBlock (block, midi);
 }
 
@@ -176,7 +274,7 @@ namespace
                 // test, the alias and EDR measurements, two regression tests)
                 // measured a different patch than it asked for. Accumulate
                 // instead, in the same ';'-separated form the batch syntax uses.
-                if ((key == "param" || key == "automate") && args.has (key))
+                if ((key == "param" || key == "automate" || key == "preset-at" || key == "reprepare-at") && args.has (key))
                     args.values[key] = args.values[key] + ";" + value;
                 else
                     args.values[key] = value;
@@ -264,6 +362,10 @@ namespace
             "Output:\n"
             "  --out=<path.wav>       Also write the render to a 32-bit float WAV file\n"
             "  --list-presets         Print the factory preset table as JSON and exit\n"
+            "  --list-params          Print the parameter layout (host order) as JSON and exit\n"
+            "  --state-in=<file>      Load a session state first (any bytes; refused -> exit 2)\n"
+            "  --state-out=<file>     Save the session state after the render\n"
+            "  --diagnostics          Print the About box's diagnostics block and exit\n"
             "  --help                 Print this message and exit\n";
     }
 
@@ -309,7 +411,8 @@ namespace
     }
 
     //--------------------------------------------------------------------
-    // Preset lookup by index or case-insensitive substring of the name.
+    // Preset lookup by bank index, slug (presets.csv), exact name, or a
+    // case-insensitive substring of the name - in that order.
     //--------------------------------------------------------------------
     const Preset* findPreset (const juce::String& key)
     {
@@ -324,6 +427,10 @@ namespace
         }
 
         for (auto& p : presets)
+            if (p.slug == key || p.name.equalsIgnoreCase (key))
+                return &p;
+
+        for (auto& p : presets)
             if (p.name.containsIgnoreCase (key))
                 return &p;
 
@@ -334,23 +441,26 @@ namespace
     {
         auto* obj = new juce::DynamicObject();
         obj->setProperty ("index", index);
+        obj->setProperty ("slug", p.slug);
         obj->setProperty ("name", p.name);
+        obj->setProperty ("category", p.category);
+        obj->setProperty ("author", p.author);
         obj->setProperty ("description", p.description);
 
         auto* vols = new juce::DynamicObject();
-        vols->setProperty ("root", p.volumes[(size_t) LayerIndex::warmFoundation]);
-        vols->setProperty ("clearing", p.volumes[(size_t) LayerIndex::analogEnsemble]);
-        vols->setProperty ("expanse", p.volumes[(size_t) LayerIndex::airyChoir]);
-        vols->setProperty ("bloom", p.volumes[(size_t) LayerIndex::motionPad]);
+        vols->setProperty ("root", toUnit (p.volumes[(size_t) LayerIndex::warmFoundation]));
+        vols->setProperty ("clearing", toUnit (p.volumes[(size_t) LayerIndex::analogEnsemble]));
+        vols->setProperty ("expanse", toUnit (p.volumes[(size_t) LayerIndex::airyChoir]));
+        vols->setProperty ("bloom", toUnit (p.volumes[(size_t) LayerIndex::motionPad]));
         obj->setProperty ("volumes", juce::var (vols));
 
         auto* macros = new juce::DynamicObject();
-        macros->setProperty ("attack", p.macros[attackMacroIndex]);
-        macros->setProperty ("release", p.macros[releaseMacroIndex]);
-        macros->setProperty ("filter", p.macros[filterMacroIndex]);
-        macros->setProperty ("reverb", p.macros[reverbMacroIndex]);
-        macros->setProperty ("width", p.macros[widthMacroIndex]);
-        macros->setProperty ("detune", p.macros[detuneMacroIndex]);
+        macros->setProperty ("attack", toUnit (p.macros[attackMacroIndex]));
+        macros->setProperty ("release", toUnit (p.macros[releaseMacroIndex]));
+        macros->setProperty ("filter", toUnit (p.macros[filterMacroIndex]));
+        macros->setProperty ("reverb", toUnit (p.macros[reverbMacroIndex]));
+        macros->setProperty ("width", toUnit (p.macros[widthMacroIndex]));
+        macros->setProperty ("detune", toUnit (p.macros[detuneMacroIndex]));
         obj->setProperty ("macros", juce::var (macros));
 
         return juce::var (obj);
@@ -1053,6 +1163,23 @@ static int runTool (int argc, char* argv[])
         return 0;
     }
 
+    // Rule 28 / harness contract: a misspelt flag must not render a different
+    // patch than the one asked for.
+    static const juce::StringArray knownFlags { "help", "list-presets", "list-params", "sample-rate", "block", "max-block",
+        "hold", "tail", "seconds", "gate", "velocity", "window-ms", "fft-size", "click-threshold", "transient-window",
+        "probe-at", "out", "partial-ratios", "notes", "note-onsets", "note-holds", "seed", "state-in", "state-out",
+        "preset", "preset-at", "solo", "layer", "param", "pedal", "automate", "bend", "mod", "profile", "warmup",
+        "reprepare-at", "true-peak", "diagnostics" };
+
+    for (const auto& [key, value] : args.values)
+    {
+        if (! knownFlags.contains (key))
+        {
+            std::cerr << "error: unknown flag --" << key.toStdString() << " (see --help)" << std::endl;
+            return 2;
+        }
+    }
+
     if (args.has ("list-presets"))
     {
         const auto& presets = getFactoryPresets();
@@ -1065,11 +1192,67 @@ static int runTool (int argc, char* argv[])
         return 0;
     }
 
+    // The plugin's real parameter layout in host order (harness contract
+    // --list-params), for paramgen.py check --list-params and the test that
+    // diffs it against parameters.csv: default normalised, plus the plain
+    // range and name so the test can compare those too.
+    if (args.has ("list-params"))
+    {
+        HorizonPadAudioProcessor processor;
+        juce::Array<juce::var> arr;
+
+        for (auto* param : processor.getParameters())
+        {
+            auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (param);
+
+            if (ranged == nullptr)
+                continue;
+
+            auto* obj = new juce::DynamicObject();
+            obj->setProperty ("id", ranged->getParameterID());
+            obj->setProperty ("name", ranged->getName (64));
+            obj->setProperty ("default", ranged->getDefaultValue());
+            obj->setProperty ("default_plain", ranged->convertFrom0to1 (ranged->getDefaultValue()));
+            obj->setProperty ("min", ranged->getNormalisableRange().start);
+            obj->setProperty ("max", ranged->getNormalisableRange().end);
+            obj->setProperty ("steps", ranged->getNumSteps() == juce::AudioProcessor::getDefaultNumParameterSteps() ? 0 : ranged->getNumSteps());
+            obj->setProperty ("automatable", ranged->isAutomatable());
+            obj->setProperty ("text_default", ranged->getText (ranged->getDefaultValue(), 64));
+            arr.add (juce::var (obj));
+        }
+
+        std::cout << juce::JSON::toString (juce::var (arr), true) << std::endl;
+        return 0;
+    }
+
     // ---- Config -------------------------------------------------------
     const double sampleRate   = (double) args.getFloat ("sample-rate", 48000.0f);
-    const int    blockSize    = args.getInt ("block", 512);
-    const double holdSeconds  = (double) args.getFloat ("hold", 4.0f);
-    const double tailSeconds  = (double) args.getFloat ("tail", 6.0f);
+    // Harness contract v3: --seconds is the render length, --gate the
+    // note-off (held to the end without it); --hold/--tail are the older
+    // spelling of the same and stay the default.
+    const bool   fixedLength  = args.has ("seconds");
+    const double renderLength = (double) args.getFloat ("seconds", 0.0f);
+    const double holdSeconds  = args.has ("gate") ? (double) args.getFloat ("gate", 4.0f)
+                              : fixedLength       ? renderLength
+                                                  : (double) args.getFloat ("hold", 4.0f);
+    const double tailSeconds  = fixedLength ? juce::jmax (0.0, renderLength - holdSeconds) : (double) args.getFloat ("tail", 6.0f);
+
+    // --block=<n>, or --block=random:<seed> - every block a random size from 0
+    // to --max-block (D.5.1: a zero-length block must be legal). --max-block is
+    // what prepareToPlay announces; a fixed --block above it tests blocks
+    // larger than announced.
+    const auto   blockArg     = args.getString ("block", "512");
+    const bool   randomBlocks = blockArg.startsWith ("random:");
+    const bool   zeroBlocks   = blockArg.trim() == "0";   // a zero-length block before every --max-block one
+    const int    maxBlock     = args.getInt ("max-block", randomBlocks || zeroBlocks ? 512 : blockArg.getIntValue());
+    const int    blockSize    = randomBlocks || zeroBlocks ? maxBlock : blockArg.getIntValue();
+    juce::Random blockRng (randomBlocks ? blockArg.fromFirstOccurrenceOf (":", false, false).getLargeIntValue() : 0);
+
+    if (blockSize < 1 || maxBlock < 1 || (randomBlocks && ! blockArg.fromFirstOccurrenceOf (":", false, false).containsOnly ("0123456789")))
+    {
+        std::cerr << "error: --block must be a positive number or random:<seed>, --max-block positive" << std::endl;
+        return 2;
+    }
     const float  velocity     = juce::jlimit (0.0f, 1.0f, args.getFloat ("velocity", 0.85f));
     const double windowMs     = (double) args.getFloat ("window-ms", 50.0f);
     const int    fftSizeReq   = args.getInt ("fft-size", 8192);
@@ -1134,7 +1317,16 @@ static int runTool (int argc, char* argv[])
     // ---- Build the processor -------------------------------------------
     HorizonPadAudioProcessor processor;
     const auto startupProgram = processor.getProgramName (processor.getCurrentProgram());  // before any preset/param
-    processor.prepareToPlay (sampleRate, blockSize);
+    processor.prepareToPlay (sampleRate, maxBlock);
+
+    // The About box's diagnostics block, as a friend would paste it (test
+    // about_copy_is_fourteen_lines); the rate and block are the ones asked for.
+    if (args.has ("diagnostics"))
+    {
+        processor.setRateAndBufferSizeDetails (sampleRate, maxBlock);
+        std::cout << horizon::diagnosticsText (processor) << std::endl;
+        return 0;
+    }
 
     // Oscillator start phases are randomised per voice on purpose, so renders
     // vary run to run. --seed pins them, which is what makes a null test, a
@@ -1143,6 +1335,32 @@ static int runTool (int argc, char* argv[])
     // averaged over several runs before it means anything.
     if (args.has ("seed"))
         processor.setDeterministicSeed ((juce::int64) args.getInt ("seed", 1));
+
+    // 0) Optional session state (harness contract --state-in), first so the
+    //    flags below override it. Any bytes: a refused blob leaves the plugin
+    //    as it was and the render still runs (it keeps processing), then the
+    //    run exits 2 with the reason on stderr; a newer one loads as far as
+    //    understood with a note.
+    juce::String stateRefused;
+
+    if (args.has ("state-in"))
+    {
+        const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (args.getString ("state-in", ""));
+        juce::MemoryBlock blob;
+
+        if (! file.existsAsFile() || ! file.loadFileAsData (blob))
+        {
+            std::cerr << "error: cannot read --state-in " << file.getFullPathName().toStdString() << std::endl;
+            return 2;
+        }
+
+        processor.setStateInformation (blob.getData(), (int) blob.getSize());
+
+        if (const auto notice = processor.getStateNotice(); notice.startsWith ("refused"))
+            stateRefused = notice;
+        else if (notice.isNotEmpty())
+            std::cerr << "note: " << notice.toStdString() << std::endl;
+    }
 
     // 1) Optional factory preset.
     if (args.has ("preset"))
@@ -1154,21 +1372,11 @@ static int runTool (int argc, char* argv[])
         {
             std::cerr << "error: no factory preset matches --preset=" << key.toStdString()
                        << " (see --list-presets)" << std::endl;
-            return 1;
+            return 2;
         }
 
-        for (int i = 0; i < kNumLayers; ++i)
-            if (auto* p = processor.getAPVTS().getParameter (allVolumeIds()[(size_t) i]))
-                p->setValueNotifyingHost (p->convertTo0to1 (preset->volumes[(size_t) i]));
-
-        static const std::array<const char*, kNumGlobalParams> macroIds {
-            ParamID::attackMacro, ParamID::releaseMacro, ParamID::filterMacro, ParamID::reverbMacro,
-            ParamID::widthMacro, ParamID::detuneMacro
-        };
-
-        for (int i = 0; i < kNumGlobalParams; ++i)
-            if (auto* p = processor.getAPVTS().getParameter (macroIds[(size_t) i]))
-                p->setValueNotifyingHost (p->convertTo0to1 (preset->macros[(size_t) i]));
+        // The plugin's own recall path, as the preset bar uses it.
+        processor.applyFactoryPreset ((int) (preset - getFactoryPresets().data()));
     }
 
     // 2) Optional solo: zero every layer not named, set the named ones to 1.0.
@@ -1185,7 +1393,7 @@ static int runTool (int argc, char* argv[])
             const bool solo = std::find (soloIds.begin(), soloIds.end(), juce::String (id)) != soloIds.end();
 
             if (auto* p = processor.getAPVTS().getParameter (id))
-                p->setValueNotifyingHost (p->convertTo0to1 (solo ? 1.0f : 0.0f));
+                p->setValueNotifyingHost (solo ? 1.0f : 0.0f);   // normalised: full or silent
         }
     }
 
@@ -1207,7 +1415,7 @@ static int runTool (int argc, char* argv[])
             if (eq < 0)
             {
                 std::cerr << "error: --param entries must be id=value, got: " << assignment.toStdString() << std::endl;
-                return 1;
+                return 2;
             }
 
             const auto id = resolveParamId (assignment.substring (0, eq));
@@ -1217,12 +1425,62 @@ static int runTool (int argc, char* argv[])
             if (p == nullptr)
             {
                 std::cerr << "error: unknown parameter id: " << id.toStdString() << std::endl;
-                return 1;
+                return 2;
             }
 
-            p->setValueNotifyingHost (p->convertTo0to1 (value));
+            p->setValueNotifyingHost (value);   // normalised 0..1 (harness contract)
         }
     }
+
+    // --preset-at=<t>:<slug> (a factory preset recalled mid-render, the
+    // preset-change spike of D.2.1) and --reprepare-at=<t>:<rate>/<block>
+    // (prepareToPlay again without releaseResources, pluginval's
+    // non-releasing case, D.5.1). Both repeatable, applied at the first block
+    // boundary at or after t.
+    struct TimedPreset { double t; int index; };
+    struct Reprepare  { double t; double rate; int block; };
+    std::vector<TimedPreset> presetChanges;
+    std::vector<Reprepare> reprepares;
+
+    for (auto entry : juce::StringArray::fromTokens (args.getString ("preset-at", ""), ";", ""))
+    {
+        entry = entry.trim();
+        if (entry.isEmpty())
+            continue;
+
+        const auto* preset = findPreset (entry.fromFirstOccurrenceOf (":", false, false));
+
+        if (! entry.containsChar (':') || preset == nullptr)
+        {
+            std::cerr << "error: --preset-at needs <seconds>:<slug> with a factory preset, got: " << entry.toStdString() << std::endl;
+            return 2;
+        }
+
+        presetChanges.push_back ({ entry.upToFirstOccurrenceOf (":", false, false).getDoubleValue(),
+                                   (int) (preset - getFactoryPresets().data()) });
+    }
+
+    for (auto entry : juce::StringArray::fromTokens (args.getString ("reprepare-at", ""), ";", ""))
+    {
+        entry = entry.trim();
+        if (entry.isEmpty())
+            continue;
+
+        const auto spec = entry.fromFirstOccurrenceOf (":", false, false);
+        const auto rate = spec.upToFirstOccurrenceOf ("/", false, false).getDoubleValue();
+        const auto block = spec.fromFirstOccurrenceOf ("/", false, false).getIntValue();
+
+        if (! entry.containsChar (':') || ! spec.containsChar ('/') || rate < 8000.0 || block < 1)
+        {
+            std::cerr << "error: --reprepare-at needs <seconds>:<rate>/<block>, got: " << entry.toStdString() << std::endl;
+            return 2;
+        }
+
+        reprepares.push_back ({ entry.upToFirstOccurrenceOf (":", false, false).getDoubleValue(), rate, block });
+    }
+
+    std::sort (presetChanges.begin(), presetChanges.end(), [] (auto& x, auto& y) { return x.t < y.t; });
+    std::sort (reprepares.begin(), reprepares.end(), [] (auto& x, auto& y) { return x.t < y.t; });
 
     // ---- Render ---------------------------------------------------------
     int firstOnSample = std::numeric_limits<int>::max();
@@ -1356,6 +1614,7 @@ static int runTool (int argc, char* argv[])
     const bool timeBlocks = args.has ("profile");
     std::vector<double> blockMicros;
     std::vector<double> blockStartSec;
+    std::vector<int> blockLengths;
 
     if (timeBlocks)
     {
@@ -1366,16 +1625,36 @@ static int runTool (int argc, char* argv[])
     auto renderAll = [&]
     {
     int position = 0;
+    size_t nextPresetChange = 0, nextReprepare = 0;
 
     while (position < totalSamples)
     {
-        const int blockLen = juce::jmin (blockSize, totalSamples - position);
+        const auto now = (double) position / sampleRate;
+
+        while (nextPresetChange < presetChanges.size() && presetChanges[nextPresetChange].t <= now)
+            processor.applyFactoryPreset (presetChanges[nextPresetChange++].index);
+
+        while (nextReprepare < reprepares.size() && reprepares[nextReprepare].t <= now)
+        {
+            const auto& r = reprepares[nextReprepare++];
+            processor.prepareToPlay (r.rate, r.block);   // no releaseResources(): the non-releasing case
+        }
+
+        const int blockLen = randomBlocks ? juce::jmin (blockRng.nextInt (maxBlock + 1), totalSamples - position)
+                                          : juce::jmin (blockSize, totalSamples - position);
+
+        if (zeroBlocks)
+        {
+            juce::AudioBuffer<float> empty (render.getArrayOfWritePointers(), 2, position, 0);
+            juce::MidiBuffer noMidi;
+            processBlockRealtime (processor, empty, noMidi);
+        }
 
         for (auto& a : automations)
         {
             if (const auto value = automationValueAt (a, (double) position / sampleRate))
-                if (! juce::approximatelyEqual (a.param->convertFrom0to1 (a.param->getValue()), *value))
-                    a.param->setValueNotifyingHost (a.param->convertTo0to1 (*value));
+                if (! juce::approximatelyEqual (a.param->getValue(), (float) *value))
+                    a.param->setValueNotifyingHost ((float) *value);   // normalised 0..1
         }
 
         juce::MidiBuffer midi;
@@ -1408,6 +1687,7 @@ static int runTool (int argc, char* argv[])
             const auto t1 = juce::Time::getHighResolutionTicks();
             blockMicros.push_back (juce::Time::highResolutionTicksToSeconds (t1 - t0) * 1.0e6);
             blockStartSec.push_back ((double) position / sampleRate);
+            blockLengths.push_back (blockLen);
         }
         else
         {
@@ -1589,12 +1869,25 @@ static int runTool (int argc, char* argv[])
     if (timeBlocks && ! blockMicros.empty())
     {
         // Rule 37: worst case against the deadline, never the mean alone.
-        // Blocks shorter than --block (the last one) are excluded.
+        // The first block after prepareToPlay is reported on its own
+        // (first_block_pct), --warmup=<n> blocks are left out, and so are the
+        // last (shorter) block and zero-length blocks (harness contract).
+        const auto warmup = (size_t) juce::jmax (0, args.getInt ("warmup", 0));
         std::vector<double> full;
-        for (size_t i = 0; i + 1 < blockMicros.size(); ++i)
-            full.push_back (blockMicros[i]);
+        std::vector<double> fullStart;
+        for (size_t i = juce::jmax ((size_t) 1, warmup); i + 1 < blockMicros.size(); ++i)
+        {
+            if (blockLengths[i] > 0)
+            {
+                full.push_back (blockMicros[i]);
+                fullStart.push_back (blockStartSec[i]);
+            }
+        }
         if (full.empty())
+        {
             full = blockMicros;
+            fullStart = blockStartSec;
+        }
 
         auto sorted = full;
         std::sort (sorted.begin(), sorted.end());
@@ -1616,7 +1909,9 @@ static int runTool (int argc, char* argv[])
         bt->setProperty ("p99_pct", asPct (pct (0.99)));
         bt->setProperty ("p999_pct", asPct (pct (0.999)));
         bt->setProperty ("max_pct", asPct (sorted.back()));
-        bt->setProperty ("worst_block_at_s", blockStartSec[worst]);
+        bt->setProperty ("worst_block_at_s", fullStart[worst]);
+        bt->setProperty ("first_block_pct", blockMicros.empty() ? 0.0 : asPct (blockMicros.front()));
+        bt->setProperty ("warmup_blocks", (int) juce::jmax ((size_t) 1, warmup));
         bt->setProperty ("over_deadline", (int) std::count_if (full.begin(), full.end(), [&] (double v) { return v > deadlineUs; }));
         root->setProperty ("profile", juce::var (bt));
     }
@@ -1808,9 +2103,110 @@ static int runTool (int argc, char* argv[])
         root->setProperty ("wav", juce::var (wav));
     }
 
+    // The state after the render (harness contract --state-out).
+    if (args.has ("state-out"))
+    {
+        const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (args.getString ("state-out", ""));
+        juce::MemoryBlock blob;
+        processor.getStateInformation (blob);
+        root->setProperty ("stateOut", file.replaceWithData (blob.getData(), blob.getSize()) ? file.getFullPathName() : juce::String());
+    }
+
+    root->setProperty ("activePreset", processor.getActivePresetName());
+    root->setProperty ("stateNotice", processor.getStateNotice());
+
+    // ---- Harness contract v3 (scripts/dsp-kit/harness-contract.md) ---------
+    // The fields every kit script reads, beside the tool's own older ones.
+    double maxStep = 0.0;
+    int lastAudible = -1;
+
+    for (int ch = 0; ch < render.getNumChannels(); ++ch)
+    {
+        const auto* x = render.getReadPointer (ch);
+
+        for (int n = 0; n < totalSamples; ++n)
+        {
+            if (n > 0 && std::isfinite (x[n]) && std::isfinite (x[n - 1]))
+                maxStep = juce::jmax (maxStep, (double) std::abs (x[n] - x[n - 1]));
+
+            if (std::abs (x[n]) > 3.16227766e-5f)   // -90 dBFS
+                lastAudible = juce::jmax (lastAudible, n);
+        }
+    }
+
+    {
+        auto* applied = new juce::DynamicObject();
+        applied->setProperty ("seed", args.has ("seed") ? juce::var (args.getInt ("seed", 1)) : juce::var());
+        applied->setProperty ("sample_rate", (int) std::lround (sampleRate));
+        applied->setProperty ("block", randomBlocks ? juce::var (blockArg) : juce::var (zeroBlocks ? 0 : blockSize));
+        applied->setProperty ("max_block", maxBlock);
+        applied->setProperty ("seconds", fixedLength ? renderLength : (double) totalSamples / sampleRate);
+        applied->setProperty ("preset", args.has ("preset") ? juce::var (args.getString ("preset", "")) : juce::var());
+        applied->setProperty ("solo", args.has ("solo") ? juce::var (args.getString ("solo", "")) : juce::var());
+
+        auto* byId = new juce::DynamicObject();
+        for (auto* param : processor.getParameters())
+            if (auto* ranged = dynamic_cast<juce::RangedAudioParameter*> (param))
+                byId->setProperty (ranged->getParameterID(), ranged->getValue());   // normalised 0..1
+        applied->setProperty ("params", juce::var (byId));
+
+        juce::Array<juce::var> noteList;
+        for (auto n : notes) noteList.add (n);
+        applied->setProperty ("notes", noteList);
+        applied->setProperty ("gate", holdSeconds);
+        applied->setProperty ("latency_samples", processor.getLatencySamples());
+        // Time from the note-off to the first sample after which everything stays below -90 dBFS (D.2.5).
+        applied->setProperty ("tail_seconds", lastAudible < 0 ? 0.0 : juce::jmax (0.0, (double) (lastAudible + 1 - lastOffSample) / sampleRate));
+
+        auto* build = new juce::DynamicObject();
+        build->setProperty ("commit", BUILD_SHA);
+        build->setProperty ("config", HORIZON_BUILD_CONFIG);
+       #if defined (__aarch64__) || defined (__arm64__)
+        build->setProperty ("arch", "arm64");
+       #elif defined (__x86_64__) || defined (_M_X64)
+        build->setProperty ("arch", "x86_64");
+       #else
+        build->setProperty ("arch", "unknown");
+       #endif
+        applied->setProperty ("build", juce::var (build));
+        root->setProperty ("applied", juce::var (applied));
+    }
+
+    root->setProperty ("contract", 3);
+
+    if (auto* levels = root->getProperty ("levels").getDynamicObject())
+    {
+        const auto db = [] (double v) { return v > 0.0 ? 20.0 * std::log10 (v) : -300.0; };
+        levels->setProperty ("peak_dbfs", db (peak));
+        levels->setProperty ("rms_dbfs", db (rms));
+        levels->setProperty ("dc_dbfs", db (juce::jmax (std::abs (dcL), std::abs (dcR))));
+        if (args.has ("true-peak"))
+            levels->setProperty ("true_peak_dbtp", loudness.truePeakDb);
+    }
+
+    {
+        auto* health = new juce::DynamicObject();
+        health->setProperty ("nan", (double) nanCount);
+        health->setProperty ("inf", (double) infCount);
+        health->setProperty ("clipped_samples", (double) hotSampleCount);
+        health->setProperty ("max_click_db", peak > 0.0 && maxStep > 0.0 ? 20.0 * std::log10 (maxStep / peak) : -300.0);
+        root->setProperty ("health", juce::var (health));
+
+        auto* loud = new juce::DynamicObject();
+        loud->setProperty ("integrated_lufs", loudness.valid ? loudness.integratedLufs : -300.0);
+        root->setProperty ("loudness", juce::var (loud));
+    }
+
     std::cout << juce::JSON::toString (juce::var (root), true) << std::endl;
 
-    return 0;
+    if (stateRefused.isNotEmpty())
+    {
+        std::cerr << "error: --state-in " << stateRefused.toStdString() << std::endl;
+        return 2;
+    }
+
+    // Harness contract: NaN or Inf in the render is exit 3 (the JSON is printed).
+    return nanCount > 0 || infCount > 0 ? 3 : 0;
 }
 
 int main (int argc, char* argv[])

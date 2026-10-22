@@ -11,6 +11,7 @@
 #include "gui/MacrosPanel.h"
 #include "gui/OutputMeter.h"
 #include "gui/FooterBar.h"
+#include "gui/AboutPanel.h"
 
 /**
     The editor: one shared panel (HorizonScene - sky, glow, mountain ridge)
@@ -28,11 +29,11 @@
 
     One layout, drawn at a chosen size: every child paints its own precise
     layout in the designed 1080 x 748 coordinates, and the SIZE menu in the
-    footer scales the whole editor to 75 / 100 / 125 / 150% (a transform on
+    footer scales the whole editor to 75 / 100 / 125 / 150 / 200% (a transform on
     top of whatever scale the host itself applies - setScaleFactor() keeps
     the two apart). Everything is vector or cached at the screen's pixel
-    density, so no size blurs. Remembered per instance and as the default
-    for the next new one (HorizonPadAudioProcessor::getEditorScale()).
+    density, so no size blurs. A machine-local preference every instance
+    opens at, never in the session (HorizonPadAudioProcessor::getEditorScale()).
 
     Motion. Everything moves because the sound changed, and only then:
       - the scene follows FILTER (time of day), REVERB (haze) and WIDTH
@@ -55,6 +56,9 @@ class HorizonPadAudioProcessorEditor final : public juce::AudioProcessorEditor,
 public:
     explicit HorizonPadAudioProcessorEditor (HorizonPadAudioProcessor&);
     ~HorizonPadAudioProcessorEditor() override;
+
+    /** Opens the About box (footer product label; the snapshot tool uses it too). */
+    void showAbout (bool openLicences = false);
 
     void paint (juce::Graphics&) override;
     void resized() override;
@@ -109,6 +113,7 @@ private:
     horizon::ui::OutputMeter outputMeter;
 
     horizon::ui::FooterBar footerBar;
+    horizon::ui::AboutPanel aboutPanel;
 
     // Every control below sets its own setTooltip() text; without an actual
     // TooltipWindow instance somewhere in the component tree, that text is

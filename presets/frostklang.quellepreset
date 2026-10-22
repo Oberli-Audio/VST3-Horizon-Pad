@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Frostklang" author="Quelle Music" category="In-between"
+              description="Cold, bright and sharp - a frozen ring that speaks at once."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="29.8"/>
+      <PARAM id="clearingVolume" value="29.8"/>
+      <PARAM id="expanseVolume" value="69.5"/>
+      <PARAM id="bloomVolume" value="34.6"/>
+      <PARAM id="attackMacro" value="53.68"/>
+      <PARAM id="releaseMacro" value="77.54"/>
+      <PARAM id="filterMacro" value="75"/>
+      <PARAM id="reverbMacro" value="35"/>
+      <PARAM id="widthMacro" value="55"/>
+      <PARAM id="detuneMacro" value="55"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

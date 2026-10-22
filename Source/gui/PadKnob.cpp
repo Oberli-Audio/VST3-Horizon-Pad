@@ -31,7 +31,8 @@ PadKnob::PadKnob (HorizonPadAudioProcessor& processorToUse, int layerIndex,
       subtitle (std::move (subtitleToUse))
 {
     setUpRingKnob (volumeSlider, accent);
-    volumeSlider.setTooltip (caption + " volume - how loud this layer sits in the mix.");
+    volumeSlider.setTooltip (Params::tooltipFor (volumeParamId));   // parameters.csv
+    volumeSlider.setHelpText (Params::tooltipFor (volumeParamId));
     addAndMakeVisible (volumeSlider);
     volumeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         processorToUse.getAPVTS(), volumeParamId, volumeSlider);
@@ -155,7 +156,7 @@ void PadKnob::paint (juce::Graphics& g)
     const auto slots = computeColumnSlots (getLocalBounds());
     const auto c = computePadControlLayout (slots.control.getUnion (slots.value));
     const auto glow = shownGlow;
-    const auto shownVolume = volumeSlider.getDisplayValue();
+    const auto shownVolume = toUnit ((float) volumeSlider.getDisplayValue());
 
     if (glow > 0.002f)
     {

@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Horizon Pad (Quelle Music) — a four-layer ambient pad synthesiser VST3/Standalone
-plugin, built with JUCE 8.0.4 (C++17). Everything is synthesised in DSP code:
+plugin, built with JUCE 8.0.16 (C++17, pinned by commit; 8.0.11+ bundles the MIT VST 3 SDK). Everything is synthesised in DSP code:
 no samples, audio files, or bitmap artwork anywhere in the repo — oscillators,
 the shimmer/pitch-shift engine, and the entire GUI (including the sunset
 banner and mountain range) are drawn/generated in code.
@@ -140,7 +140,7 @@ state is echoed under `activeParams`, and scripts should assert on it.
 **Real-time safety (rule 35).** `-DHORIZON_RTSAN=ON` builds the sound tool with
 RealtimeSanitizer; every `processBlock` then runs as a real-time context, and any
 allocation, lock or system call aborts with a stack trace. Needs Homebrew LLVM (Apple
-clang has no RTSan) and, with JUCE 8.0.4, two workarounds - the SDK's libc++ headers
+clang has no RTSan) and, as found with JUCE 8.0.4 (not yet re-checked on 8.0.16), two workarounds - the SDK's libc++ headers
 and a private JUCE copy without one deprecated constructor clang 23 rejects (playbook
 D.1.6):
 
@@ -266,9 +266,10 @@ full thread-safety model before touching processor state.
 
 A 1080×748 layout, pixel-accurate to a design handoff — every child paints
 its own precise layout rather than scaling a shared "design surface"; the
-footer's SIZE menu scales the whole editor 75-150% with a transform on top of
-the host's own scale (`setScaleFactor`, remembered per instance and in
-`EditorSettings.xml` beside `UserPresets.xml`). Since the UI review of
+footer's SIZE menu scales the whole editor 75-200% with a transform on top of
+the host's own scale (`setScaleFactor`; a machine-local preference in
+`EditorSettings.xml`, never in the session, since 0.1.0 - EX-008 records that the
+skill wants a content-component transform and host resizing instead). Since the UI review of
 2026-10-17 every knob behaves like a DAW knob (`AnimatedKnob::bindParameter`:
 double-click reset, the host's right-click menu, Tab and arrow keys, an
 accessible name) and no control takes keyboard focus on a click, so the

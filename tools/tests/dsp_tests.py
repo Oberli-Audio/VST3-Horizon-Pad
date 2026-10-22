@@ -805,6 +805,263 @@ def test_automation_is_zipper_free():
             raise Fail(f"{pid}: a fast sweep clicks ({d['safety']['clickCount']} discontinuities)")
 
 
+
+# ---------------------------------------------------------------------------
+# The parameter table (parameters.csv) is the single source (S.1, 2026-10-21)
+# ---------------------------------------------------------------------------
+REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+
+
+def test_parameter_table_matches_plugin():
+    """The plugin's layout is parameters.csv's, and the generated files are current.
+
+    The layout is written by hand only because ATTACK/RELEASE show a time the
+    table cannot express yet; this diff keeps it honest: IDs, order, names,
+    0..100 ranges and defaults against the CSV (paramgen.py check --list-params
+    plus name and range), the manual and Source/Params.h regenerated and compared.
+    """
+    import csv
+    paramgen = os.path.join(REPO, "scripts", "dsp-kit", "paramgen.py")
+    table = os.path.join(REPO, "parameters.csv")
+    r = subprocess.run([TOOL, "--list-params"], capture_output=True, text=True)
+    if r.returncode != 0 or not r.stdout.lstrip().startswith("["):
+        raise Fail(f"--list-params gave no parameter list (exit {r.returncode}); the harness must answer it")
+    listing = json.loads(r.stdout)
+    with tempfile.TemporaryDirectory() as tmp:
+        lp = os.path.join(tmp, "params.json")
+        with open(lp, "w") as f:
+            json.dump(listing, f)
+        c = subprocess.run([sys.executable, paramgen, "check", table,
+                            "--manual", os.path.join(REPO, "docs", "parameters.md"), "--list-params", lp],
+                           capture_output=True, text=True)
+        if c.returncode != 0:
+            raise Fail("paramgen check: " + (c.stdout + c.stderr).strip()[-600:])
+        gen = os.path.join(tmp, "Params.h")
+        subprocess.run([sys.executable, paramgen, "juce", table, "-o", gen], check=True, capture_output=True)
+        with open(gen) as f1, open(os.path.join(REPO, "Source", "Params.h")) as f2:
+            if f1.read() != f2.read():
+                raise Fail("Source/Params.h is stale: run scripts/dsp-kit/paramgen.py juce parameters.csv -o Source/Params.h")
+    with open(table, newline="", encoding="utf-8") as f:
+        rows = {row["id"]: row for row in csv.DictReader(f)}
+    for item in listing:
+        row = rows.get(item["id"])
+        if row is None:
+            continue   # paramgen reported it already
+        for key, want in (("name", row["name"]), ("min", float(row["min"])), ("max", float(row["max"])),
+                          ("default_plain", float(row["default"]))):
+            got = item.get(key)
+            if (got != want) if key == "name" else (got is None or abs(float(got) - want) > 1e-3):
+                raise Fail(f"{item['id']}: plugin {key} {got!r}, parameters.csv {want!r}")
+
+
+
+# ---------------------------------------------------------------------------
+# Session state (D.5.3): version 2 since 0.1.0 (2026-10-21)
+# ---------------------------------------------------------------------------
+ALIAS = {"rootVolume": "root", "clearingVolume": "clearing", "expanseVolume": "expanse", "bloomVolume": "bloom",
+         "attackMacro": "attack", "releaseMacro": "release", "filterMacro": "filter", "reverbMacro": "reverb",
+         "widthMacro": "width", "detuneMacro": "detune"}
+STATE_DIR = os.path.join(REPO, "tools", "tests", "state")
+
+
+def _state_run(extra):
+    """The tool with a state flag: (exit code, JSON or None, stderr). Never raises on a non-zero exit."""
+    r = subprocess.run([TOOL, "--notes=60", "--hold=0.3", "--tail=0.2"] + extra, capture_output=True, text=True)
+    if r.returncode < 0:
+        raise Fail(f"tool crashed (signal {-r.returncode}) on {extra}: {r.stderr[-300:]}")
+    d = json.loads(r.stdout[r.stdout.index("{"):]) if "{" in r.stdout else None
+    return r.returncode, d, r.stderr
+
+
+def _xml_of(blob):
+    import struct
+    if len(blob) < 9 or struct.unpack("<I", blob[:4])[0] != 0x21324356:
+        raise Fail("state blob is not JUCE's XML-in-binary format")
+    return blob[8:].rstrip(b"\0").decode("utf-8")
+
+
+def test_state_round_trip():
+    """State out, in, out is bytewise identical, and a session renders as the preset it was saved on."""
+    with tempfile.TemporaryDirectory() as tmp:
+        for preset in ("init", "sternenzelt", "funkenflug"):
+            a, b = os.path.join(tmp, "a.bin"), os.path.join(tmp, "b.bin")
+            run([f"--preset={preset}", "--notes=60", "--hold=0.3", "--tail=0", f"--state-out={a}"])
+            code, d, err = _state_run([f"--state-in={a}", f"--state-out={b}"])
+            if code != 0:
+                raise Fail(f"{preset}: its own state was refused: {err[-200:]}")
+            if open(a, "rb").read() != open(b, "rb").read():
+                raise Fail(f"{preset}: state out -> in -> out differs bytewise")
+            if 'version="2"' not in _xml_of(open(a, "rb").read()):
+                raise Fail(f"{preset}: the state carries no version 2")
+            x, _ = render([f"--preset={preset}", "--seed=1", "--notes=48,60,64", "--hold=1.5", "--tail=0.5"])
+            y, _ = render([f"--state-in={a}", "--seed=1", "--notes=48,60,64", "--hold=1.5", "--tail=0.5"])
+            resid = 20 * np.log10(max(np.max(np.abs(x - y)), 1e-20))
+            if resid > -120:
+                raise Fail(f"{preset}: the session renders {resid:.1f} dBFS away from the preset")
+
+
+def test_corrupted_state_is_refused():
+    """Any bytes as state: refused with a message and exit 2, or loaded as far as understood; never a
+    crash, never NaN, and the plugin keeps playing (harness contract --state-in, D.5.3)."""
+    import struct
+    good = open(os.path.join(STATE_DIR, "0.1.0.bin"), "rb").read()
+    xml = _xml_of(good)
+    pack = lambda s: struct.pack("<II", 0x21324356, len(s) + 1) + s + b"\0"
+    refused = {
+        "empty": b"",
+        "random": bytes(range(7, 250, 3)),
+        "truncated": good[: len(good) // 2],
+        "foreign": pack(b'<?xml version="1.0"?><SomeOtherPlugin a="1"/>'),
+        "bad length": struct.pack("<II", 0x21324356, 0x7FFFFFF0) + b"<HorizonPadState",
+    }
+    sanitised = {
+        "values not numbers": pack(xml.replace('value="16.7"', 'value="nan"', 1).replace('value="100"', 'value="abc"', 1).encode()),
+        "values out of range": pack(xml.replace('value="80"', 'value="1e9"', 1).replace('value="75"', 'value="-40"', 1).encode()),
+        "flipped bytes": good[:200] + bytes(b ^ 0x5A for b in good[200:260]) + good[260:],
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        for cases, want_refused in ((refused, True), (sanitised, False)):
+            for name, blob in cases.items():
+                path = os.path.join(tmp, "s.bin")
+                open(path, "wb").write(blob)
+                code, d, err = _state_run([f"--state-in={path}"])
+                if code == 3 or d is None:
+                    raise Fail(f"{name}: no clean render (exit {code})")
+                if d["safety"]["hasNanOrInf"]:
+                    raise Fail(f"{name}: NaN or Inf in the output")
+                if d["levels"]["peakDb"] < -60:
+                    raise Fail(f"{name}: the plugin stopped playing (peak {d['levels']['peakDb']:.1f} dBFS)")
+                bad = {k: v for k, v in d["activeParams"].items() if not 0.0 <= float(v) <= 1.0}
+                if bad:
+                    raise Fail(f"{name}: parameters outside their range: {bad}")
+                if want_refused and (code != 2 or "refused" not in err):
+                    raise Fail(f"{name}: should be refused with a message and exit 2, got exit {code}")
+                if not want_refused and name != "flipped bytes" and code != 0:
+                    raise Fail(f"{name}: a readable state with broken values should load (sanitised), got exit {code}")
+
+
+def test_golden_states_load():
+    """Every golden state in tools/tests/state loads into this build with its values and preset name:
+    v1 (before 0.1.0, 0..1, buffers by index) migrates, 0.1.0 loads unchanged (rule 36, D.5.3)."""
+    goldens = sorted(f[:-4] for f in os.listdir(STATE_DIR) if f.endswith(".bin"))
+    if len(goldens) < 2:
+        raise Fail(f"expected the v1 and 0.1.0 goldens, found {goldens}")
+    with tempfile.TemporaryDirectory() as tmp:
+        for g in goldens:
+            want = json.load(open(os.path.join(STATE_DIR, g + ".json"), encoding="utf-8"))
+            out = os.path.join(tmp, "out.bin")
+            code, d, err = _state_run([f"--state-in={os.path.join(STATE_DIR, g + '.bin')}", f"--state-out={out}"])
+            if code != 0:
+                raise Fail(f"{g}: refused ({err[-200:]})")
+            for k, v in want["params"].items():
+                got = d["activeParams"].get(ALIAS.get(k, k))
+                if got is None or abs(float(got) - float(v)) > 1e-4:
+                    raise Fail(f"{g}: {k} loads as {got}, the golden says {v}")
+            if d["activePreset"] != want["activePreset"]:
+                raise Fail(f"{g}: preset name {d['activePreset']!r}, the golden says {want['activePreset']!r}")
+            if "bufferB" in want:
+                import re
+                xml = _xml_of(open(out, "rb").read())
+                attrs = dict(re.findall(r'(\w+)="([^"]*)"', re.search(r"<BufferB ([^>]*)/>", xml).group(1)))
+                off = {k: (attrs.get(k), v) for k, v in want["bufferB"].items() if abs(float(attrs.get(k, "nan")) - v) > 1e-3}
+                if off:
+                    raise Fail(f"{g}: buffer B migrated wrong: {off}")
+            if "editorScale" in _xml_of(open(out, "rb").read()):
+                raise Fail(f"{g}: the editor size is still saved in the state (machine-local since 0.1.0)")
+
+
+def test_newer_state_loads_what_it_understands():
+    """A session from a newer version loads its parameters, ignores what it does not know, says so."""
+    good = _xml_of(open(os.path.join(STATE_DIR, "0.1.0.bin"), "rb").read())
+    newer = good.replace('version="2"', 'version="7"', 1).replace('pluginVersion="0.1.0"', 'pluginVersion="3.0.0"', 1)
+    newer = newer.replace("</HorizonPadState>", '<FutureThing x="1"/></HorizonPadState>')
+    import struct
+    blob = struct.pack("<II", 0x21324356, len(newer) + 1) + newer.encode() + b"\0"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "n.bin")
+        open(path, "wb").write(blob)
+        code, d, err = _state_run([f"--state-in={path}"])
+    if code != 0:
+        raise Fail(f"a newer session was refused (exit {code}); it should load as far as understood")
+    if "newer" not in d.get("stateNotice", ""):
+        raise Fail(f"no notice that the session is newer: {d.get('stateNotice')!r}")
+    if abs(float(d["activeParams"]["expanse"]) - 1.0) > 1e-4:
+        raise Fail(f"the parameters of the newer session did not load: {d['activeParams']}")
+
+
+
+def test_larger_block_than_prepared():
+    """A host block larger than prepareToPlay announced renders the same sound (D.5.1).
+
+    Found 2026-10-22 (Round 14, harness --max-block): the layers and the FX chain clamped to the
+    prepared size, so everything past it in the block was silence - a gap three quarters long
+    at 4x the announced size. Seeded, so the renders compare sample for sample.
+    """
+    # 1024 = 4 x 256 renders in the same pieces as the reference: bit-identical. 300 renders as
+    # 256 + 44, and the instrument's output depends slightly on where its render calls fall
+    # (-78.6 dBFS here, measured 2026-10-22), so it gets -60. The defect measured -1.8 dBFS.
+    patch = ["--preset=sternenzelt", "--seed=1", "--notes=48,60,64,67", "--seconds=3", "--gate=2"]
+    ref, sr = render(patch + ["--block=256"])
+    for block, limit in ((1024, -120.0), (300, -60.0)):
+        big, _ = render(patch + [f"--block={block}", "--max-block=256"])
+        resid = 20 * np.log10(max(np.max(np.abs(big - ref)), 1e-20))
+        if resid > limit:
+            raise Fail(f"block {block} on a 256 prepare: {resid:.1f} dBFS from the 256-block render (limit {limit:.0f})")
+
+
+
+def test_output_dc_and_knee():
+    """EX-001's triggers, automated (invariant 6, Round 14 S.9).
+
+    The output limiter is odd-symmetric but the mix is not, so where it engages it leaves DC;
+    the 2 Hz blocker after it took the pathological extreme from -58.6 dBFS (EX-001, before
+    the fix) to -80.3 dBFS worst of six. Fails on either trigger: the offset above -60 dBFS
+    at that extreme, or a factory preset reaching the limiter's knee (-1.94 dBFS) in a chord.
+    """
+    extreme = ["--param=root=1", "--param=clearing=1", "--param=expanse=1", "--param=bloom=1",
+               "--param=width=1", "--param=filter=1", "--param=reverb=1",
+               "--notes=48,52,55,60,64,67,72,76", "--velocity=1.0", "--hold=2", "--tail=0.5"]
+    worst = -400.0
+    for rate, block in ((96000, 13), (48000, 512)):
+        for seed in range(1, 7):
+            d = run(extreme + [f"--sample-rate={rate}", f"--block={block}", f"--seed={seed}"])
+            dc = max(abs(d["levels"]["dcOffsetL"]), abs(d["levels"]["dcOffsetR"]))
+            worst = max(worst, 20 * np.log10(max(dc, 1e-20)))
+    if worst > -60.0:
+        raise Fail(f"output DC {worst:.1f} dBFS at the limiter's extreme (EX-001 trigger: -60)")
+    knee_db = 20 * np.log10(0.80)
+    for p in list_presets():
+        d = run([f"--preset={p['slug']}", "--seed=1", "--notes=48,55,60,64,67", "--hold=3", "--tail=1"])
+        if d["levels"]["peakDb"] > knee_db:
+            raise Fail(f"{p['name']} peaks at {d['levels']['peakDb']:.2f} dBFS, past the limiter knee "
+                       f"({knee_db:.2f}) - EX-001 trigger: a factory preset reaching the knee")
+
+
+
+def test_about_copy_is_fourteen_lines():
+    """The About box copies the fourteen diagnostics fields and nothing else
+    (ux-ui-design-bob audio-plugins.md 14, ship-bob feedback-loop.md 3): no user name, no paths."""
+    r = subprocess.run([TOOL, "--diagnostics", "--sample-rate=44100", "--block=256"], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise Fail(f"--diagnostics failed (exit {r.returncode}): {r.stderr[:200]}")
+    lines = r.stdout.strip("\n").split("\n")
+    want = ["Product", "Version", "Sound version", "Build", "Build date", "Format", "Host", "OS",
+            "Architecture", "Rosetta", "Sample rate", "Buffer size", "Editor scale", "Preset"]
+    labels = [l.split(":", 1)[0] for l in lines]
+    if labels != want:
+        raise Fail(f"diagnostics fields {labels}, want exactly {want}")
+    fields = {l.split(":", 1)[0]: l.split(":", 1)[1].strip() for l in lines}
+    version = open(os.path.join(REPO, "VERSION")).read().strip()
+    if fields["Version"] != version:
+        raise Fail(f"Version {fields['Version']!r} but VERSION says {version!r}")
+    if fields["Sample rate"] != "44100 Hz" or fields["Buffer size"] != "256 samples":
+        raise Fail(f"rate/buffer not the ones the plugin runs at: {fields['Sample rate']!r}, {fields['Buffer size']!r}")
+    home = os.path.expanduser("~")
+    for private in (home, os.environ.get("USER", "\0"), os.path.basename(home)):
+        if private and private in r.stdout:
+            raise Fail(f"the copy contains something private ({private!r})")
+
+
 TESTS = {name[5:]: fn for name, fn in sorted(globals().items())
          if name.startswith("test_")}
 

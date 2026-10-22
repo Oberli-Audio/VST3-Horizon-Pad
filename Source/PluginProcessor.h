@@ -12,6 +12,7 @@
 #include "dsp/FxChain.h"
 #include "presets/Presets.h"
 #include "presets/UserPresetStore.h"
+#include "presets/PresetFile.h"
 
 /**
     Horizon Pad - a four-layer ambient pad synthesiser.
@@ -28,9 +29,12 @@
         wheel being dragged, and read once per block by the audio thread. No
         lock anywhere on the audio path.
 
-      * Programs are applied on whatever thread the host calls setCurrentProgram
-        on; that only touches parameters (thread-safe), then posts a
-        ChangeBroadcaster message for the editor.
+      * The host sees one program (D.5.3): the bank lives in the plugin. A
+        preset recall (applyFactoryPreset/applyUserPreset, message thread)
+        only touches parameters (thread-safe), then posts a ChangeBroadcaster
+        message for the editor. The active preset is a kind plus a slug and
+        name under presetLock, so getProgramName() and the state can read it
+        from any thread.
 
       * The A/B buffers mirror the mockup's design: an AudioProcessorValueTreeState::
         Listener callback (parameterChanged(), which can fire from ANY thread -
@@ -38,10 +42,10 @@
         GUI edit) keeps the *active* buffer's snapshot in sync with live
         parameter values, so switching or copying buffers is just atomics.
 
-      * User presets (the "+Save preset" library) are message-thread-only: they
-        are created, deleted and read exclusively from GUI actions and editor
-        polling, so the plain std::vector needs no extra synchronisation - the
-        audio thread never touches it.
+      * User presets (.quellepreset files in the User folder) are
+        message-thread-only: scanned, saved, imported and deleted exclusively
+        from GUI actions, so the plain std::vector needs no extra
+        synchronisation - the audio thread never touches it.
 */
 class HorizonPadAudioProcessor final : public juce::AudioProcessor,
                                        public juce::ChangeBroadcaster,
@@ -104,19 +108,39 @@ public:
     /** For the on-screen PITCH/MOD wheels (mouse-dragged, not host-automated). */
     horizon::PerformanceState& getPerformanceState() noexcept { return performanceState; }
 
-    /** Factory programs (read-only, host-visible via getProgramName/setCurrentProgram). */
+    /** The factory bank (read-only, in presets.csv's order; Init first). */
     const std::vector<horizon::Preset>& getPresets() const { return horizon::getFactoryPresets(); }
+    void applyFactoryPreset (int index);
 
-    /** User-saved presets (the "+Save preset" library) - global, shared across
-        every instance via a small file on disk, not part of the host's own
-        program list. */
-    const std::vector<horizon::UserPreset>& getUserPresets() const noexcept { return userPresets; }
+    /** The player's presets - .quellepreset files in the User folder, shared
+        by every instance (UserPresetStore). Message thread. */
+    const std::vector<horizon::Preset>& getUserPresets() const noexcept { return userPresets; }
+    void refreshUserPresets();
     void saveCurrentAsUserPreset (const juce::String& name);
     void deleteUserPreset (int index);
     void applyUserPreset (int index);
 
+    /** Reads a .quellepreset (a friend's, or an exported one), copies it into
+        the User folder and recalls it. Returns an empty string, or the reason
+        it was refused (D.5.3: a newer file is never half-loaded). */
+    juce::String importPreset (const juce::File& file);
+
+    /** Writes the current sound as a .quellepreset. Empty, or why not. */
+    juce::String exportPreset (const juce::File& file) const;
+
     PresetKind getActivePresetKind() const noexcept { return (PresetKind) activePresetKind.load (std::memory_order_relaxed); }
-    int getActivePresetIndex() const noexcept { return activePresetIndex.load (std::memory_order_relaxed); }
+
+    /** Index into getPresets() or getUserPresets() by the active kind, or -1.
+        Message thread. */
+    int getActivePresetIndex() const;
+
+    /** The active preset's display name; any thread. */
+    juce::String getActivePresetName() const;
+
+    /** Set by the last setStateInformation(): empty when it loaded, a
+        sentence when it was refused ("refused: ...") or came from a newer
+        version and was loaded as far as understood. Any thread. */
+    juce::String getStateNotice() const;
 
     /** True when any of the ten parameters differs from the active preset's
         stored value - the sound has been edited since the recall (or the
@@ -125,10 +149,11 @@ public:
         Message thread. */
     bool isActivePresetModified() const;
 
-    /** The editor's size as a factor of its designed 1080 x 748 (0.75-1.5),
-        per instance and saved with the session; a new instance starts from
-        the size last chosen in any instance (a small settings file beside
-        UserPresets.xml). Message thread. */
+    /** The editor's size as a factor of its designed 1080 x 748 (0.75-2.0):
+        a machine-local preference, not part of the session (ux-ui-design-bob
+        audio-plugins.md 9) - every instance opens at the size last chosen on
+        this machine (EditorSettings.xml in PresetFile::settingsFolder()).
+        Message thread. */
     float getEditorScale() const noexcept { return editorScale; }
     void setEditorScale (float newScale);
 
@@ -166,6 +191,8 @@ private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     void applyPreset (const horizon::Preset& preset);
+    void setActivePreset (PresetKind kind, const juce::String& slug, const juce::String& name);
+    juce::String getActivePresetSlug() const;
     void renderSegment (juce::AudioBuffer<float>& output, int startSample, int numSamples);
     void handleMidiMessage (const juce::MidiMessage& message);
     void noteOn (int midiNote, float velocity);
@@ -232,8 +259,6 @@ private:
     void setSustainPedal (bool down);
     void releaseSlot (int slot);
 
-    std::atomic<int> currentProgram { 0 };
-
     /*  Level meters for the editor: the audio thread accumulates, the editor
         polls the atomics from its frame callback.
 
@@ -271,12 +296,14 @@ private:
     std::array<BufferSnapshot, 2> buffers; // 0 = A, 1 = B
     std::atomic<int> activeBufferIndex { 0 };
 
-    // --- Preset row highlight state (factory or user, or none once buffers diverge).
+    // --- The active preset (factory or user, or none): kind as an atomic,
+    // slug and name under presetLock - see the class-level note.
     std::atomic<int> activePresetKind { (int) PresetKind::factory };
-    std::atomic<int> activePresetIndex { 0 };
+    mutable juce::SpinLock presetLock;
+    juce::String activePresetSlug, activePresetName, stateNotice;
 
-    // --- User preset library (message-thread only - see class-level note).
-    std::vector<horizon::UserPreset> userPresets;
+    // --- User presets (message-thread only - see class-level note).
+    std::vector<horizon::Preset> userPresets;
 
     // --- Editor settings (message thread).
     float editorScale = 1.0f;

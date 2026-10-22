@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Ruhepuls" author="Quelle Music" category="Pad"
+              description="A slow resting pulse, with subtle motion underneath."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="38.7"/>
+      <PARAM id="clearingVolume" value="23.1"/>
+      <PARAM id="expanseVolume" value="19.4"/>
+      <PARAM id="bloomVolume" value="42.6"/>
+      <PARAM id="attackMacro" value="79.15"/>
+      <PARAM id="releaseMacro" value="80.66"/>
+      <PARAM id="filterMacro" value="30"/>
+      <PARAM id="reverbMacro" value="35"/>
+      <PARAM id="widthMacro" value="50"/>
+      <PARAM id="detuneMacro" value="50"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

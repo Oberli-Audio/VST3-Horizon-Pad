@@ -1,0 +1,19 @@
+{
+  "about": "Bloom's swept filter and tremolo",
+  "flags": {
+    "seed": 1,
+    "sample_rate": 48000,
+    "block": 512,
+    "seconds": 4.0,
+    "gate": 2.5,
+    "solo": "bloom",
+    "notes": "48,60,64"
+  },
+  "params": {
+    "reverbMacro": 0.0
+  },
+  "arch": "x86_64",
+  "feedback": false,
+  "commit": "26664b052f07",
+  "rendered": "2026-10-22"
+}

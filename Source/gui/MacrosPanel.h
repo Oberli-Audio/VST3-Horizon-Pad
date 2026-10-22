@@ -40,7 +40,7 @@ private:
         juce::Rectangle<int> valueCell;   // where its readout is drawn (set in resized())
     };
 
-    void setUpKnob (Knob& knob, const juce::String& caption, const juce::String& tooltip, const char* paramId,
+    void setUpKnob (Knob& knob, const juce::String& caption, const char* paramId,
                     juce::Colour accent, HorizonPadAudioProcessor& processor);
 
     std::array<Knob, (size_t) kNumGlobalParams> knobs;

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Mitternachtsblau" author="Quelle Music" category="Pad"
+              description="A deep midnight drone, barely lit."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="53.8"/>
+      <PARAM id="clearingVolume" value="23.6"/>
+      <PARAM id="expanseVolume" value="20.3"/>
+      <PARAM id="bloomVolume" value="10.1"/>
+      <PARAM id="attackMacro" value="85.17"/>
+      <PARAM id="releaseMacro" value="86.68"/>
+      <PARAM id="filterMacro" value="12"/>
+      <PARAM id="reverbMacro" value="40"/>
+      <PARAM id="widthMacro" value="50"/>
+      <PARAM id="detuneMacro" value="50"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

@@ -5,13 +5,22 @@
 namespace horizon::ui
 {
 
-void MacrosPanel::setUpKnob (Knob& knob, const juce::String& caption, const juce::String& tooltip,
-                             const char* paramId, juce::Colour accent, HorizonPadAudioProcessor& processor)
+void MacrosPanel::setUpKnob (Knob& knob, const juce::String& caption, const char* paramId,
+                             juce::Colour accent, HorizonPadAudioProcessor& processor)
 {
     knob.caption = caption;
     knob.accent = accent;
     setUpRingKnob (knob.slider, accent);
+
+    // The table's sentence plus its generated range; ATTACK/RELEASE read as a
+    // time, so their percent range is left off (paramgen has no display column
+    // yet - docs/exceptions.md EX-005).
+    juce::String tooltip (Params::tooltipFor (paramId));
+    if (juce::String (paramId) == ParamID::attackMacro || juce::String (paramId) == ParamID::releaseMacro)
+        tooltip = tooltip.upToFirstOccurrenceOf (" Range ", false, false);
+
     knob.slider.setTooltip (tooltip);
+    knob.slider.setHelpText (tooltip);
     addAndMakeVisible (knob.slider);
 
     knob.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
@@ -26,29 +35,13 @@ void MacrosPanel::setUpKnob (Knob& knob, const juce::String& caption, const juce
 
 MacrosPanel::MacrosPanel (HorizonPadAudioProcessor& processor)
 {
-    setUpKnob (knobs[0], "ATTACK",
-              "How quickly notes fade in - left is fast and percussive, right is slow and gradual. "
-              "Shows Root's attack time; Bloom is about half as long, Clearing and Expanse a little longer.",
-              ParamID::attackMacro, Palette::macroAccents[0], processor);
-    setUpKnob (knobs[1], "RELEASE",
-              "How long notes take to fade out after you release them - left is short, right is long. "
-              "Shows Root's release time before the reverb; Bloom is about two thirds as long.",
-              ParamID::releaseMacro, Palette::macroAccents[1], processor);
-    setUpKnob (knobs[2], "FILTER",
-              "Overall brightness - darker to the left, brighter to the right "
-              "(scales each layer's own filter cutoff curve).",
-              ParamID::filterMacro, Palette::macroAccents[2], processor);
-    setUpKnob (knobs[3], "REVERB",
-              "How much reverb is mixed in - dry at 0%, a full wet tail at 100%.",
-              ParamID::reverbMacro, Palette::macroAccents[3], processor);
-    setUpKnob (knobs[4], "WIDTH",
-              "Stereo width of the whole pad - 0% is mono. The airy pads open first (Expanse, then "
-              "Clearing and Bloom), the foundation (Root) last and least. Mono-safe; the bass stays centred.",
-              ParamID::widthMacro, Palette::macroAccents[4], processor);
-    setUpKnob (knobs[5], "DETUNE",
-              "How far apart each pad's stacked oscillators are tuned - 50% is the designed sound, "
-              "left is tighter and cleaner, right is wider and lusher. Eases off in the bass so low notes stay steady.",
-              ParamID::detuneMacro, Palette::macroAccents[5], processor);
+    // Tooltips come from parameters.csv (Params::tooltipFor, ux-copy / audio-plugins.md 14).
+    setUpKnob (knobs[0], "ATTACK",  ParamID::attackMacro,  Palette::macroAccents[0], processor);
+    setUpKnob (knobs[1], "RELEASE", ParamID::releaseMacro, Palette::macroAccents[1], processor);
+    setUpKnob (knobs[2], "FILTER",  ParamID::filterMacro,  Palette::macroAccents[2], processor);
+    setUpKnob (knobs[3], "REVERB",  ParamID::reverbMacro,  Palette::macroAccents[3], processor);
+    setUpKnob (knobs[4], "WIDTH",   ParamID::widthMacro,   Palette::macroAccents[4], processor);
+    setUpKnob (knobs[5], "DETUNE",  ParamID::detuneMacro,  Palette::macroAccents[5], processor);
 }
 
 MacrosPanel::~MacrosPanel() = default;
@@ -133,7 +126,7 @@ void MacrosPanel::paint (juce::Graphics& g)
             g.setFont (labelFont (11.0f));
             // ATTACK/RELEASE read as a time (Root's, EnvelopeMacro.h), the
             // others as a percentage - the same text the host shows.
-            const auto shown = (float) knob.slider.getDisplayValue();
+            const auto shown = toUnit ((float) knob.slider.getDisplayValue());
             const auto text = row == 0 ? envelopeMacroText (shown, col == 0 ? kRootAttackSeconds : kRootReleaseSeconds)
                                        : juce::String (juce::roundToInt (shown * 100.0f)) + "%";
             g.drawText (text, knob.valueCell, juce::Justification::centred);

@@ -10,26 +10,32 @@ namespace
 {
     juce::String percentText (float value, int)
     {
-        return juce::String (juce::roundToInt (value * 100.0f)) + " %";
+        return juce::String (juce::roundToInt (value)) + " %";
     }
 
     float percentValue (const juce::String& text)
     {
-        return juce::jlimit (0.0f, 1.0f, text.getFloatValue() * 0.01f);
+        return juce::jlimit (0.0f, kParamScale, text.getFloatValue());
     }
 
-    // The size last chosen in any instance, for the next new one: a small
-    // file beside UserPresets.xml.
+    // The size last chosen on this machine, for every instance: a small file
+    // in the settings folder (D.6.4). Before 0.1.0 it sat beside
+    // UserPresets.xml in ~/Library/Quelle Music; the first open moves it.
     std::unique_ptr<juce::PropertiesFile> openEditorSettings()
     {
+        const auto file = PresetFile::settingsFolder().getChildFile ("EditorSettings.xml");
+
+        if (const auto old = PresetFile::legacyFolder().getChildFile ("EditorSettings.xml"); ! file.exists() && old.existsAsFile())
+            if (file.getParentDirectory().createDirectory())
+                old.moveFileTo (file);
+
         juce::PropertiesFile::Options o;
         o.storageFormat = juce::PropertiesFile::storeAsXML;
-        return std::make_unique<juce::PropertiesFile> (
-            horizon::UserPresetStore::getPresetFile().getSiblingFile ("EditorSettings.xml"), o);
+        return std::make_unique<juce::PropertiesFile> (file, o);
     }
 
     constexpr float kMinEditorScale = 0.75f;
-    constexpr float kMaxEditorScale = 1.5f;
+    constexpr float kMaxEditorScale = 2.0f;
 
     /** FILTER/DETUNE macro mapping: 0.5 = the sound design's own validated
         value (no change), <0.5 halves it, >0.5 doubles it, on a log2 curve so
@@ -76,14 +82,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout HorizonPadAudioProcessor::cr
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
-    const juce::NormalisableRange<float> unitRange { 0.0f, 1.0f };
+    // The ranges, defaults and IDs are parameters.csv's (0..100 since state
+    // version 2); test parameter_table_matches_plugin diffs this layout against
+    // it. Written by hand rather than Params::createParameterLayout() only
+    // because ATTACK/RELEASE show a time, which the table cannot express yet.
+    const juce::NormalisableRange<float> hostRange { 0.0f, kParamScale };
 
     auto addPercent = [&] (const char* id, const char* name, float defaultValue)
     {
         layout.add (std::make_unique<juce::AudioParameterFloat> (
             juce::ParameterID { id, 1 },
             name,
-            unitRange,
+            hostRange,
             defaultValue,
             juce::AudioParameterFloatAttributes()
                 .withStringFromValueFunction (percentText)
@@ -98,11 +108,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout HorizonPadAudioProcessor::cr
         layout.add (std::make_unique<juce::AudioParameterFloat> (
             juce::ParameterID { id, 1 },
             name,
-            unitRange,
+            hostRange,
             defaultValue,
             juce::AudioParameterFloatAttributes()
-                .withStringFromValueFunction ([referenceSeconds] (float v, int) { return envelopeMacroText (v, referenceSeconds); })
-                .withValueFromStringFunction ([referenceSeconds] (const juce::String& t) { return envelopeMacroFromText (t, referenceSeconds); })));
+                .withStringFromValueFunction ([referenceSeconds] (float v, int) { return envelopeMacroText (toUnit (v), referenceSeconds); })
+                .withValueFromStringFunction ([referenceSeconds] (const juce::String& t) { return envelopeMacroFromText (t, referenceSeconds) * kParamScale; })));
     };
 
     // The ten (and only ten) host-automatable parameters: four pad volumes,
@@ -120,21 +130,31 @@ juce::AudioProcessorValueTreeState::ParameterLayout HorizonPadAudioProcessor::cr
     // (2026-09-26) rescaled Lagerfeuer again (net -0.4 dB after the register pass), when WIDTH stopped
     // losing level and REVERB stopped dipping (docs/sound-design-v2.md), and
     // these follow it.
-    addPercent (ParamID::rootVolume,     "Root",     0.477f);
-    addPercent (ParamID::clearingVolume, "Clearing", 0.191f);
-    addPercent (ParamID::expanseVolume,  "Expanse",  0.096f);
-    addPercent (ParamID::bloomVolume,    "Bloom",    0.159f);
+    const auto defaultOf = [] (const char* id)
+    {
+        for (const auto& spec : kParamSpecs)
+            if (juce::String (spec.id) == id)
+                return spec.defaultValue;
+
+        jassertfalse;
+        return 0.0f;
+    };
+
+    addPercent (ParamID::rootVolume,     "Root",     defaultOf (ParamID::rootVolume));
+    addPercent (ParamID::clearingVolume, "Clearing", defaultOf (ParamID::clearingVolume));
+    addPercent (ParamID::expanseVolume,  "Expanse",  defaultOf (ParamID::expanseVolume));
+    addPercent (ParamID::bloomVolume,    "Bloom",    defaultOf (ParamID::bloomVolume));
     // ATTACK/RELEASE: Lagerfeuer's 73.13% on the curve of A-009 (Root
     // attack 0.64 s, release 0.70 s).
-    addEnvelopeTime (ParamID::attackMacro,  "Attack",  0.7313f, kRootAttackSeconds);
-    addEnvelopeTime (ParamID::releaseMacro, "Release", 0.7313f, kRootReleaseSeconds);
-    addPercent (ParamID::filterMacro,    "Filter",   0.30f);
-    addPercent (ParamID::reverbMacro,    "Reverb",   0.20f);
-    addPercent (ParamID::widthMacro,     "Width",    0.40f);
+    addEnvelopeTime (ParamID::attackMacro,  "Attack",  defaultOf (ParamID::attackMacro), kRootAttackSeconds);
+    addEnvelopeTime (ParamID::releaseMacro, "Release", defaultOf (ParamID::releaseMacro), kRootReleaseSeconds);
+    addPercent (ParamID::filterMacro,    "Filter",   defaultOf (ParamID::filterMacro));
+    addPercent (ParamID::reverbMacro,    "Reverb",   defaultOf (ParamID::reverbMacro));
+    addPercent (ParamID::widthMacro,     "Width",    defaultOf (ParamID::widthMacro));
     // 0.0 since 2026-10-07: the owner preferred the default patch at DETUNE 0%
     // over the designed detune (50%) in the blind A/B of 2026-10-06. 50% still
     // reproduces the designed detune exactly; the defaults stay Lagerfeuer's.
-    addPercent (ParamID::detuneMacro,    "Detune",   0.00f);
+    addPercent (ParamID::detuneMacro,    "Detune",   defaultOf (ParamID::detuneMacro));
 
     return layout;
 }
@@ -164,11 +184,12 @@ HorizonPadAudioProcessor::HorizonPadAudioProcessor()
     // setValueNotifyingHost() here - hosts dislike parameter traffic from a
     // processor constructor.
     //
-    // The bank is ordered by family and envelope length (2026-10-07), so the
-    // preset the defaults equal is not necessarily program 0. Point the
-    // program index and the preset bar at it, so the name shown at startup is
-    // the sound heard. Matched by value, not by name: renaming or reordering
-    // the bank cannot break it (test startup_program_matches_defaults).
+    // The preset the defaults equal is Init (Lagerfeuer, first in the bank
+    // since 2026-10-21; presetlint.py render asserts Init = the table). Point
+    // the preset bar at it, so the name shown at startup is the sound heard.
+    // Matched by value, not by name: renaming or reordering the bank cannot
+    // break it (test startup_program_matches_defaults).
+    setActivePreset (PresetKind::none, {}, {});
     {
         const auto& factory = getFactoryPresets();
 
@@ -177,15 +198,14 @@ HorizonPadAudioProcessor::HorizonPadAudioProcessor()
             bool same = true;
 
             for (int i = 0; i < kNumLayers; ++i)
-                same = same && std::abs (factory[p].volumes[(size_t) i] - volumeParams[(size_t) i]->load()) < 1.0e-4f;
+                same = same && std::abs (factory[p].volumes[(size_t) i] - volumeParams[(size_t) i]->load()) < 1.0e-2f;
 
             for (int i = 0; i < kNumGlobalParams; ++i)
-                same = same && std::abs (factory[p].macros[(size_t) i] - macroParams[(size_t) i]->load()) < 1.0e-4f;
+                same = same && std::abs (factory[p].macros[(size_t) i] - macroParams[(size_t) i]->load()) < 1.0e-2f;
 
             if (same)
             {
-                currentProgram.store ((int) p);
-                activePresetIndex.store ((int) p);
+                setActivePreset (PresetKind::factory, factory[p].slug, factory[p].name);
                 break;
             }
         }
@@ -214,9 +234,12 @@ HorizonPadAudioProcessor::HorizonPadAudioProcessor()
     for (auto* id : macroIds())
         apvts.addParameterListener (id, this);
 
-    userPresets = horizon::UserPresetStore::load();
+    // The Factory folder is rewritten on the first run of each version, the
+    // User folder only ever read here (D.6.5).
+    UserPresetStore::syncFactoryFolder();
+    userPresets = UserPresetStore::scan();
 
-    // A new instance opens at the size last chosen in any instance.
+    // Every instance opens at the size last chosen on this machine.
     {
         editorScale = juce::jlimit (kMinEditorScale, kMaxEditorScale,
                                     (float) openEditorSettings()->getDoubleValue ("editorScale", 1.0));
@@ -252,7 +275,7 @@ void HorizonPadAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     }
 
     for (int i = 0; i < kNumLayers; ++i)
-        layerGain[(size_t) i].setCurrentAndTargetValue (volumeParams[(size_t) i]->load());
+        layerGain[(size_t) i].setCurrentAndTargetValue (toUnit (volumeParams[(size_t) i]->load()));
 
     // One-pole DC blocker: y = x - x1 + R*y1, R = 1 - 2*pi*fc/fs.
     dcBlockerCoeff = 1.0f - (juce::MathConstants<float>::twoPi * kDcBlockerHz / (float) sampleRate);
@@ -293,40 +316,31 @@ bool HorizonPadAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 }
 
 //==============================================================================
-int HorizonPadAudioProcessor::getNumPrograms()   { return getNumFactoryPresets(); }
-int HorizonPadAudioProcessor::getCurrentProgram() { return currentProgram.load(); }
+// One program for the host (D.5.3): the bank lives in the plugin. With more,
+// the VST3 wrapper exports a "Program" parameter that takes one of Live's
+// auto-populated slots and is automatable; Live shows no program list anyway.
+int HorizonPadAudioProcessor::getNumPrograms()                     { return 1; }
+int HorizonPadAudioProcessor::getCurrentProgram()                  { return 0; }
+void HorizonPadAudioProcessor::setCurrentProgram (int)             {}
+void HorizonPadAudioProcessor::changeProgramName (int, const juce::String&) {}
 
-const juce::String HorizonPadAudioProcessor::getProgramName (int index)
+const juce::String HorizonPadAudioProcessor::getProgramName (int)
 {
-    const auto& presets = getFactoryPresets();
-
-    if (! juce::isPositiveAndBelow (index, (int) presets.size()))
-        return {};
-
-    return presets[(size_t) index].name;
+    return getActivePresetName();
 }
 
-void HorizonPadAudioProcessor::changeProgramName (int, const juce::String&)
-{
-    // Factory programs are read-only; user variations live in the plugin state,
-    // which the host saves separately.
-}
-
-void HorizonPadAudioProcessor::setCurrentProgram (int index)
+void HorizonPadAudioProcessor::applyFactoryPreset (int index)
 {
     const auto& presets = getFactoryPresets();
 
     if (! juce::isPositiveAndBelow (index, (int) presets.size()))
         return;
 
-    currentProgram.store (index);
-
     // The active-preset fields are set before the counter moves, and the
     // counter before any parameter does, so an editor that sees the new
     // count reads the right preset name and catches every knob before it
     // starts to glide (see getPresetRecallCount()).
-    activePresetKind.store ((int) PresetKind::factory, std::memory_order_relaxed);
-    activePresetIndex.store (index, std::memory_order_relaxed);
+    setActivePreset (PresetKind::factory, presets[(size_t) index].slug, presets[(size_t) index].name);
     presetRecallCount.fetch_add (1, std::memory_order_release);
 
     applyPreset (presets[(size_t) index]);
@@ -438,45 +452,77 @@ void HorizonPadAudioProcessor::copyActiveBufferToOtherBuffer()
 }
 
 //==============================================================================
-bool HorizonPadAudioProcessor::isActivePresetModified() const
+void HorizonPadAudioProcessor::setActivePreset (PresetKind kind, const juce::String& slug, const juce::String& name)
 {
-    const float* vols = nullptr;
-    const float* macros = nullptr;
-    const auto index = getActivePresetIndex();
+    {
+        const juce::SpinLock::ScopedLockType lock (presetLock);
+        activePresetSlug = kind == PresetKind::none ? juce::String() : slug;
+        activePresetName = kind == PresetKind::none ? juce::String() : name;
+    }
+
+    activePresetKind.store ((int) kind, std::memory_order_relaxed);
+}
+
+juce::String HorizonPadAudioProcessor::getActivePresetSlug() const
+{
+    const juce::SpinLock::ScopedLockType lock (presetLock);
+    return activePresetSlug;
+}
+
+juce::String HorizonPadAudioProcessor::getActivePresetName() const
+{
+    const juce::SpinLock::ScopedLockType lock (presetLock);
+    return activePresetName;
+}
+
+juce::String HorizonPadAudioProcessor::getStateNotice() const
+{
+    const juce::SpinLock::ScopedLockType lock (presetLock);
+    return stateNotice;
+}
+
+int HorizonPadAudioProcessor::getActivePresetIndex() const
+{
+    const auto slug = getActivePresetSlug();
 
     switch (getActivePresetKind())
     {
         case PresetKind::factory:
-        {
-            const auto& presets = getFactoryPresets();
-            if (! juce::isPositiveAndBelow (index, (int) presets.size()))
-                return false;
-            vols = presets[(size_t) index].volumes.data();
-            macros = presets[(size_t) index].macros.data();
-            break;
-        }
+            return findFactoryPreset (slug);
 
         case PresetKind::user:
-            if (! juce::isPositiveAndBelow (index, (int) userPresets.size()))
-                return false;
-            vols = userPresets[(size_t) index].vols.data();
-            macros = userPresets[(size_t) index].macros.data();
-            break;
+            for (size_t i = 0; i < userPresets.size(); ++i)
+                if (userPresets[i].slug == slug)
+                    return (int) i;
+            return -1;
 
         case PresetKind::none:
-            return false;
+            break;
     }
+
+    return -1;
+}
+
+bool HorizonPadAudioProcessor::isActivePresetModified() const
+{
+    const auto index = getActivePresetIndex();
+
+    if (index < 0)
+        return false;
+
+    const auto& preset = getActivePresetKind() == PresetKind::factory ? getFactoryPresets()[(size_t) index]
+                                                                      : userPresets[(size_t) index];
 
     // A thousandth of the knob is below anything a hand sets on purpose,
     // and above a float round trip through the host or the state.
-    constexpr float kTolerance = 1.0e-3f;
+    constexpr float kTolerance = 1.0e-3f * kParamScale;
 
     for (int i = 0; i < kNumLayers; ++i)
-        if (std::abs (volumeParams[(size_t) i]->load (std::memory_order_relaxed) - vols[i]) > kTolerance)
+        if (std::abs (volumeParams[(size_t) i]->load (std::memory_order_relaxed) - preset.volumes[(size_t) i]) > kTolerance)
             return true;
 
     for (int i = 0; i < kNumGlobalParams; ++i)
-        if (std::abs (macroParams[(size_t) i]->load (std::memory_order_relaxed) - macros[i]) > kTolerance)
+        if (std::abs (macroParams[(size_t) i]->load (std::memory_order_relaxed) - preset.macros[(size_t) i]) > kTolerance)
             return true;
 
     return false;
@@ -493,22 +539,38 @@ void HorizonPadAudioProcessor::setEditorScale (float newScale)
 }
 
 //==============================================================================
+void HorizonPadAudioProcessor::refreshUserPresets()
+{
+    userPresets = UserPresetStore::scan();
+
+    // A user preset whose file went away (deleted in the Finder) leaves the
+    // sound as it is and clears the name (D.6.5).
+    if (getActivePresetKind() == PresetKind::user && getActivePresetIndex() < 0)
+        setActivePreset (PresetKind::none, {}, {});
+
+    sendChangeMessage();
+}
+
 void HorizonPadAudioProcessor::saveCurrentAsUserPreset (const juce::String& name)
 {
-    UserPreset preset;
+    Preset preset;
     preset.name = name.isNotEmpty() ? name : "Untitled";
+    preset.author = juce::SystemStats::getFullUserName().trim().isNotEmpty() ? juce::SystemStats::getFullUserName().trim()
+                                                                            : juce::SystemStats::getLogonName();
 
     for (int i = 0; i < kNumLayers; ++i)
-        preset.vols[(size_t) i] = volumeParams[(size_t) i]->load (std::memory_order_relaxed);
+        preset.volumes[(size_t) i] = volumeParams[(size_t) i]->load (std::memory_order_relaxed);
 
     for (int i = 0; i < kNumGlobalParams; ++i)
         preset.macros[(size_t) i] = macroParams[(size_t) i]->load (std::memory_order_relaxed);
 
-    userPresets.push_back (preset);
-    UserPresetStore::save (userPresets);
+    juce::String error;
 
-    activePresetKind.store ((int) PresetKind::user, std::memory_order_relaxed);
-    activePresetIndex.store ((int) userPresets.size() - 1, std::memory_order_relaxed);
+    if (auto saved = UserPresetStore::saveNew (preset, error))
+    {
+        userPresets.push_back (*saved);
+        setActivePreset (PresetKind::user, saved->slug, saved->name);
+    }
 
     sendChangeMessage();
 }
@@ -518,19 +580,13 @@ void HorizonPadAudioProcessor::deleteUserPreset (int index)
     if (! juce::isPositiveAndBelow (index, (int) userPresets.size()))
         return;
 
+    const auto deleted = userPresets[(size_t) index];
+    UserPresetStore::remove (deleted);
     userPresets.erase (userPresets.begin() + index);
-    UserPresetStore::save (userPresets);
 
-    const auto activeKind = getActivePresetKind();
-    const auto activeIndex = getActivePresetIndex();
-
-    if (activeKind == PresetKind::user)
-    {
-        if (activeIndex == index)
-            activePresetKind.store ((int) PresetKind::none, std::memory_order_relaxed);
-        else if (activeIndex > index)
-            activePresetIndex.store (activeIndex - 1, std::memory_order_relaxed);
-    }
+    // Deleting the loaded preset keeps the sound and clears the name (D.6.5).
+    if (getActivePresetKind() == PresetKind::user && getActivePresetSlug() == deleted.slug)
+        setActivePreset (PresetKind::none, {}, {});
 
     sendChangeMessage();
 }
@@ -540,35 +596,68 @@ void HorizonPadAudioProcessor::applyUserPreset (int index)
     if (! juce::isPositiveAndBelow (index, (int) userPresets.size()))
         return;
 
-    const auto& preset = userPresets[(size_t) index];
+    const auto preset = userPresets[(size_t) index];
 
-    // Same instant full-parameter jump as applyPreset() - see
-    // freezeBrightnessRequested's doc comment.
-    freezeBrightnessRequested.store (true, std::memory_order_release);
-
-    // Same order as setCurrentProgram(): active-preset fields, then the
+    // Same order as applyFactoryPreset(): active-preset fields, then the
     // recall counter, then the parameters.
-    activePresetKind.store ((int) PresetKind::user, std::memory_order_relaxed);
-    activePresetIndex.store (index, std::memory_order_relaxed);
+    setActivePreset (PresetKind::user, preset.slug, preset.name);
     presetRecallCount.fetch_add (1, std::memory_order_release);
 
-    auto setParam = [&] (const char* id, float value)
-    {
-        if (auto* p = apvts.getParameter (id))
-            p->setValueNotifyingHost (p->convertTo0to1 (value));
-    };
-
-    for (int i = 0; i < kNumLayers; ++i)
-        setParam (volumeIds()[(size_t) i], preset.vols[(size_t) i]);
-
-    for (int i = 0; i < kNumGlobalParams; ++i)
-        setParam (macroIds()[(size_t) i], preset.macros[(size_t) i]);
-
-    // Wheels spring back to rest on a preset change, like a real keyboard.
-    performanceState.setPitchBendSemitones (0.0f);
-    performanceState.setModAmount (0.0f);
+    applyPreset (preset);
 
     sendChangeMessage();
+}
+
+juce::String HorizonPadAudioProcessor::importPreset (const juce::File& file)
+{
+    juce::String error;
+    auto preset = PresetFile::read (file, error);
+
+    if (! preset)
+        return error;
+
+    // An unchanged re-import of a file already in the User folder recalls it.
+    if (file.getParentDirectory() == PresetFile::userFolder())
+    {
+        refreshUserPresets();
+
+        for (size_t i = 0; i < userPresets.size(); ++i)
+        {
+            if (userPresets[i].file == file)
+            {
+                applyUserPreset ((int) i);
+                return {};
+            }
+        }
+    }
+
+    auto copy = UserPresetStore::saveNew (*preset, error);
+
+    if (! copy)
+        return error;
+
+    userPresets.push_back (*copy);
+    applyUserPreset ((int) userPresets.size() - 1);
+    return {};
+}
+
+juce::String HorizonPadAudioProcessor::exportPreset (const juce::File& file) const
+{
+    Preset preset;
+    preset.name = getActivePresetName().isNotEmpty() ? getActivePresetName() : file.getFileNameWithoutExtension();
+    preset.author = juce::SystemStats::getFullUserName().trim().isNotEmpty() ? juce::SystemStats::getFullUserName().trim()
+                                                                            : juce::SystemStats::getLogonName();
+
+    if (const auto index = getActivePresetIndex(); index >= 0 && getActivePresetKind() == PresetKind::factory)
+        preset.category = getFactoryPresets()[(size_t) index].category;
+
+    for (int i = 0; i < kNumLayers; ++i)
+        preset.volumes[(size_t) i] = volumeParams[(size_t) i]->load (std::memory_order_relaxed);
+
+    for (int i = 0; i < kNumGlobalParams; ++i)
+        preset.macros[(size_t) i] = macroParams[(size_t) i]->load (std::memory_order_relaxed);
+
+    return PresetFile::toXml (preset, false)->writeTo (file) ? juce::String() : "Cannot write " + file.getFullPathName();
 }
 
 //==============================================================================
@@ -742,8 +831,18 @@ void HorizonPadAudioProcessor::handleMidiMessage (const juce::MidiMessage& messa
 //==============================================================================
 void HorizonPadAudioProcessor::renderSegment (juce::AudioBuffer<float>& output, int startSample, int numSamples)
 {
+    // A segment longer than the prepared block (a host block larger than
+    // prepareToPlay announced, D.5.1) renders in pieces of the prepared size;
+    // it used to be clamped, leaving the rest of the block silent.
+    while (numSamples > layerBuffer.getNumSamples())
+    {
+        const auto piece = layerBuffer.getNumSamples();
+        renderSegment (output, startSample, piece);
+        startSample += piece;
+        numSamples -= piece;
+    }
+
     const auto numChannels = juce::jmin (2, output.getNumChannels());
-    numSamples = juce::jmin (numSamples, layerBuffer.getNumSamples());
 
     if (numSamples <= 0 || numChannels <= 0)
         return;
@@ -790,14 +889,15 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
     // --- Automatable parameters: set smoothing targets and per-block macros.
     for (int i = 0; i < kNumLayers; ++i)
-        layerGain[(size_t) i].setTargetValue (volumeParams[(size_t) i]->load (std::memory_order_relaxed));
+        layerGain[(size_t) i].setTargetValue (toUnit (volumeParams[(size_t) i]->load (std::memory_order_relaxed)));
 
-    const auto attackScale = attackReleaseTimeScale (macroParams[attackMacroIndex]->load (std::memory_order_relaxed));
-    const auto releaseScale = attackReleaseTimeScale (macroParams[releaseMacroIndex]->load (std::memory_order_relaxed));
-    const auto brightnessMul = macroMultiplier (macroParams[filterMacroIndex]->load (std::memory_order_relaxed));
-    const auto reverbSend = macroParams[reverbMacroIndex]->load (std::memory_order_relaxed);
-    const auto width = macroParams[widthMacroIndex]->load (std::memory_order_relaxed);
-    const auto detuneScale = macroMultiplier (macroParams[detuneMacroIndex]->load (std::memory_order_relaxed));
+    const auto macro = [this] (MacroIndex m) { return toUnit (macroParams[m]->load (std::memory_order_relaxed)); };
+    const auto attackScale = attackReleaseTimeScale (macro (attackMacroIndex));
+    const auto releaseScale = attackReleaseTimeScale (macro (releaseMacroIndex));
+    const auto brightnessMul = macroMultiplier (macro (filterMacroIndex));
+    const auto reverbSend = macro (reverbMacroIndex);
+    const auto width = macro (widthMacroIndex);
+    const auto detuneScale = macroMultiplier (macro (detuneMacroIndex));
 
     // Freeze every layer's currently sounding voices at *last* block's
     // brightness before this block's setMacros() below overwrites it with
@@ -854,7 +954,12 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 
     renderSegment (buffer, position, numSamples - position);
 
-    fxChain.process (buffer, numSamples);
+    // A host may send a block larger than prepareToPlay announced (D.5.1):
+    // the FX chain's buffers hold the prepared size, so it runs in pieces.
+    const auto preparedBlock = layerBuffer.getNumSamples();
+
+    for (int start = 0; start < numSamples; start += preparedBlock)
+        fxChain.process (buffer, start, juce::jmin (preparedBlock, numSamples - start));
 
     // --- Output stage: a fixed make-up gain, then a soft limiter.
     //
@@ -965,104 +1070,186 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
 }
 
 //==============================================================================
+/*  The session state (playbook D.5.3), format PresetFile::kStateVersion = 2:
+
+      <HorizonPadState version="2" dspVersion="1" pluginVersion="0.1.0">
+        <PARAMETERS> <PARAM id="rootVolume" value="47.7"/> ... </PARAMETERS>
+        <Extra activeBuffer="0" presetKind="factory" preset="init"/>
+        <BufferA rootVolume="47.7" ... detuneMacro="0"/>  <BufferB .../>
+      </HorizonPadState>
+
+    Every parameter is written, by ID, in 0..100; the A/B snapshots by ID too;
+    <Extra> holds what is not a parameter. Version 1 (before 0.1.0) stored
+    0..1 values, the buffers as v0..v3/m0..m5, program/activePresetKind/
+    activePresetIndex/editorScale as attributes, or was a bare APVTS tree: it
+    is migrated on load. A newer version loads as far as this one understands
+    and says so (getStateNotice()); anything else is refused and the sound
+    stays as it was. The editor size is machine-local, never in the state. */
+
+namespace
+{
+    const char* const kBufferNames[2] { "BufferA", "BufferB" };
+
+    // The bank's order in version 1, to name the preset a v1 session was on.
+    const char* const kV1FactorySlugs[] { "alpengluehen", "init", "talwind", "frostklang", "funkenflug",
+                                          "steinerne-ruhe", "bergecho", "kupferglanz", "silberpfad",
+                                          "mitternachtsblau", "ruhepuls", "sturmfront", "glasperle",
+                                          "sternenzelt", "daemmerlicht", "goldstaub", "klarheit" };
+
+    /** One value from an attribute, in today's 0..100: missing or broken
+        takes `fallback`, everything is clamped. */
+    float readValue (const juce::XmlElement& element, const juce::String& attribute, float scale, float fallback)
+    {
+        const auto text = element.getStringAttribute (attribute).trim();
+
+        if (! (text.containsOnly ("0123456789.-+eE") && text.containsAnyOf ("0123456789")))
+            return fallback;
+
+        const auto v = (float) text.getDoubleValue() * scale;
+        return std::isfinite (v) ? juce::jlimit (0.0f, kParamScale, v) : fallback;
+    }
+}
+
 void HorizonPadAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    juce::ValueTree root ("HorizonPadState");
-    root.setProperty ("program", currentProgram.load(), nullptr);
-    root.setProperty ("activeBuffer", activeBufferIndex.load (std::memory_order_relaxed), nullptr);
-    root.setProperty ("activePresetKind", activePresetKind.load (std::memory_order_relaxed), nullptr);
-    root.setProperty ("activePresetIndex", activePresetIndex.load (std::memory_order_relaxed), nullptr);
-    root.setProperty ("editorScale", (double) editorScale, nullptr);
-    root.appendChild (apvts.copyState(), nullptr);
+    juce::XmlElement root ("HorizonPadState");
+    root.setAttribute ("version", PresetFile::kStateVersion);
+    root.setAttribute ("dspVersion", PresetFile::kDspVersion);
+    root.setAttribute ("pluginVersion", JucePlugin_VersionString);
 
-    // Both A/B snapshots, independent of whichever one is currently live in
-    // the APVTS (which copyState() above already captures).
-    const char* bufferNames[2] { "BufferA", "BufferB" };
+    auto* parameters = root.createNewChildElement ("PARAMETERS");
 
-    for (int b = 0; b < 2; ++b)
+    for (const auto& spec : kParamSpecs)
     {
-        juce::ValueTree bufferTree (bufferNames[b]);
-
-        for (int i = 0; i < kNumLayers; ++i)
-            bufferTree.setProperty ("v" + juce::String (i), buffers[(size_t) b].vols[(size_t) i].load (std::memory_order_relaxed), nullptr);
-
-        for (int i = 0; i < kNumGlobalParams; ++i)
-            bufferTree.setProperty ("m" + juce::String (i), buffers[(size_t) b].macros[(size_t) i].load (std::memory_order_relaxed), nullptr);
-
-        root.appendChild (bufferTree, nullptr);
+        auto* param = parameters->createNewChildElement ("PARAM");
+        param->setAttribute ("id", spec.id);
+        param->setAttribute ("value", PresetFile::formatValue (apvts.getRawParameterValue (spec.id)->load()));
     }
 
-    if (auto xml = root.createXml())
-        copyXmlToBinary (*xml, destData);
+    auto* extra = root.createNewChildElement ("Extra");
+    extra->setAttribute ("activeBuffer", activeBufferIndex.load (std::memory_order_relaxed));
+
+    switch (getActivePresetKind())
+    {
+        case PresetKind::factory: extra->setAttribute ("presetKind", "factory"); break;
+        case PresetKind::user:    extra->setAttribute ("presetKind", "user"); break;
+        case PresetKind::none:    extra->setAttribute ("presetKind", "none"); break;
+    }
+
+    extra->setAttribute ("preset", getActivePresetSlug());
+    extra->setAttribute ("presetName", getActivePresetName());
+
+    for (size_t b = 0; b < 2; ++b)
+    {
+        auto* buffer = root.createNewChildElement (kBufferNames[b]);
+
+        for (size_t i = 0; i < kParamSpecs.size(); ++i)
+        {
+            const auto& slot = i < (size_t) kNumLayers ? buffers[b].vols[i] : buffers[b].macros[i - (size_t) kNumLayers];
+            buffer->setAttribute (kParamSpecs[i].id, PresetFile::formatValue (slot.load (std::memory_order_relaxed)));
+        }
+    }
+
+    copyXmlToBinary (root, destData);
 }
 
 void HorizonPadAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    auto xml = getXmlFromBinary (data, sizeInBytes);
+    // JUCE's XML-in-binary header carries the text's length: fewer bytes than
+    // that is a truncated blob, which the lenient XML parser would otherwise
+    // half-read.
+    const auto truncated = sizeInBytes >= 8
+                        && juce::ByteOrder::littleEndianInt (data) == 0x21324356
+                        && (juce::int64) juce::ByteOrder::littleEndianInt (juce::addBytesToPointer (data, 4)) > (juce::int64) sizeInBytes - 8;
 
-    if (xml == nullptr)
-        return;
+    const auto xml = truncated ? nullptr : getXmlFromBinary (data, sizeInBytes);
+    const auto bareTree = xml != nullptr && xml->hasTagName (apvts.state.getType().toString());
 
-    auto root = juce::ValueTree::fromXml (*xml);
-
-    if (! root.hasType ("HorizonPadState"))
+    if (xml == nullptr || ! (bareTree || xml->hasTagName ("HorizonPadState")))
     {
-        // Backwards/forwards tolerance: an APVTS-only state still loads.
-        if (root.hasType (apvts.state.getType()))
-            apvts.replaceState (root);
-
+        const juce::SpinLock::ScopedLockType lock (presetLock);
+        stateNotice = "refused: not a Horizon Pad state; the sound was left as it was";
         return;
     }
 
-    if (auto params = root.getChildWithName (apvts.state.getType()); params.isValid())
-        apvts.replaceState (params);
+    const auto version = bareTree ? 1 : xml->getIntAttribute ("version", 1);
+    const auto scale = version < 2 ? kParamScale : 1.0f;
 
-    currentProgram.store (juce::jlimit (0, juce::jmax (0, getNumFactoryPresets() - 1),
-                                        (int) root.getProperty ("program", 0)));
+    // Parameters: every one, migrated and sanitised, into a fresh tree.
+    Preset values;
+    PresetFile::readParameters (bareTree ? xml.get() : xml->getChildByName ("PARAMETERS"), version, values);
 
-    activeBufferIndex.store (juce::jlimit (0, 1, (int) root.getProperty ("activeBuffer", 0)),
-                             std::memory_order_relaxed);
-    activePresetKind.store ((int) root.getProperty ("activePresetKind", (int) PresetKind::factory),
-                            std::memory_order_relaxed);
-    activePresetIndex.store ((int) root.getProperty ("activePresetIndex", 0), std::memory_order_relaxed);
+    juce::ValueTree params (apvts.state.getType());
 
-    if (root.hasProperty ("editorScale"))
-        editorScale = juce::jlimit (kMinEditorScale, kMaxEditorScale, (float) (double) root.getProperty ("editorScale"));
+    for (size_t i = 0; i < kParamSpecs.size(); ++i)
+        params.appendChild (juce::ValueTree ("PARAM", { { "id", kParamSpecs[i].id }, { "value", values.valueAt (i) } }), nullptr);
 
-    const char* bufferNames[2] { "BufferA", "BufferB" };
-    bool haveSavedBuffers = false;
+    apvts.replaceState (params);
 
-    for (int b = 0; b < 2; ++b)
+    // Non-parameter state.
+    int bufferIndex = 0;
+    auto kind = PresetKind::none;
+    juce::String slug, name;
+
+    if (version >= 2)
     {
-        auto bufferTree = root.getChildWithName (bufferNames[b]);
+        if (const auto* extra = xml->getChildByName ("Extra"))
+        {
+            bufferIndex = extra->getIntAttribute ("activeBuffer", 0);
+            const auto k = extra->getStringAttribute ("presetKind");
+            kind = k == "factory" ? PresetKind::factory : k == "user" ? PresetKind::user : PresetKind::none;
+            slug = extra->getStringAttribute ("preset");
+            name = extra->getStringAttribute ("presetName");
+        }
+    }
+    else if (! bareTree)
+    {
+        bufferIndex = xml->getIntAttribute ("activeBuffer", 0);
+        const auto v1Index = xml->getIntAttribute ("activePresetIndex", 0);
 
-        if (! bufferTree.isValid())
-            continue;
-
-        haveSavedBuffers = true;
-
-        for (int i = 0; i < kNumLayers; ++i)
-            buffers[(size_t) b].vols[(size_t) i].store ((float) bufferTree.getProperty ("v" + juce::String (i), 0.0), std::memory_order_relaxed);
-
-        for (int i = 0; i < kNumGlobalParams; ++i)
-            buffers[(size_t) b].macros[(size_t) i].store ((float) bufferTree.getProperty ("m" + juce::String (i), 0.0), std::memory_order_relaxed);
+        // Version 1 kinds: 0 none, 1 factory, 2 user. User presets were
+        // renumbered by the move to files, so only a factory name survives.
+        if (xml->getIntAttribute ("activePresetKind", 1) == 1
+            && juce::isPositiveAndBelow (v1Index, (int) juce::numElementsInArray (kV1FactorySlugs)))
+        {
+            kind = PresetKind::factory;
+            slug = kV1FactorySlugs[v1Index];
+        }
     }
 
-    if (! haveSavedBuffers)
+    if (kind == PresetKind::factory)
     {
-        // Older saved state with no A/B buffers: seed both from the
-        // just-restored live parameter values, matching construction.
-        for (int i = 0; i < kNumLayers; ++i)
-        {
-            buffers[0].vols[(size_t) i].store (volumeParams[(size_t) i]->load(), std::memory_order_relaxed);
-            buffers[1].vols[(size_t) i].store (volumeParams[(size_t) i]->load(), std::memory_order_relaxed);
-        }
+        const auto index = findFactoryPreset (slug);
+        kind = index >= 0 ? kind : PresetKind::none;
+        name = index >= 0 ? getFactoryPresets()[(size_t) index].name : juce::String();
+    }
 
-        for (int i = 0; i < kNumGlobalParams; ++i)
+    setActivePreset (kind, slug, name);
+    activeBufferIndex.store (juce::jlimit (0, 1, bufferIndex), std::memory_order_relaxed);
+
+    // A/B snapshots: by ID since version 2, v0..v3/m0..m5 in 0..1 before.
+    for (size_t b = 0; b < 2; ++b)
+    {
+        const auto* bufferXml = bareTree ? nullptr : xml->getChildByName (kBufferNames[b]);
+
+        for (size_t i = 0; i < kParamSpecs.size(); ++i)
         {
-            buffers[0].macros[(size_t) i].store (macroParams[(size_t) i]->load(), std::memory_order_relaxed);
-            buffers[1].macros[(size_t) i].store (macroParams[(size_t) i]->load(), std::memory_order_relaxed);
+            const auto live = values.valueAt (i);
+            const auto attribute = version >= 2 ? juce::String (kParamSpecs[i].id)
+                                 : i < (size_t) kNumLayers ? "v" + juce::String ((int) i)
+                                                           : "m" + juce::String ((int) i - kNumLayers);
+            const auto v = bufferXml != nullptr ? readValue (*bufferXml, attribute, scale, live) : live;
+            auto& slot = i < (size_t) kNumLayers ? buffers[b].vols[i] : buffers[b].macros[i - (size_t) kNumLayers];
+            slot.store (v, std::memory_order_relaxed);
         }
+    }
+
+    {
+        const juce::SpinLock::ScopedLockType lock (presetLock);
+        stateNotice = version > PresetFile::kStateVersion
+                        ? "Saved by a newer Horizon Pad (" + xml->getStringAttribute ("pluginVersion", "format " + juce::String (version))
+                              + "); loaded what this version understands."
+                        : juce::String();
     }
 
     sendChangeMessage();

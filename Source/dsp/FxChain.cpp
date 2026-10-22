@@ -63,7 +63,7 @@ void FxChain::setParameters (float reverbSend) noexcept
     smoothedReverbSend.setTargetValue (reverbSend);
 }
 
-void FxChain::process (juce::AudioBuffer<float>& buffer, int numSamples)
+void FxChain::process (juce::AudioBuffer<float>& buffer, int startSample, int numSamples)
 {
     const auto numChannels = juce::jmin (2, buffer.getNumChannels());
 
@@ -72,8 +72,8 @@ void FxChain::process (juce::AudioBuffer<float>& buffer, int numSamples)
 
     numSamples = juce::jmin (numSamples, dryMono.getNumSamples());
 
-    auto* left  = buffer.getWritePointer (0);
-    auto* right = numChannels > 1 ? buffer.getWritePointer (1) : left;
+    auto* left  = buffer.getWritePointer (0, startSample);
+    auto* right = numChannels > 1 ? buffer.getWritePointer (1, startSample) : left;
 
     // Each layer now has its own width, so left/right may genuinely differ by
     // this point - the reverb send is still built from a mono sum (a stereo

@@ -179,6 +179,17 @@ macro's staggered profile) and decided: **"Sternenzelt is ok as is."** No
 rebalance into the loudness match; the exception stays accepted, now on the
 owner's ear rather than on the calculation. The trigger above still applies.
 
+### Remeasured, with a numeric trigger (2026-10-22, Round 14 S.11)
+
+Since the 2026-10-07 rematch Sternenzelt sits **1.94 LU below the bank median**
+(-18.07 against -16.13 LUFS; median of 4 seeds, chord 48-55-60-64-67, 8 s, gate 6 s),
+the only preset outside +/-1 LU; the next lowest is Goldstaub at -0.67 LU.
+
+- **Unacceptable if:** Sternenzelt falls more than 3.0 LU below the bank median, or a
+  second preset leaves +/-1 LU, on that measurement.
+
+Friends: Sternenzelt plays about 2 dB quieter than the other presets.
+
 ## EX-003 - Expanse aliases at the top two octaves
 
 - **Date:** 2026-09-24
@@ -252,3 +263,214 @@ solo C7-E7-G7) X was identified correctly and the v2 build was preferred; the no
 v1 reads "not usable". The polyBLAMP triangles (2026-09-26) and, since 2026-10-07,
 v1's two-pole safety lowpass leave the top octave clean enough to hear and use.
 
+---
+
+## EX-004 - The output depends on the host's block size
+
+- **Date:** 2026-10-22
+- **Raised by:** Claude, Round 14 (S.5, while building the harness's `--max-block`)
+- **Rule / target:** rule 18 (control signals at sample rate or in sub-blocks of 32
+  samples at most), D.5.1
+- **Status:** OPEN - to diagnose in its own session (D.8.3)
+
+### What failed, and by how much
+
+Seeded renders that differ only in block size do not null. Sternenzelt, full mix,
+1024-sample blocks against 256: **-19.0 dBFS** peak residual. Per layer (REVERB 0,
+1024 against 32-sample blocks): Expanse **-15.6**, Bloom **-23.1**, Root -60.5,
+Clearing -63.4 dBFS. With WIDTH held at its default (Lagerfeuer, no ramp): Expanse
+-30.3, Bloom -41.2 dBFS. So part of it is the WIDTH smoothing, which advances once per
+render call (`LayerBase::smoothedWidth.skip`) and which Expanse's shimmer reverb reads
+once per call; the rest is not yet identified.
+
+### Why shipping this way is acceptable for now
+
+Within one block size every render is deterministic (`reset_determinism`), a host
+does not change its block size while playing, `automation_is_zipper_free` passes, and
+no step or zipper has been heard. The difference is between two block sizes, not a
+glitch in one.
+
+### What would make it unacceptable
+
+- A step or zipper audible when WIDTH or DETUNE is automated at a 1024 or 2048 buffer.
+- The residual between 2048- and 32-sample blocks above -10 dBFS on any factory preset.
+- A friend reporting that a bounce sounds different from playback at another buffer size.
+
+---
+
+## EX-005 - The parameter layout is written by hand, checked against the table
+
+- **Date:** 2026-10-22
+- **Raised by:** Claude, Round 14 (S.1)
+- **Rule / target:** joint workflow / D.1.2: `parameters.csv` generates the layout
+- **Status:** OPEN - waits for paramgen's display column (the owner fixes the skill)
+
+### What failed
+
+The generated `Source/Params.h` is compiled in (IDs, tooltips, smoothing), but
+`createParameterLayout()` is written by hand: ATTACK and RELEASE show Root's time
+(`dsp/EnvelopeMacro.h`), which `paramgen.py juce` cannot express, and its `percent`
+format at precision 0 prints "47.7 %" in C++ while its Python round trip prints "48 %".
+
+### Why shipping this way is acceptable
+
+`parameter_table_matches_plugin` diffs the plugin's layout against the CSV on every
+test run (IDs, order, names, 0..100 ranges, defaults, steps, automatable, through
+`paramgen.py check --list-params`) and fails on a stale `Params.h` or manual.
+
+### What would make it unacceptable
+
+- paramgen gaining a display column: switch to the generated layout in the release after.
+- Any difference reported by that test.
+
+---
+
+## EX-006 - pluginval has not run under AddressSanitizer
+
+- **Date:** 2026-10-22
+- **Raised by:** Claude, Round 14 (S.6)
+- **Rule / target:** the Tier P release gate (sound-design-bob): pluginval L10 under ASan
+- **Status:** OPEN
+
+### What failed
+
+Not run: it needs pluginval built from source with ASan and an ASan build of the
+plugin (`validate_plugin.py --sanitizer asan`, whose own help calls it Tier F; the
+skills disagree). Neither build exists in this repo yet.
+
+### Why shipping this way is acceptable for now
+
+pluginval strictness 10 passes at all six sample rates on the Release bundle, the
+Steinberg validator 47 of 47, the RTSan suite was clean (2026-10-03), and since this
+round the malloc trap runs in every Release test.
+
+### What would make it unacceptable
+
+- Any crash report from a friend's host.
+- The skills settling ASan at Tier P: then an `asan` preset and pluginval from source
+  before the next shared build.
+
+---
+
+## EX-007 - Blocks over the deadline at 32 samples under Rosetta, idle CPU above 2 %
+
+- **Date:** 2026-10-22
+- **Raised by:** Claude, Round 14 (S.7)
+- **Rule / target:** rule 37 and D.2.1: p99.9 under 25 %, recurring maximum under 50 %,
+  no block over the deadline; D.2.5: idle under 2 % after the tail
+- **Status:** OPEN
+
+### What failed, and by how much
+
+`perf.py run` on the x86_64 slice under Rosetta (Funkenflug, the heaviest preset in a
+17-preset survey; 3 runs of 60 s; M3 Pro):
+
+| fs / block | p50 | p99 | p99.9 | max | reading | over deadline |
+|---|---|---|---|---|---|---|
+| 48000 / 64 | 8.1 % | 9.5 % | 10.5 % | 53.4 % | scheduling | 0 |
+| 44100 / 32 | 11.4 % | 17.0 % | 24.7 % | 3339.5 % | scheduling | **35** |
+
+Idle after the tail: **2.1 %** p50 (2 % budget); both reverbs keep running on silence.
+
+### Why shipping this way is acceptable for now
+
+p99.9 is inside the budget at both block sizes, and every maximum moves between runs
+(scheduling, not the DSP): the harness renders on a normal-priority thread, which the
+OS preempts (see the note in `tools/sound_tool/Main.cpp`); a host's audio thread is not.
+
+### What would make it unacceptable
+
+- p99.9 above 25 % or a recurring (DSP) maximum above 50 % at 44100/32 under Rosetta.
+- Idle above 4 %.
+- A friend reporting dropouts at a buffer of 64 samples or more.
+
+Friends: If Live 10 crackles at a 32-sample buffer on an Apple-silicon Mac, set the buffer to 64 or more.
+
+
+---
+
+## EX-008 - The editor scales through setScaleFactor and cannot be dragged to size
+
+- **Date:** 2026-10-22
+- **Raised by:** Claude, Round 14 (U.1)
+- **Rule / target:** ux-ui-design-bob `audio-plugins.md` 9: a content component in the design's
+  coordinates scaled by a transform, the editor's own constrainer (`setResizable (true, true)`,
+  `setResizeLimits`, fixed aspect ratio); `setScaleFactor` is the host's DPI notification and the
+  plugin never drives it
+- **Status:** OPEN
+
+### What failed
+
+The SIZE menu (75 / 100 / 125 / 150 / 200 % since this round, machine-local since 0.1.0) applies
+the user's scale through `AudioProcessorEditor::setScaleFactor (hostScale * editorScale)`, and the
+window is not resizable by its corner.
+
+### Why shipping this way is acceptable for now
+
+Every size renders sharp (`HorizonPadGuiSnapshot --scale 1 / 1.5 / 2`, checked 2026-10-22), the
+host's own scale is kept apart in `setScaleFactor()`, and five fixed sizes cover a 13" laptop to a
+large screen. Moving the whole editor into a transformed content component is a rebuild of its
+layout and caching, verifiable only in hosts.
+
+### What would make it unacceptable
+
+- A wrong window size or blur in Live 10.1 under Rosetta or Live on Windows, at any SIZE step or
+  after the host's own DPI change.
+- A friend asking for a size between the steps.
+
+---
+
+## EX-009 - Footer text below 4.5:1 at the bright end of the sky
+
+- **Date:** 2026-10-22
+- **Raised by:** Claude, Round 14 (U.2)
+- **Rule / target:** U.2: every text over 4.5:1 (3:1 for large text); the footer is 12.5 px bold
+- **Status:** OPEN - the UI review of 2026-10-17 set the footer's own bar at 3:1
+
+### What failed, and by how much
+
+`snapshot_contrast.py` on the 1x render of the Init preset: footer left ("HORIZON PAD 0.1.0 ·
+VST3") worst 3.54:1, median 4.81:1, against #B76140 (the sunset's brightest row behind it).
+`HorizonScene.h` records 3.8 -> 3.2:1 from the designed palette to golden hour, 5.9:1 at night.
+
+### Why shipping this way is acceptable for now
+
+The UI review of 2026-10-17 lifted the footer from 2.1-2.2:1 to cream and judged >= 3:1 enough
+for a strip that repeats what the editor shows elsewhere (the product name is also the wordmark;
+the SIZE step is in its menu). Raising it to 4.5:1 means a darker band behind the footer or a
+different sky, a design decision.
+
+### What would make it unacceptable
+
+- Any palette taking the footer below 3.0:1.
+- The footer carrying information shown nowhere else (since this round the version line opens
+  the About box, which shows the version at 11.7:1 on a card).
+
+---
+
+## EX-010 - The active preset pill's gold text is 3.19:1
+
+- **Date:** 2026-10-22
+- **Raised by:** Claude, Round 14 (U.2)
+- **Rule / target:** text 4.5:1 (visual-design.md 4); the pill text is about 13 px
+- **Status:** OPEN - a fix is proposed, the owner decides (a visible change to an approved design)
+
+### What failed, and by how much
+
+The active pill draws gold text (#F5AE39) on its gold-tinted fill over the sky: 3.19:1 against
+#735F41 on the Init render (`snapshot_contrast.py`, worst = median). Inactive pills measure
+4.99-6.86:1.
+
+### Why shipping this way is acceptable for now
+
+The active pill is also marked by its gold border and fill, so its state does not depend on
+reading the text, and the same name is shown again, larger, under the wordmark on every recall.
+
+### What would make it unacceptable
+
+- Any palette taking it below 3.0:1.
+
+### The fix, if it is preferred
+
+Cream text (#F3E6C8, the preset title's colour) on the active pill, keeping the gold border and
+fill: about 4.9:1 on the same background by calculation, to be confirmed on the renders.

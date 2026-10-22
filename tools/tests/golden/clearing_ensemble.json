@@ -1,0 +1,19 @@
+{
+  "about": "Clearing's unison saws and stereo ensemble",
+  "flags": {
+    "seed": 1,
+    "sample_rate": 48000,
+    "block": 512,
+    "seconds": 4.0,
+    "gate": 2.5,
+    "solo": "clearing",
+    "notes": "48,55,60"
+  },
+  "params": {
+    "reverbMacro": 0.0
+  },
+  "arch": "x86_64",
+  "feedback": false,
+  "commit": "26664b052f07",
+  "rendered": "2026-10-22"
+}

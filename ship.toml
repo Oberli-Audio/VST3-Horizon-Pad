@@ -1,0 +1,22 @@
+[product]
+name = "Horizon Pad"              # bundle name
+slug = "horizon-pad"              # folder names (tags stay v<VERSION> in this single-plugin repo)
+asset_name = "HorizonPad"         # version-free asset names: HorizonPad-macOS.zip, HorizonPad-Windows-x64.zip
+repo = "bjoernoberli/VST3-Horizon-Pad"
+formats = ["VST3", "Standalone"]  # AU and CLAP declined by the owner 2026-10-06
+tier = "P"                        # P: ad-hoc; F: Developer ID + notarisation
+
+[macos]
+deployment_target = "10.13"
+identity_app = ""                 # "Developer ID Application: Name (TEAMID)" at Tier F
+identity_installer = ""           # "Developer ID Installer: Name (TEAMID)" at Tier F
+notary_profile = ""               # keychain profile from `notarytool store-credentials`
+
+[windows]
+runtime = "MT"
+arch = "SSE4.2"
+installer = false                 # true: build the Inno installer as well (Tier F)
+
+[release]
+sound_changed = false             # true: the changelog section must carry a "Sounds different:" line
+state_version_bumped = true       # true: ... and "will not open in older versions"; the message says so

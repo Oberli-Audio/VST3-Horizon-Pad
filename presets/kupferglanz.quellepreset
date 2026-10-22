@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Kupferglanz" author="Quelle Music" category="In-between"
+              description="Warm copper shine - a present poly synth that speaks quickly."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="29.8"/>
+      <PARAM id="clearingVolume" value="46.2"/>
+      <PARAM id="expanseVolume" value="26.5"/>
+      <PARAM id="bloomVolume" value="19.8"/>
+      <PARAM id="attackMacro" value="59.64"/>
+      <PARAM id="releaseMacro" value="83.5"/>
+      <PARAM id="filterMacro" value="55"/>
+      <PARAM id="reverbMacro" value="30"/>
+      <PARAM id="widthMacro" value="50"/>
+      <PARAM id="detuneMacro" value="50"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

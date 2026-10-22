@@ -54,6 +54,7 @@ namespace
         float scale = 1.0f;
         juce::File framesDir;
         bool knobSheet = false;
+        bool about = false, licences = false;
     };
 
     void printUsage()
@@ -70,7 +71,8 @@ namespace
             "  --frames=<dir>          also write frame_NNNN.png every --frame-every seconds\n"
             "  --frame-every=<s>       frame interval for --frames (default 0.1)\n"
             "  --scale=<factor>        pixel scale, e.g. 2 for Retina (default 1)\n"
-            "  --knob-sheet            instead: the ring knob at rest / hover / drag, per accent colour\n";
+            "  --knob-sheet            instead: the ring knob at rest / hover / drag, per accent colour\n"
+            "  --about / --licences    open the About box (diagnostics / licence texts) before the snapshot\n";
     }
 
     std::optional<Options> parse (int argc, char** argv)
@@ -92,6 +94,8 @@ namespace
             else if (arg.startsWith ("--frames="))          o.framesDir = juce::File::getCurrentWorkingDirectory().getChildFile (value);
             else if (arg.startsWith ("--frame-every="))     o.frameEvery = value.getDoubleValue();
             else if (arg == "--knob-sheet")                 o.knobSheet = true;
+            else if (arg == "--about")                      o.about = true;
+            else if (arg == "--licences")                   o.licences = o.about = true;
             else if (arg.startsWith ("--param="))
                 o.params.emplace_back (value.upToFirstOccurrenceOf ("=", false, false),
                                        value.fromFirstOccurrenceOf ("=", false, false).getFloatValue());
@@ -125,7 +129,7 @@ namespace
         const auto& presets = processor.getPresets();
 
         for (size_t i = 0; i < presets.size(); ++i)
-            if (presets[i].name.equalsIgnoreCase (name))
+            if (presets[i].slug == name || presets[i].name.equalsIgnoreCase (name))   // slug (presets.csv) or display name
                 return (int) i;
 
         return -1;
@@ -208,7 +212,7 @@ int main (int argc, char** argv)
             return 2;
         }
 
-        processor.setCurrentProgram (index);
+        processor.applyFactoryPreset (index);
     }
 
     for (const auto& [id, value] : options->params)
@@ -221,7 +225,7 @@ int main (int argc, char** argv)
             return 2;
         }
 
-        param->setValueNotifyingHost (param->convertTo0to1 (value));
+        param->setValueNotifyingHost (value);   // normalised 0..1, like the sound tool
     }
 
     const auto recallIndex = options->recall.isNotEmpty() ? findPreset (processor, options->recall) : -1;
@@ -237,6 +241,9 @@ int main (int argc, char** argv)
 
     if (editor == nullptr)
         return 1;
+
+    if (options->about)
+        editor->showAbout (options->licences);
 
     juce::AudioBuffer<float> audio (2, kFrameSamples);
     juce::MidiBuffer midi;
@@ -255,7 +262,7 @@ int main (int argc, char** argv)
 
         if (recallIndex >= 0 && ! recalled && now >= options->recallAt)
         {
-            processor.setCurrentProgram (recallIndex);
+            processor.applyFactoryPreset (recallIndex);
             recalled = true;
         }
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Lagerfeuer" author="Quelle Music" category="Pad"
+              description="Warm, close and grounded - the campfire pad."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="47.7"/>
+      <PARAM id="clearingVolume" value="19.1"/>
+      <PARAM id="expanseVolume" value="9.6"/>
+      <PARAM id="bloomVolume" value="15.9"/>
+      <PARAM id="attackMacro" value="73.13"/>
+      <PARAM id="releaseMacro" value="73.13"/>
+      <PARAM id="filterMacro" value="30"/>
+      <PARAM id="reverbMacro" value="20"/>
+      <PARAM id="widthMacro" value="40"/>
+      <PARAM id="detuneMacro" value="0"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

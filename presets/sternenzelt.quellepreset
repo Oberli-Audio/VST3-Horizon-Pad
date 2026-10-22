@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Sternenzelt" author="Quelle Music" category="Pad"
+              description="Vast and celestial - Expanse fills the whole sky."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="16.7"/>
+      <PARAM id="clearingVolume" value="16.7"/>
+      <PARAM id="expanseVolume" value="100"/>
+      <PARAM id="bloomVolume" value="27.8"/>
+      <PARAM id="attackMacro" value="83.67"/>
+      <PARAM id="releaseMacro" value="83.67"/>
+      <PARAM id="filterMacro" value="80"/>
+      <PARAM id="reverbMacro" value="75"/>
+      <PARAM id="widthMacro" value="100"/>
+      <PARAM id="detuneMacro" value="50"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

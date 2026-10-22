@@ -1,0 +1,17 @@
+{
+  "about": "Expanse with its octave shimmer (shimmer_octave_present)",
+  "flags": {
+    "seed": 1,
+    "sample_rate": 48000,
+    "block": 512,
+    "seconds": 4.0,
+    "gate": 2.5,
+    "solo": "expanse",
+    "notes": "60,64,67"
+  },
+  "params": {},
+  "arch": "x86_64",
+  "feedback": true,
+  "commit": "26664b052f07",
+  "rendered": "2026-10-22"
+}

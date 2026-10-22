@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Steinerne Ruhe" author="Quelle Music" category="Pad"
+              description="Stillness carved in stone - minimal, slow and sparse."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="47.6"/>
+      <PARAM id="clearingVolume" value="27.3"/>
+      <PARAM id="expanseVolume" value="27.3"/>
+      <PARAM id="bloomVolume" value="20.3"/>
+      <PARAM id="attackMacro" value="86.68"/>
+      <PARAM id="releaseMacro" value="86.68"/>
+      <PARAM id="filterMacro" value="30"/>
+      <PARAM id="reverbMacro" value="35"/>
+      <PARAM id="widthMacro" value="40"/>
+      <PARAM id="detuneMacro" value="50"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

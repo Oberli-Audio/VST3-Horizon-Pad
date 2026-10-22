@@ -1,0 +1,42 @@
+# dsp-kit - the playbook's executable part (v3.14)
+
+Everything here is tested. Run every check - kit, compiled code blocks, lint - with one
+command after changing anything in the kit or the playbook:
+
+    sh <skill>/scripts/tools/check_all.sh   # <skill> = sound-design-bob in ~/bob-skills
+
+| File | What it is | Check |
+|---|---|---|
+| `dspkit.py` | Measurement library: peak, true peak, RMS, DC, crest; BS.1770 K-weighting at any rate, integrated / momentary / short-term loudness, LRA; null residual and latency; harmonic profile and THD; Schroeder t60; centroid; click score; repeat variation (the "sterile" descriptor, I.1); run statistics (F.13.9); block-time report with p99.9, over-deadline, worst-block position, first block and warm-up (rule 37, contract v3); absolute `max_click_db`; peak and RMS residual; `render()` / `assert_echo()` / `list_presets()` for the harness contract | `python3 test_dspkit.py` - 33 tests: BS.1770 coefficients at 48 kHz, EBU Tech 3341 cases 1-4 (case 1 at six rates), EBU Tech 3342 cases 1-3, analytic peak/THD/t60/latency/null checks, the harness contract including a dropped `--param`, exit 3, arch echo, and both tools' self-tests |
+| `harness-contract.md` | What every product's offline renderer implements (v3): flags incl. `--gate`, `--reprepare-at`, `--preset-at`, `--warmup`, random blocks from 0, state in from any bytes; JSON with `build.arch` and the full `profile`; list formats; exit codes | Implemented by `fake_harness.py` |
+| `test_template.py` | Project test scaffold with labels `fast` (echo incl. flags, seeded determinism, the 42-combination rate x block matrix incl. block 0, random blocks, oversized blocks, silence test at 48 k/64 with `--gate`, latency by cross-correlation, tail, state round trip, corrupted state) and `render` (goldens with sidecars and the F.8 tolerances, arch-aware; presence-test stub); per-test seconds, a budget on `fast`; CTest snippet | `HARNESS=$PWD/fake_harness.py FAST_BUDGET_S=120 python3 test_template.py --label fast` |
+| `fake_harness.py` | An instrument-shaped renderer implementing contract v3 (three presets, gate, synthetic block times with a first-block and preset-change spike) with environment switches that plant defects, so every kit check is shown failing before it is trusted (D.3.8) | - |
+| `presetlint.py` | The preset bank as a deliverable (F.14.3, D.8.8): `bank` checks `presets.csv` (slugs, names, one Init first, categories, edge presets, size by tier) and the harness listing; `render` checks Init = table defaults, seeded loudness spread (1 LU at P, 0.35 LU over N at F), true peak, NaN, click on note-off, CPU per preset, state round trip, drift against a baseline; writes `docs/presets.md` | `python3 presetlint.py selftest` (every check fails on a planted defect) |
+| `perf.py` | The CPU budget as a measurement (rule 37, D.2.1): presets x configurations x runs, median p50/p99/p99.9, the maximum read as DSP or scheduling by position, first-block and preset-change spikes, idle after the tail, `build.arch` asserted, regression against a baseline of the same machine | `python3 perf.py selftest` |
+| `new_project_docs.py` | Writes the document templates (brief, gate status, G1/G3/G5, exceptions, test plan, measurement report, handoff, decision record) into a project's `docs/`, extracted from the playbook so there is one source | `python3 new_project_docs.py /tmp/x --list` |
+| `validate_plugin.py` | Unattended host-compatibility run for any VST3: your build and test commands, the Steinberg validator (built from a pinned SDK commit), pluginval pinned to 1.0.4 with tier profiles (`quick` L5, `full` L10 at all rates and block sizes from 1, `soak` repeated and randomised with a fresh logged seed), tests-started count and verdict parsed, Steinberg by exit code, `--sanitizer asan|tsan` scaling timeouts for a from-source pluginval, an optional RTSan command with its self-test; logs + JSON summary; exit 77 = skipped (D.5.7). pluginval 2.0 (beta, 2026-10) changes the syntax: migrate when it ships | Proven on Horizon Pad 2026-10-06; `check_all.sh` runs its skip path |
+| `code-blocks/` | Compiles and runs the C++ printed in the playbook (F.11 smoother, TPT SVF, ADAA tanh, gain computer and ballistics; E.1 lookahead limiter) at -O2 and under ASan/UBSan | `python3 code-blocks/test_code_blocks.py` |
+
+And for the playbook text itself: `python3 <skill>/scripts/tools/playbook_lint.py`
+(cross-references, legacy references, the invariants mirror, skill routing, versions,
+the core card's word budget; `--self-test` proves it catches each defect class).
+
+## Starting a new product
+
+```bash
+python3 <skill>/scripts/dsp-kit/new_project_docs.py <project>/docs
+cp <skill>/scripts/dsp-kit/test_template.py <project>/tools/tests/test_<product>.py
+# implement the offline renderer to harness-contract.md, then:
+HARNESS=<project>/build/<Harness> python3 -m unittest <project>/tools/tests/test_<product>.py
+```
+
+## Known limits
+
+- `true_peak_dbtp` interpolates with a Kaiser-windowed polyphase FIR, not BS.1770's
+  reference filter: use `oversample=16` to verify a ceiling, and the EBU 3341 true-peak
+  signals for a product meter (A.1).
+- Loudness supports channel weights but has only been tested in mono and stereo.
+- `harmonic_profile` expects a steady tone of at least ~0.5 s; it is not a
+  swept-sine (Farina) distortion measurement (F.13.4, appendix B.1).
+- `click_score` is relative: compare against a clean render of the same material; `max_click_db` is the absolute measure the contract and `presetlint.py` use.
+- `presetlint.py render` and `perf.py run` time out on a real harness only as long as the harness does; with a slow Python fake, the kit's own runs take about a minute each.

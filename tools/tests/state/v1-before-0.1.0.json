@@ -1,0 +1,28 @@
+{
+  "about": "A version-1 session (before 0.1.0, parameters 0..1), synthesised exactly as that build's getStateInformation wrote it.",
+  "activePreset": "Alpenglühen",
+  "params": {
+    "rootVolume": 0.307,
+    "clearingVolume": 0.443,
+    "expanseVolume": 0.375,
+    "bloomVolume": 0.239,
+    "attackMacro": 0.7915,
+    "releaseMacro": 0.7915,
+    "filterMacro": 0.65,
+    "reverbMacro": 0.45,
+    "widthMacro": 0.8,
+    "detuneMacro": 0.5
+  },
+  "bufferB": {
+    "rootVolume": 16.7,
+    "clearingVolume": 16.7,
+    "expanseVolume": 100.0,
+    "bloomVolume": 27.8,
+    "attackMacro": 83.67,
+    "releaseMacro": 83.67,
+    "filterMacro": 80.0,
+    "reverbMacro": 75.0,
+    "widthMacro": 100.0,
+    "detuneMacro": 50.0
+  }
+}

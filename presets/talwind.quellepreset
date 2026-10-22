@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Talwind" author="Quelle Music" category="In-between"
+              description="Movement and breeze - a moving synth that answers in a breath."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="26.9"/>
+      <PARAM id="clearingVolume" value="26.9"/>
+      <PARAM id="expanseVolume" value="26.9"/>
+      <PARAM id="bloomVolume" value="50.3"/>
+      <PARAM id="attackMacro" value="65.61"/>
+      <PARAM id="releaseMacro" value="89.46"/>
+      <PARAM id="filterMacro" value="50"/>
+      <PARAM id="reverbMacro" value="35"/>
+      <PARAM id="widthMacro" value="70"/>
+      <PARAM id="detuneMacro" value="50"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

@@ -1,0 +1,16 @@
+{
+  "about": "Saved by 0.1.0 (state version 2) on Sternenzelt; every later release must load it to these values.",
+  "activePreset": "Sternenzelt",
+  "params": {
+    "root": 0.167000010609627,
+    "clearing": 0.167000010609627,
+    "expanse": 1.0,
+    "bloom": 0.277999997138977,
+    "attack": 0.836699962615967,
+    "release": 0.836699962615967,
+    "filter": 0.800000011920929,
+    "reverb": 0.75,
+    "width": 1.0,
+    "detune": 0.5
+  }
+}

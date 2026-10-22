@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "Diagnostics.h"
 
 #include <limits>
 
@@ -67,6 +68,7 @@ HorizonPadAudioProcessorEditor::HorizonPadAudioProcessorEditor (HorizonPadAudioP
     addAndMakeVisible (macrosPanel);
     addAndMakeVisible (outputMeter);
     addAndMakeVisible (footerBar);
+    addChildComponent (aboutPanel);
 
     // The panel (HorizonScene) fills the window edge to edge, so nothing
     // behind the editor ever shows: the host need not paint or blend it.
@@ -102,6 +104,8 @@ HorizonPadAudioProcessorEditor::HorizonPadAudioProcessorEditor (HorizonPadAudioP
     // Tab walks the controls in reading order: presets, wheels, pads, macros.
     setFocusContainerType (FocusContainerType::keyboardFocusContainer);
 
+    footerBar.onAboutClicked = [this] { showAbout(); };
+
     footerBar.onScaleChosen = [this] (float scale)
     {
         horizonProcessor.setEditorScale (scale);
@@ -117,6 +121,12 @@ HorizonPadAudioProcessorEditor::~HorizonPadAudioProcessorEditor()
 {
     stopTimer();
     setLookAndFeel (nullptr);
+}
+
+void HorizonPadAudioProcessorEditor::showAbout (bool openLicences)
+{
+    aboutPanel.setBounds (getLocalBounds());
+    aboutPanel.show (horizon::diagnosticsLines (horizonProcessor), openLicences);
 }
 
 void HorizonPadAudioProcessorEditor::setScaleFactor (float newScale)
@@ -144,9 +154,9 @@ void HorizonPadAudioProcessorEditor::timerCallback()
 
 void HorizonPadAudioProcessorEditor::pullSceneTargets()
 {
-    scene.setTargets (filterParam->load (std::memory_order_relaxed),
-                      reverbParam->load (std::memory_order_relaxed),
-                      widthParam->load (std::memory_order_relaxed));
+    scene.setTargets (horizon::toUnit (filterParam->load (std::memory_order_relaxed)),
+                      horizon::toUnit (reverbParam->load (std::memory_order_relaxed)),
+                      horizon::toUnit (widthParam->load (std::memory_order_relaxed)));
 }
 
 void HorizonPadAudioProcessorEditor::startWave (double startTime, bool fromZero)

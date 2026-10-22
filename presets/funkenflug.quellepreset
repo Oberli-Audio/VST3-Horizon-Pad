@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<QuellePreset name="Funkenflug" author="Quelle Music" category="Lead"
+              description="Bright saw lead - sparks flying, cuts through the band."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+  <HorizonPadState version="2" dspVersion="1">
+    <PARAMETERS>
+      <PARAM id="rootVolume" value="28.1"/>
+      <PARAM id="clearingVolume" value="51.4"/>
+      <PARAM id="expanseVolume" value="18.7"/>
+      <PARAM id="bloomVolume" value="4.7"/>
+      <PARAM id="attackMacro" value="0"/>
+      <PARAM id="releaseMacro" value="29.82"/>
+      <PARAM id="filterMacro" value="65"/>
+      <PARAM id="reverbMacro" value="20"/>
+      <PARAM id="widthMacro" value="25"/>
+      <PARAM id="detuneMacro" value="65"/>
+    </PARAMETERS>
+  </HorizonPadState>
+</QuellePreset>

@@ -55,7 +55,9 @@ public:
     /** Message-thread-free: call from processBlock with the current REVERB macro value (0..1). */
     void setParameters (float reverbSend) noexcept;
 
-    void process (juce::AudioBuffer<float>& buffer, int numSamples);
+    /** numSamples at most the prepared block size; the caller splits a larger
+        host block (PluginProcessor::processBlock, D.5.1). */
+    void process (juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
 
 private:
     // juce::dsp::Reverb driven fully wet (see prepare()) puts out roughly

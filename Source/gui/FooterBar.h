@@ -10,8 +10,8 @@ namespace horizon::ui
 /** The bottom strip: a thin top divider above the product, its version and
     format (left - what support asks for first), the "Wäg zom Läbe - a life
     of joy" tagline (centred), and "4 LAYERS - 6 MACROS" with the SIZE menu
-    (right): 75 / 100 / 125 / 150 % of the designed window, remembered per
-    instance and for the next new one. (Until 2026-10-17 the right side read
+    (right): 75 / 100 / 125 / 150 / 200 % of the designed window, a
+    machine-local preference every instance opens at (not in the session). (Until 2026-10-17 the right side read
     "BUFFER A/B - ...", repeating the A/B buttons' state at a contrast the
     review measured at 2.2:1.) The mountain-skyline silhouette lives in the
     shared panel background (HorizonScene), not here. */
@@ -25,6 +25,9 @@ public:
 
     /** Called with the scale picked from the SIZE menu. */
     std::function<void (float)> onScaleChosen;
+
+    /** Called when the product label (left) is clicked: the About box. */
+    std::function<void()> onAboutClicked;
 
     /** Re-reads what the strip shows; repaints only if it changed. */
     void refreshFromProcessor();
@@ -42,9 +45,23 @@ private:
         float scale = 1.0f;
     };
 
+    /** "HORIZON PAD 0.1.0 · VST3": footer text that answers a click, like SIZE. */
+    class AboutButton final : public juce::Button
+    {
+    public:
+        AboutButton() : juce::Button ("About Horizon Pad") {}
+        void setText (const juce::String& t) { text = t; repaint(); }
+        void paintButton (juce::Graphics&, bool highlighted, bool down) override;
+        int preferredWidth() const;
+
+    private:
+        juce::String text;
+    };
+
     void showSizeMenu();
 
     HorizonPadAudioProcessor& processor;
+    AboutButton aboutButton;
     SizeButton sizeButton;
     float shownScale = -1.0f;
 

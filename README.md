@@ -1,5 +1,11 @@
 # Horizon Pad
 
+<!-- Schnellstart (Deutsch) -->
+**Schnellstart:** Den Ordner `Horizon Pad.vst3` aus dem Zip nach `~/Library/Audio/Plug-Ins/VST3/`
+kopieren (Windows: `C:\Program Files\Common Files\VST3\`) und in Live die Plug-ins neu scannen
+lassen. Horizon Pad auf eine MIDI-Spur ziehen: es startet mit dem Preset "Lagerfeuer". Zuerst ATTACK
+für den Einsatz, FILTER für die Helligkeit und REVERB für den Raum drehen.
+
 **Quelle Music — Horizon Pad v1.0.0**
 
 A four-layer ambient pad synthesiser, built with JUCE and shipped as a VST3
@@ -133,8 +139,9 @@ it's left. These are intentionally *not* automation lanes — see
 - **OUTPUT** reads in dBFS (RMS over 20 ms, ticks at 0 / -6 / -12 / -24 /
   -48, the line holds the recent peak). It is a reference, not a control;
   the limiter never lets the output past -0.04 dBFS.
-- **SIZE** (footer, right) scales the window to 75 / 100 / 125 / 150%. The
-  choice is saved with the session and used for the next new instance.
+- **SIZE** (footer, right) scales the window to 75 / 100 / 125 / 150 / 200%.
+  The choice belongs to your computer: every Horizon Pad opens at the size you
+  chose last, whichever project it is in.
 - The sky follows the sound: FILTER sets the time of day, REVERB hazes the
   ridge, WIDTH spreads the glow; each pad card glows with its own layer. The
   first time the editor opens on an instance the sun rises; after that it
@@ -196,7 +203,7 @@ Each preset's full ten-value parameter set lives in
 
 ## Building
 
-Requirements: **CMake ≥ 3.22** and a C++17 compiler. JUCE 8.0.4 is pulled in
+Requirements: **CMake ≥ 3.22** and a C++17 compiler. JUCE 8.0.16 is pulled in
 automatically by CMake `FetchContent` — there is no submodule to initialise and
 nothing to install first.
 
@@ -390,7 +397,7 @@ rather than copying them, so it cannot drift from the prototype.
   Developer ID on this project) — Gatekeeper will warn on first launch (see
   Installing below for the workaround). This needs the project owner's own
   Apple Developer credentials to resolve; out of scope for a code change.
-- **No free resizing**: the window scales in four steps (SIZE, 75-150%),
+- **No free resizing**: the window scales in five steps (SIZE, 75-200%),
   not by dragging its corner.
 - 64-bit (double-precision) audio processing is not implemented —
   `supportsDoublePrecisionProcessing()` is not overridden, so it defaults to

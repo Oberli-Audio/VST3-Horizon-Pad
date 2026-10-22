@@ -168,7 +168,7 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
         // The highlight is drawn from "activeAmount" (see applyFactoryHighlight()),
         // so the toggled-on colour must not add a fill of its own.
         b->setColour (juce::TextButton::buttonOnColourId, juce::Colours::transparentBlack);
-        b->onClick = [this, i] { processor.setCurrentProgram (i); refreshFromProcessor(); };
+        b->onClick = [this, i] { processor.applyFactoryPreset (i); refreshFromProcessor(); };
         keepFocusWithHost (*b);
         presetScrollContent.addAndMakeVisible (b);
     }
@@ -551,7 +551,7 @@ void PresetBar::stepPreset (int delta)
                                      : ((position + delta) % total + total) % total;
 
     if (target < numFactory)
-        processor.setCurrentProgram (target);
+        processor.applyFactoryPreset (target);
     else
         processor.applyUserPreset (target - numFactory);
 
