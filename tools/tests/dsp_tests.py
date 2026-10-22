@@ -1062,6 +1062,43 @@ def test_about_copy_is_fourteen_lines():
             raise Fail(f"the copy contains something private ({private!r})")
 
 
+
+def test_preset_file_round_trip():
+    """Export a sound as a .quellepreset, import it into a fresh preset folder: it lands in User/,
+    keeps its name and author, and plays the same values; a file from a newer version is refused
+    with a message and nothing is half-loaded (D.6.5, D.5.3)."""
+    import re
+    with tempfile.TemporaryDirectory() as tmp:
+        env_a = dict(os.environ, HORIZON_PRESET_ROOT=os.path.join(tmp, "a"))
+        env_b = dict(os.environ, HORIZON_PRESET_ROOT=os.path.join(tmp, "b"))
+        out = os.path.join(tmp, "Mine.quellepreset")
+        base = ["--notes=60", "--seconds=0.3"]
+        r = subprocess.run([TOOL, "--preset=glasperle", "--param=width=0.9", f"--export-preset={out}"] + base,
+                           capture_output=True, text=True, env=env_a)
+        if r.returncode != 0 or not os.path.exists(out):
+            raise Fail(f"export failed (exit {r.returncode}): {r.stderr[-200:]}")
+        want = json.loads(r.stdout[r.stdout.index("{"):])["activeParams"]
+        r = subprocess.run([TOOL, f"--import-preset={out}"] + base, capture_output=True, text=True, env=env_b)
+        if r.returncode != 0:
+            raise Fail(f"import refused its own export (exit {r.returncode}): {r.stderr[-200:]}")
+        d = json.loads(r.stdout[r.stdout.index("{"):])
+        off = {k: (d["activeParams"][k], v) for k, v in want.items() if abs(float(d["activeParams"][k]) - float(v)) > 1e-4}
+        if off:
+            raise Fail(f"the imported preset plays different values: {off}")
+        if d["activePreset"] != "Glasperle":
+            raise Fail(f"imported preset is named {d['activePreset']!r}, not the exported name")
+        user = os.path.join(tmp, "b", "User")
+        if not any(f.endswith(".quellepreset") for f in os.listdir(user)):
+            raise Fail("the import left no file in the User folder")
+        text = open(out, encoding="utf-8").read()
+        newer = re.sub(r'<HorizonPadState version="\d+"', '<HorizonPadState version="9"', text)
+        newer_path = os.path.join(tmp, "Newer.quellepreset")
+        open(newer_path, "w", encoding="utf-8").write(newer)
+        r = subprocess.run([TOOL, f"--import-preset={newer_path}"] + base, capture_output=True, text=True, env=env_b)
+        if r.returncode != 2 or "newer" not in r.stderr.lower():
+            raise Fail(f"a preset from a newer version was not refused with a message (exit {r.returncode}): {r.stderr[-200:]}")
+
+
 TESTS = {name[5:]: fn for name, fn in sorted(globals().items())
          if name.startswith("test_")}
 

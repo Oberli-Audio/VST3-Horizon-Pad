@@ -51,6 +51,7 @@
     nothing. It also replaces the old 15 Hz polling timer.
 */
 class HorizonPadAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                             public juce::FileDragAndDropTarget,
                                              private juce::Timer
 {
 public:
@@ -59,6 +60,10 @@ public:
 
     /** Opens the About box (footer product label; the snapshot tool uses it too). */
     void showAbout (bool openLicences = false);
+
+    // A .quellepreset dropped on the editor is imported (D.6.5).
+    bool isInterestedInFileDrag (const juce::StringArray& files) override;
+    void filesDropped (const juce::StringArray& files, int x, int y) override;
 
     void paint (juce::Graphics&) override;
     void resized() override;

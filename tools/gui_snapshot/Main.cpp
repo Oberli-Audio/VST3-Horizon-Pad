@@ -41,6 +41,7 @@
 #include "PluginEditor.h"
 
 #include <iostream>
+#include <mach/mach.h>
 
 namespace
 {
@@ -55,6 +56,7 @@ namespace
         juce::File framesDir;
         bool knobSheet = false;
         bool about = false, licences = false;
+        int reopen = 0;
     };
 
     void printUsage()
@@ -72,7 +74,8 @@ namespace
             "  --frame-every=<s>       frame interval for --frames (default 0.1)\n"
             "  --scale=<factor>        pixel scale, e.g. 2 for Retina (default 1)\n"
             "  --knob-sheet            instead: the ring knob at rest / hover / drag, per accent colour\n"
-            "  --about / --licences    open the About box (diagnostics / licence texts) before the snapshot\n";
+            "  --about / --licences    open the About box (diagnostics / licence texts) before the snapshot\n"
+            "  --reopen=<n>            instead: open, play and paint the editor n times; report memory (U.7)\n";
     }
 
     std::optional<Options> parse (int argc, char** argv)
@@ -95,6 +98,7 @@ namespace
             else if (arg.startsWith ("--frame-every="))     o.frameEvery = value.getDoubleValue();
             else if (arg == "--knob-sheet")                 o.knobSheet = true;
             else if (arg == "--about")                      o.about = true;
+            else if (arg.startsWith ("--reopen="))          o.reopen = arg.fromFirstOccurrenceOf ("=", false, false).getIntValue();
             else if (arg == "--licences")                   o.licences = o.about = true;
             else if (arg.startsWith ("--param="))
                 o.params.emplace_back (value.upToFirstOccurrenceOf ("=", false, false),
@@ -234,6 +238,58 @@ int main (int argc, char** argv)
     {
         std::cerr << "Unknown preset: " << options->recall << "\n";
         return 2;
+    }
+
+    // U.7, offline: open the editor, play a second of audio under it with its
+    // frame callback running, paint it, close it - n times - and report the
+    // resident memory after each round. A leak grows; a steady figure does not.
+    if (options->reopen > 0)
+    {
+        const auto residentMB = []
+        {
+            mach_task_basic_info info {};
+            mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+            task_info (mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t) &info, &count);
+            return (double) info.resident_size / (1024.0 * 1024.0);
+        };
+
+        juce::AudioBuffer<float> audio (2, kFrameSamples);
+        juce::MidiBuffer midi;
+        for (auto note : options->notes)
+            midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+
+        juce::Array<juce::var> rounds;
+        double worstFrameMs = 0.0;
+
+        for (int round = 0; round < options->reopen; ++round)
+        {
+            std::unique_ptr<juce::AudioProcessorEditor> ed (processor.createEditor());
+            auto* hp = dynamic_cast<HorizonPadAudioProcessorEditor*> (ed.get());
+
+            for (int frame = 0; frame < juce::roundToInt (1.0 / kFrameSeconds); ++frame)
+            {
+                audio.clear();
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                processor.processBlock (audio, midi);
+                worstFrameMs = juce::jmax (worstFrameMs, juce::Time::getMillisecondCounterHiRes() - t0);
+                midi.clear();
+
+                if (hp != nullptr)
+                    hp->advanceFrame ((double) (round * 100 + frame) * kFrameSeconds);
+            }
+
+            ed->createComponentSnapshot (ed->getLocalBounds(), true, options->scale);
+            ed.reset();
+            rounds.add (residentMB());
+        }
+
+        auto* json = new juce::DynamicObject();
+        json->setProperty ("reopened", options->reopen);
+        json->setProperty ("residentMB", rounds);
+        json->setProperty ("growthMB", (double) rounds.getLast() - (double) rounds[juce::jmin (2, rounds.size() - 1)]);
+        json->setProperty ("worstAudioBlockMs", worstFrameMs);
+        std::cout << juce::JSON::toString (juce::var (json), true) << std::endl;
+        return 0;
     }
 
     std::unique_ptr<juce::AudioProcessorEditor> editorHolder (processor.createEditor());

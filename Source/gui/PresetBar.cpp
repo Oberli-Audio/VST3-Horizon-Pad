@@ -1,4 +1,5 @@
 #include "PresetBar.h"
+#include "../presets/PresetFile.h"
 #include "../PluginProcessor.h"
 
 namespace horizon::ui
@@ -184,6 +185,14 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
     keepFocusWithHost (saveButton);
     addAndMakeVisible (saveButton);
 
+    browseButton.setClickingTogglesState (false);
+    browseButton.setColour (juce::TextButton::buttonColourId, juce::Colours::transparentBlack);
+    browseButton.setColour (juce::TextButton::textColourOffId, Palette::textKnobLabel);
+    browseButton.setTooltip ("Every preset by category, your own presets, and import or export of a preset file.");
+    browseButton.onClick = [this] { showBrowseMenu(); };
+    keepFocusWithHost (browseButton);
+    addAndMakeVisible (browseButton);
+
     saveNameEditor.setSelectAllWhenFocused (true);
     saveNameEditor.setTooltip ("Type a name, then press Enter or click Save.");
     // Background/outline drawn by PresetBar::paint() instead (a rounded
@@ -294,6 +303,108 @@ PresetBar::PresetBar (HorizonPadAudioProcessor& processorToUse)
 }
 
 PresetBar::~PresetBar() = default;
+
+//==============================================================================
+void PresetBar::showBrowseMenu()
+{
+    // The User folder is re-read whenever the browser opens (D.6.5).
+    processor.refreshUserPresets();
+    syncUserPresetPills();
+    refreshFromProcessor();
+
+    const auto kind = processor.getActivePresetKind();
+    const auto active = processor.getActivePresetIndex();
+    const auto& presets = processor.getPresets();
+    juce::PopupMenu menu;
+
+    juce::StringArray categories;
+    for (const auto& p : presets)
+        categories.addIfNotAlreadyThere (p.category);
+
+    for (const auto& category : categories)
+    {
+        menu.addSectionHeader (category);
+
+        for (int i = 0; i < (int) presets.size(); ++i)
+            if (presets[(size_t) i].category == category)
+                menu.addItem (presets[(size_t) i].name, true, kind == HorizonPadAudioProcessor::PresetKind::factory && active == i,
+                              [this, i] { processor.applyFactoryPreset (i); refreshFromProcessor(); });
+    }
+
+    menu.addSectionHeader ("Your presets");
+    const auto& user = processor.getUserPresets();
+    const auto me = juce::SystemStats::getFullUserName().trim();
+
+    if (user.empty())
+        menu.addItem ("None saved yet", false, false, nullptr);
+
+    for (int i = 0; i < (int) user.size(); ++i)
+    {
+        const auto& p = user[(size_t) i];
+        // A friend's preset says whose it is (the author is read from the file).
+        const auto label = p.author.isNotEmpty() && p.author != me ? p.name + " (" + p.author + ")" : p.name;
+        menu.addItem (label, true, kind == HorizonPadAudioProcessor::PresetKind::user && active == i,
+                      [this, i] { processor.applyUserPreset (i); refreshFromProcessor(); });
+    }
+
+    menu.addSeparator();
+    menu.addItem ("Import preset file...", [this] { importPresetFile(); });
+    menu.addItem ("Export current sound...", [this] { exportPresetFile(); });
+    menu.addItem ("Show the preset folder", []
+    {
+        const auto root = horizon::PresetFile::userFolder();
+        root.createDirectory();
+        root.revealToUser();
+    });
+
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&browseButton));
+}
+
+void PresetBar::importPreset (const juce::File& file)
+{
+    const auto error = processor.importPreset (file);
+    syncUserPresetPills();
+    refreshFromProcessor();
+
+    if (error.isNotEmpty())
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon,
+                                                "Preset not imported", file.getFileName() + ": " + error);
+}
+
+void PresetBar::importPresetFile()
+{
+    fileChooser = std::make_unique<juce::FileChooser> ("Import a Horizon Pad preset",
+                                                       juce::File::getSpecialLocation (juce::File::userDesktopDirectory),
+                                                       juce::String ("*") + horizon::PresetFile::kExtension);
+    fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                              [safe = juce::Component::SafePointer<PresetBar> (this)] (const juce::FileChooser& chooser)
+    {
+        if (safe != nullptr && chooser.getResult() != juce::File())
+            safe->importPreset (chooser.getResult());
+    });
+}
+
+void PresetBar::exportPresetFile()
+{
+    const auto name = processor.getActivePresetName().isNotEmpty() ? processor.getActivePresetName() : juce::String ("Horizon Pad");
+    const auto start = juce::File::getSpecialLocation (juce::File::userDesktopDirectory)
+                           .getChildFile (horizon::PresetFile::slugFor (name) + horizon::PresetFile::kExtension);
+
+    fileChooser = std::make_unique<juce::FileChooser> ("Export the current sound", start,
+                                                       juce::String ("*") + horizon::PresetFile::kExtension);
+    fileChooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                  | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [safe = juce::Component::SafePointer<PresetBar> (this)] (const juce::FileChooser& chooser)
+    {
+        if (safe == nullptr || chooser.getResult() == juce::File())
+            return;
+
+        const auto file = chooser.getResult().withFileExtension (horizon::PresetFile::kExtension);
+
+        if (const auto error = safe->processor.exportPreset (file); error.isNotEmpty())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Preset not exported", error);
+    });
+}
 
 PresetBar::UserPresetPill* PresetBar::addUserPresetPill (const juce::String& name)
 {
@@ -633,6 +744,8 @@ void PresetBar::resized()
     constexpr int kArrowWidth = 26;
     nextButton.setBounds (r.removeFromRight (kArrowWidth));
     r.removeFromRight (4);
+    browseButton.setBounds (r.removeFromLeft (84).reduced (2));
+    r.removeFromLeft (8);
     previousButton.setBounds (r.removeFromLeft (kArrowWidth));
     r.removeFromLeft (4);
 

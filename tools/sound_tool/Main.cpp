@@ -366,6 +366,8 @@ namespace
             "  --state-in=<file>      Load a session state first (any bytes; refused -> exit 2)\n"
             "  --state-out=<file>     Save the session state after the render\n"
             "  --diagnostics          Print the About box's diagnostics block and exit\n"
+            "  --import-preset=<file> Import a .quellepreset first (as the preset bar does)\n"
+            "  --export-preset=<file> Write the current sound as a .quellepreset after the render\n"
             "  --help                 Print this message and exit\n";
     }
 
@@ -1169,7 +1171,7 @@ static int runTool (int argc, char* argv[])
         "hold", "tail", "seconds", "gate", "velocity", "window-ms", "fft-size", "click-threshold", "transient-window",
         "probe-at", "out", "partial-ratios", "notes", "note-onsets", "note-holds", "seed", "state-in", "state-out",
         "preset", "preset-at", "solo", "layer", "param", "pedal", "automate", "bend", "mod", "profile", "warmup",
-        "reprepare-at", "true-peak", "diagnostics" };
+        "reprepare-at", "true-peak", "diagnostics", "import-preset", "export-preset" };
 
     for (const auto& [key, value] : args.values)
     {
@@ -1360,6 +1362,19 @@ static int runTool (int argc, char* argv[])
             stateRefused = notice;
         else if (notice.isNotEmpty())
             std::cerr << "note: " << notice.toStdString() << std::endl;
+    }
+
+    // 0b) A .quellepreset file imported as the preset bar does it (copied
+    //     into the User folder and recalled); refused -> exit 2 with the reason.
+    if (args.has ("import-preset"))
+    {
+        const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (args.getString ("import-preset", ""));
+
+        if (const auto error = processor.importPreset (file); error.isNotEmpty())
+        {
+            std::cerr << "error: --import-preset refused: " << error.toStdString() << std::endl;
+            return 2;
+        }
     }
 
     // 1) Optional factory preset.
@@ -2101,6 +2116,18 @@ static int runTool (int argc, char* argv[])
         wav->setProperty ("written", wavWritten);
         if (wavError.isNotEmpty()) wav->setProperty ("error", wavError);
         root->setProperty ("wav", juce::var (wav));
+    }
+
+    // The current sound as a .quellepreset (the preset bar's Export).
+    if (args.has ("export-preset"))
+    {
+        const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (args.getString ("export-preset", ""));
+
+        if (const auto error = processor.exportPreset (file); error.isNotEmpty())
+        {
+            std::cerr << "error: --export-preset: " << error.toStdString() << std::endl;
+            return 2;
+        }
     }
 
     // The state after the render (harness contract --state-out).

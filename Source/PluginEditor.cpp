@@ -129,6 +129,22 @@ void HorizonPadAudioProcessorEditor::showAbout (bool openLicences)
     aboutPanel.show (horizon::diagnosticsLines (horizonProcessor), openLicences);
 }
 
+bool HorizonPadAudioProcessorEditor::isInterestedInFileDrag (const juce::StringArray& files)
+{
+    for (const auto& f : files)
+        if (f.endsWithIgnoreCase (horizon::PresetFile::kExtension))
+            return true;
+
+    return false;
+}
+
+void HorizonPadAudioProcessorEditor::filesDropped (const juce::StringArray& files, int, int)
+{
+    for (const auto& f : files)
+        if (f.endsWithIgnoreCase (horizon::PresetFile::kExtension))
+            presetBar.importPreset (juce::File (f));
+}
+
 void HorizonPadAudioProcessorEditor::setScaleFactor (float newScale)
 {
     hostScale = newScale;

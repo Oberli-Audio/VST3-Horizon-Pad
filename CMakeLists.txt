@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.25)
 
 # One VERSION file feeds the project, the plugin's version string, the footer and
 # the release (ship-bob versioning-and-provenance.md); the git tag is v + VERSION.
@@ -153,6 +153,28 @@ target_compile_definitions(HorizonPad PUBLIC
     JUCE_REPORT_APP_USAGE=0
     JUCE_STRICT_REFCOUNTEDPOINTER=1)
 
+# Release platform settings (ship-bob versioning-and-provenance.md): no dependency on
+# the friend's MSVC runtime (/MT, also set by the release preset) and the x86-64-v2
+# baseline on Windows.
+if (MSVC)
+    target_compile_options(HorizonPad PUBLIC /arch:SSE4.2)
+endif()
+
+# Symbols of each release (ship-bob feedback-loop.md 6), on with the `release` preset:
+# compiled with debug info, the dSYM split off beside the bundle and the shipped binary
+# stripped (macOS), or the PDB kept beside the DLL (Windows) - so a friend's crash
+# report from that tag can be symbolicated.
+option(HORIZON_RELEASE_SYMBOLS "Keep a dSYM / PDB per format and strip the shipped binary" OFF)
+
+if (HORIZON_RELEASE_SYMBOLS)
+    if (MSVC)
+        target_compile_options(HorizonPad PUBLIC $<$<CONFIG:Release>:/Zi>)
+        target_link_options(HorizonPad PUBLIC $<$<CONFIG:Release>:/DEBUG /OPT:REF /OPT:ICF>)
+    elseif (APPLE)
+        target_compile_options(HorizonPad PUBLIC $<$<CONFIG:Release>:-g>)
+    endif()
+endif()
+
 target_link_libraries(HorizonPad
     PRIVATE
         HorizonPadPresetData
@@ -163,6 +185,16 @@ target_link_libraries(HorizonPad
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+if (HORIZON_RELEASE_SYMBOLS AND APPLE)
+    foreach(format VST3 Standalone)
+        add_custom_command(TARGET HorizonPad_${format} POST_BUILD
+            COMMAND dsymutil "$<TARGET_FILE:HorizonPad_${format}>" -o "$<TARGET_BUNDLE_DIR:HorizonPad_${format}>.dSYM"
+            COMMAND strip -x "$<TARGET_FILE:HorizonPad_${format}>"
+            COMMENT "dSYM and strip: ${format}"
+            VERBATIM)
+    endforeach()
+endif()
 
 # ---------------------------------------------------------------------------
 # HorizonPadSoundTool
@@ -395,7 +427,8 @@ else()
         newer_state_loads_what_it_understands
         larger_block_than_prepared
         output_dc_and_knee
-        about_copy_is_fourteen_lines)
+        about_copy_is_fourteen_lines
+        preset_file_round_trip)
 
     foreach(test_name IN LISTS HORIZON_TEST_NAMES)
         add_test(NAME ${test_name}
