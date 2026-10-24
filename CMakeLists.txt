@@ -372,6 +372,18 @@ endfunction()
 add_executable(HorizonPadSoundTool tools/sound_tool/Main.cpp)
 horizon_configure_tool(HorizonPadSoundTool)
 
+# MSVC's ASan runtime is a DLL beside the cl.exe that built the tool; the tool needs it beside itself.
+if (HORIZON_ASAN AND MSVC)
+    get_filename_component(HORIZON_MSVC_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    set(HORIZON_ASAN_DLL "${HORIZON_MSVC_BIN}/clang_rt.asan_dynamic-x86_64.dll")
+    if (NOT EXISTS "${HORIZON_ASAN_DLL}")
+        message(FATAL_ERROR "HORIZON_ASAN: no ASan runtime at ${HORIZON_ASAN_DLL}")
+    endif()
+    add_custom_command(TARGET HorizonPadSoundTool POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${HORIZON_ASAN_DLL}" "$<TARGET_FILE_DIR:HorizonPadSoundTool>"
+        VERBATIM)
+endif()
+
 # Real-time safety (playbook rule 35): build the tool with RealtimeSanitizer so
 # the test suite runs every processBlock as a real-time context. Needs an
 # upstream LLVM 20+ toolchain, e.g.

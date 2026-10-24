@@ -372,19 +372,11 @@ jobs:
           key: Windows-asan-fetchcontent-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: Windows-asan-fetchcontent-
 
+      # HORIZON_ASAN copies MSVC's ASan runtime DLL beside the tool (CMakeLists.txt).
       - name: Build HorizonPadSoundTool with /fsanitize=address
         run: |
           cmake -B build-asan -G "Visual Studio 17 2022" -A x64 -DHORIZON_ASAN=ON
           cmake --build build-asan --target HorizonPadSoundTool --config RelWithDebInfo
-
-      # The runtime DLL ships beside the cl.exe CMake chose; the tool needs it on PATH.
-      - name: Put the ASan runtime on PATH
-        shell: pwsh
-        run: |
-          $cl = (Select-String -Path build-asan/CMakeCache.txt -Pattern '^CMAKE_CXX_COMPILER:FILEPATH=(.+)$').Matches[0].Groups[1].Value
-          $dir = Split-Path $cl
-          if (-not (Test-Path (Join-Path $dir 'clang_rt.asan_dynamic-x86_64.dll'))) { throw "no ASan runtime beside $cl" }
-          Add-Content -Path $env:GITHUB_PATH -Value $dir
 
       - name: Run the test suite under ASan
         shell: bash
