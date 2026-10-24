@@ -82,6 +82,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# Local fixes on that commit until upstream carries them (cmake/PatchJuce.cmake): applied
+# to the fetched tree, only checked on a FETCHCONTENT_SOURCE_DIR_JUCE checkout.
+include(cmake/PatchJuce.cmake)
+if (FETCHCONTENT_SOURCE_DIR_JUCE)
+    horizon_patch_juce("${juce_SOURCE_DIR}" CHECK_ONLY)
+else()
+    horizon_patch_juce("${juce_SOURCE_DIR}" APPLY)
+endif()
+
 # ---------------------------------------------------------------------------
 # Plugin target
 # ---------------------------------------------------------------------------
@@ -191,6 +200,23 @@ target_link_libraries(HorizonPad
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
+
+# Memory/UB safety (D.1.6 release gate, EX-006): PUBLIC so the flag is also a
+# usage requirement on the final link of HorizonPad_VST3 / HorizonPad_Standalone
+# (the ASan/UBSan runtime must be linked into the actual loadable bundle, not
+# just this static library) and on anything else that links HorizonPad, e.g.
+# HorizonPadSoundTool below - set with the "asan" CMake preset. MSVC has ASan
+# only; its linker picks the runtime up from the objects, and ASan rules out /INCREMENTAL.
+option(HORIZON_ASAN "Build the plugin and HorizonPadSoundTool with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+if (HORIZON_ASAN)
+    if (MSVC)
+        target_compile_options(HorizonPad PUBLIC /fsanitize=address)
+        target_link_options(HorizonPad PUBLIC /INCREMENTAL:NO)
+    else()
+        target_compile_options(HorizonPad PUBLIC -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(HorizonPad PUBLIC -fsanitize=address,undefined)
+    endif()
+endif()
 
 if (HORIZON_RELEASE_SYMBOLS AND APPLE)
     foreach(format VST3 Standalone)

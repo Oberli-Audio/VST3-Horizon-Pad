@@ -196,7 +196,12 @@ def step_validator(a, logs):
     code, out = run([v, a.plugin], logs / "steinberg-validator.log", timeout=1800)
     m = re.search(r"Result: (\d+) tests passed, (\d+) tests failed", out)
     detail = ("%s passed, %s failed (SDK %s)" % (m.group(1), m.group(2), PINS["vst3sdk"]["version"])) if m else "see log"
-    return code == 0 and (m is None or m.group(2) == "0"), detail
+    # Only an Info line to the validator, but it is JUCE reading past an array (UBSan,
+    # 2026-10-25; cmake/PatchJuce.cmake): a JUCE without the patch must not pass.
+    out_of_range_cc = out.count("MIDI Mapping supplied for a wrong ControllerNumbers value")
+    if out_of_range_cc:
+        detail += "; MIDI mapping answered %d out-of-range controller queries (JUCE unpatched?)" % out_of_range_cc
+    return code == 0 and (m is None or m.group(2) == "0") and not out_of_range_cc, detail
 
 
 def pluginval_cmd(a, prof, seed, repeat, randomise, logs, name):

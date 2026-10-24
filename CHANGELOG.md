@@ -27,3 +27,4 @@ The first versioned build for friends.
 ### Fixed
 - The macOS plugin needed the newest macOS of the machine that built it (14.0 from the release build); it runs on macOS 10.13 and newer again.
 - A host block larger than the size announced to the plugin rendered silence for the rest of that block; it now renders in full.
+- A VST3 host asking which parameter a MIDI controller beyond the 130 the plugin maps belongs to (program change, poly pressure) got a wrong answer read from past the end of a table; it now hears that there is none.

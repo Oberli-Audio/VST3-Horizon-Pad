@@ -13,6 +13,9 @@ banner and mountain range) are drawn/generated in code.
 ## Build commands
 
 JUCE is pulled in automatically via CMake `FetchContent` — no submodule init needed.
+Configure applies one local fix to it, `cmake/PatchJuce.cmake` (a bounds check in the
+VST3 wrapper's MIDI mapping, found under UBSan 2026-10-25, unfixed upstream), and stops
+if a JUCE bump removes the line it patches.
 
 ```bash
 # Configure + build the VST3 (macOS, Ninja)
@@ -35,7 +38,8 @@ For local dev iteration on macOS, `tools/install_plugin.sh` builds Release
 host's CPU meter on it.
 
 Faster iteration against a local JUCE checkout instead of re-fetching:
-`cmake -B build -DFETCHCONTENT_SOURCE_DIR_JUCE=/path/to/JUCE`.
+`cmake -B build -DFETCHCONTENT_SOURCE_DIR_JUCE=/path/to/JUCE`. Configure only checks such a
+checkout for the patch and prints the command that applies it.
 
 ### Offline DSP sanity/analysis tool
 
@@ -92,7 +96,9 @@ validator is built once from the VST3 SDK commit pinned in
 `tools/validate/versions.json` (with the Command Line Tools only, the script sets
 `XCODE_VERSION`); pluginval is found in /Applications or fetched with
 `--fetch-pluginval`. First full run 2026-10-06: all pass in ~2 min (pluginval L10 16 s);
-CI runs both on every push to main (L10, both platforms).
+CI runs both on every push to main (L10, both platforms). The validator step also fails
+when the MIDI mapping answers an out-of-range controller: the validator logs that only as
+Info, but it is the JUCE defect `cmake/PatchJuce.cmake` fixes.
 
 ### Tests
 
@@ -158,6 +164,32 @@ HORIZON_RTSAN_SELFTEST=1 ./build-rtsan/HorizonPadSoundTool --notes=60 --hold=1  
 python3 tools/tests/dsp_tests.py --tool ./build-rtsan/HorizonPadSoundTool       # all 19 clean, 2026-10-03
 ```
 
+**Memory and UB safety (D.1.6 release gate, EX-006).** The `asan` preset (`build-asan/`,
+Ninja, RelWithDebInfo, arm64, no LTO, no dSYM step) sets `HORIZON_ASAN`: the plugin, its
+JUCE modules and the sound tool built with `-fsanitize=address,undefined
+-fno-omit-frame-pointer` (MSVC: `/fsanitize=address`, no UBSan). The malloc trap stays in -
+it allocates through `malloc_default_zone()`, which ASan replaces, so the two coexist (a
+render is clean and the trap's self-test still aborts, 2026-10-25). pluginval must be
+built from source with ASan (DEVELOPING.md); the signed download cannot load the runtime.
+Before every tag, all clean:
+
+```bash
+cmake --preset asan && cmake --build build-asan --target HorizonPad_VST3 HorizonPadSoundTool
+export ASAN_OPTIONS=halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+caffeinate -i env PLUGINVAL=<pluginval-asan>/Builds/asan/pluginval_artefacts/Release/pluginval.app/Contents/MacOS/pluginval \
+  python3 scripts/dsp-kit/validate_plugin.py --profile full --sanitizer asan --only pluginval \
+  --plugin "build-asan/HorizonPad_artefacts/RelWithDebInfo/VST3/Horizon Pad.vst3"
+caffeinate -i env DYLD_INSERT_LIBRARIES="$(xcrun clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" \
+  build-validators/vst3sdk-build/bin/Release/validator "build-asan/HorizonPad_artefacts/RelWithDebInfo/VST3/Horizon Pad.vst3"
+caffeinate -i env HORIZON_PRESET_ROOT="$PWD/build-asan/test-presets" \
+  python3 tools/tests/dsp_tests.py --tool ./build-asan/HorizonPadSoundTool
+```
+
+The Steinberg validator runs by hand: it is not built with ASan, ASan will not start when
+a host only `dlopen`s it ("Interceptors are not working"), and `validate_plugin.py` cannot
+pass it the runtime - Python is an Apple binary, which may not load it ("Sanitizer load
+violates platform policy"). A kit bug, reported to the owner 2026-10-25.
+
 ### CI
 
 `.github/workflows/build.yml`: builds VST3 on macOS (universal binary) +
@@ -166,8 +198,10 @@ installer folder, zips both into one cross-platform release artifact, runs the
 DSP test suite (`ctest -LE validation`), and validates the **downloaded artefacts** on
 macOS and Windows with `tools/validate/validate.py`: the Steinberg validator from the
 pinned SDK commit and pluginval L10 at all six sample rates - both blocking (G6),
-logs uploaded per platform. Not yet in CI: the RTSan job (needs Homebrew LLVM and the
-JUCE workarounds above).
+logs uploaded per platform. `asan-windows` builds the sound tool with MSVC
+`/fsanitize=address` and runs the DSP tests against it, blocking, and the draft release
+waits for it (the Windows row of the sanitizer matrix; the Mac's ASan run is local, above).
+Not yet in CI: the RTSan job (needs Homebrew LLVM and the JUCE workarounds above).
 
 ## Architecture
 

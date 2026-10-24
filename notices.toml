@@ -15,7 +15,7 @@ version = "8.0.16"
 spdx = "LicenseRef-JUCE-8-EULA"
 copyright = "Raw Material Software Limited"
 url = "https://juce.com"
-note = "Built with JUCE under the JUCE 8 End User Licence Agreement, Starter tier, fetched by commit at build time and not redistributed. JUCE's own copyright notices are retained in the binary; the SDKs and libraries inside JUCE are listed in its JUCE.spdx.json."
+note = "Built with JUCE under the JUCE 8 End User Licence Agreement, Starter tier, fetched by commit at build time with one local fix to its VST3 wrapper (a bounds check, cmake/PatchJuce.cmake), and not redistributed. JUCE's own copyright notices are retained in the binary; the SDKs and libraries inside JUCE are listed in its JUCE.spdx.json."
 
 [[component]]
 name = "VST 3 SDK"

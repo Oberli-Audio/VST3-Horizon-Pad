@@ -200,7 +200,10 @@ Each preset's full ten-value parameter set lives in
 
 Requirements: **CMake ≥ 3.22** and a C++17 compiler. JUCE 8.0.16 is pulled in
 automatically by CMake `FetchContent` — there is no submodule to initialise and
-nothing to install first.
+nothing to install first. Configure applies one local fix to it,
+[`cmake/PatchJuce.cmake`](cmake/PatchJuce.cmake): JUCE's VST3 wrapper answered a host's
+question about MIDI controller 130 and above by reading past an array (found under
+UBSan, 2026-10-25; unfixed upstream on that date).
 
 ```bash
 git clone https://github.com/bjoernoberli/VST3-Horizon-Pad.git
@@ -250,6 +253,9 @@ Then copy the `.vst3` folder to `C:\Program Files\Common Files\VST3\`.
 ```bash
 cmake -B build -DFETCHCONTENT_SOURCE_DIR_JUCE=/path/to/JUCE
 ```
+
+Configure does not modify your checkout: it stops if the checkout lacks the local fix
+and prints the command that applies it (`cmake -DJUCE_DIR=/path/to/JUCE -P cmake/PatchJuce.cmake`).
 
 ### Offline DSP sanity checks
 
@@ -355,6 +361,54 @@ fails its Xcode version check. Add `-DXCODE_VERSION=16.0` and set
 `XCODE_VERSION=16.0` in the environment — it needs both, the cache variable
 for the comparison and the environment variable to skip the `xcodebuild`
 probe.
+
+### AddressSanitizer and UBSan (release gate)
+
+Before every tag the plugin runs under AddressSanitizer and UndefinedBehaviorSanitizer
+(playbook D.1.6; [`docs/exceptions.md`](docs/exceptions.md) EX-006 has the first run). The
+`asan` CMake preset builds the plugin and `HorizonPadSoundTool` with
+`-fsanitize=address,undefined -fno-omit-frame-pointer` into `build-asan/` (RelWithDebInfo,
+arm64 only, no LTO).
+
+pluginval has to be built from source with ASan — the signed download cannot load the
+sanitizer runtime. Build it once, outside this repository, at the version pinned in
+[`tools/validate/versions.json`](tools/validate/versions.json):
+
+```bash
+git clone --branch v1.0.4 --depth 1 https://github.com/Tracktion/pluginval.git pluginval-asan
+cd pluginval-asan && git submodule update --init --depth 1
+cmake -B Builds/asan -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
+  -DCMAKE_C_FLAGS="-fsanitize=address -fno-omit-frame-pointer" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" .
+cmake --build Builds/asan --config Release --target pluginval -j 8
+# -> Builds/asan/pluginval_artefacts/Release/pluginval.app/Contents/MacOS/pluginval
+```
+
+Then, back in this repository (each step must be clean - any sanitizer report stops it):
+
+```bash
+cmake --preset asan && cmake --build build-asan --target HorizonPad_VST3 HorizonPadSoundTool
+export ASAN_OPTIONS=halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+
+# pluginval L10 at six sample rates (timeouts scaled 10x for the sanitizer)
+caffeinate -i env PLUGINVAL=/path/to/pluginval-asan/Builds/asan/pluginval_artefacts/Release/pluginval.app/Contents/MacOS/pluginval \
+  python3 scripts/dsp-kit/validate_plugin.py --profile full --sanitizer asan --only pluginval \
+  --plugin "build-asan/HorizonPad_artefacts/RelWithDebInfo/VST3/Horizon Pad.vst3"
+
+# the Steinberg validator is not built with ASan, so the runtime is inserted at launch
+caffeinate -i env DYLD_INSERT_LIBRARIES="$(xcrun clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" \
+  build-validators/vst3sdk-build/bin/Release/validator "build-asan/HorizonPad_artefacts/RelWithDebInfo/VST3/Horizon Pad.vst3"
+
+# the DSP test suite against the ASan sound tool
+caffeinate -i env HORIZON_PRESET_ROOT="$PWD/build-asan/test-presets" \
+  python3 tools/tests/dsp_tests.py --tool ./build-asan/HorizonPadSoundTool
+```
+
+The validator runs on its own because `validate_plugin.py` cannot hand it the runtime: on
+macOS, Python is an Apple binary, which may not load it. On Windows, CI's `asan-windows`
+job builds the sound tool with MSVC's `/fsanitize=address` (MSVC has no UBSan) and runs
+the test suite against it.
 
 ### The Faust prototype
 

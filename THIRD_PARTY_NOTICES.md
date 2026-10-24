@@ -1,6 +1,6 @@
 # Third-party notices - Horizon Pad
 
-Generated 2026-10-22 by ship-bob notices.py from notices.toml. Do not edit by hand; edit the manifest.
+Generated 2026-10-25 by ship-bob notices.py from notices.toml. Do not edit by hand; edit the manifest.
 
 This product bundles or is built with the components below. Each keeps its own licence; the full texts follow. The product's own terms are in `LICENSE`.
 
@@ -8,7 +8,7 @@ This product bundles or is built with the components below. Each keeps its own l
 
 ### JUCE 8.0.16
 Copyright (c) Raw Material Software Limited. Licence: LicenseRef-JUCE-8-EULA. https://juce.com
-Built with JUCE under the JUCE 8 End User Licence Agreement, Starter tier, fetched by commit at build time and not redistributed. JUCE's own copyright notices are retained in the binary; the SDKs and libraries inside JUCE are listed in its JUCE.spdx.json.
+Built with JUCE under the JUCE 8 End User Licence Agreement, Starter tier, fetched by commit at build time with one local fix to its VST3 wrapper (a bounds check, cmake/PatchJuce.cmake), and not redistributed. JUCE's own copyright notices are retained in the binary; the SDKs and libraries inside JUCE are listed in its JUCE.spdx.json.
 
 ## Plugin SDKs
 

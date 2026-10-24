@@ -347,12 +347,58 @@ jobs:
       - name: Run the test suite
         run: ctest --test-dir build -LE validation --output-on-failure
 
+  # The Windows row of the sanitizer matrix (D.1.6, EX-006): MSVC has ASan only, no
+  # UBSan. The Mac's ASan + UBSan run and pluginval under ASan are local (CLAUDE.md).
+  asan-windows:
+    name: DSP test suite under ASan (Windows, MSVC)
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install python dependencies
+        run: python -m pip install numpy scipy
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v6
+        with:
+          path: build-asan/_deps
+          key: Windows-asan-fetchcontent-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: Windows-asan-fetchcontent-
+
+      - name: Build HorizonPadSoundTool with /fsanitize=address
+        run: |
+          cmake -B build-asan -G "Visual Studio 17 2022" -A x64 -DHORIZON_ASAN=ON
+          cmake --build build-asan --target HorizonPadSoundTool --config RelWithDebInfo
+
+      # The runtime DLL ships beside the cl.exe CMake chose; the tool needs it on PATH.
+      - name: Put the ASan runtime on PATH
+        shell: pwsh
+        run: |
+          $cl = (Select-String -Path build-asan/CMakeCache.txt -Pattern '^CMAKE_CXX_COMPILER:FILEPATH=(.+)$').Matches[0].Groups[1].Value
+          $dir = Split-Path $cl
+          if (-not (Test-Path (Join-Path $dir 'clang_rt.asan_dynamic-x86_64.dll'))) { throw "no ASan runtime beside $cl" }
+          Add-Content -Path $env:GITHUB_PATH -Value $dir
+
+      - name: Run the test suite under ASan
+        shell: bash
+        env:
+          ASAN_OPTIONS: halt_on_error=1
+          HORIZON_PRESET_ROOT: ${{ github.workspace }}/build-asan/test-presets
+        run: python tools/tests/dsp_tests.py --tool build-asan/RelWithDebInfo/HorizonPadSoundTool.exe
+
   # A version tag (v*) becomes a draft GitHub Release with the assets above
   # (ship-bob github-releases.md, release-recipe.md step 8); publishing it stays a click.
   release:
     name: Draft release (tags only)
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, validate]
+    needs: [build, validate, asan-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write

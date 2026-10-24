@@ -14,6 +14,18 @@
         "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
         "HORIZON_RELEASE_SYMBOLS": "ON"
       }
+    },
+    {
+      "name": "asan",
+      "displayName": "ASan + UBSan (release gate, D.1.6 / EX-006)",
+      "description": "The plugin and HorizonPadSoundTool built with -fsanitize=address,undefined -fno-omit-frame-pointer (HORIZON_ASAN), for the Tier P release gate's sanitizer run. RelWithDebInfo, arm64 only (local dev machine), no LTO (not a Release config), no dSYM/strip step (HORIZON_RELEASE_SYMBOLS stays OFF).",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_OSX_ARCHITECTURES": "arm64",
+        "HORIZON_ASAN": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -22,6 +34,11 @@
       "configurePreset": "release",
       "configuration": "Release",
       "targets": [ "HorizonPad_VST3", "HorizonPad_Standalone" ]
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan",
+      "targets": [ "HorizonPad_VST3", "HorizonPadSoundTool" ]
     }
   ]
 }

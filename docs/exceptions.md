@@ -330,7 +330,7 @@ test run (IDs, order, names, 0..100 ranges, defaults, steps, automatable, throug
 - **Date:** 2026-10-22
 - **Raised by:** Claude, Round 14 (S.6)
 - **Rule / target:** the Tier P release gate (sound-design-bob): pluginval L10 under ASan
-- **Status:** OPEN
+- **Status:** OPEN - the Mac runs are clean (2026-10-25, "Resolution" below); the Windows CI job is to pass
 
 ### What failed
 
@@ -356,6 +356,47 @@ sound-design-bob 4.15.0 settles the ASan run at Tier P (`validate_plugin.py` say
 trigger above: an `asan` CMake preset and pluginval built from source with ASan are due **before
 the next shared build**. `validate_plugin.py full`, as Round 14 writes it, passes otherwise
 (Steinberg 47/0, pluginval L10 at six rates, 17 s).
+
+### Resolution (2026-10-25, Mac)
+
+Built: the `asan` CMake preset (`HORIZON_ASAN`: plugin, JUCE modules and sound tool with
+`-fsanitize=address,undefined -fno-omit-frame-pointer`, RelWithDebInfo, arm64) and pluginval
+v1.0.4 from source with `-fsanitize=address` (DEVELOPING.md). The malloc trap needed no change:
+it allocates through `malloc_default_zone()`, which ASan replaces. Every run under
+`caffeinate -i` with `ASAN_OPTIONS=halt_on_error=1` and
+`UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1`; each command and its last line:
+
+| Step | Command | Last line |
+|---|---|---|
+| Preset | `cmake --preset asan` | `-- Build files have been written to: .../build-asan` |
+| Trap under ASan | `./build-asan/HorizonPadSoundTool --notes=60 --hold=0.2 --tail=0.2` | the JSON report, `"ok": true`, no sanitizer output |
+| Trap self-test | `HORIZON_MALLOC_TRAP_SELFTEST=1` + the same | `malloc trap: malloc inside processBlock (rule 1: no allocation on the audio thread)`, exit 134 |
+| pluginval | `cmake --build Builds/asan --config Release --target pluginval -j 8` | `[31/32] Linking CXX executable pluginval_artefacts/Release/pluginval.app/Contents/MacOS/pluginval` |
+| 4a, pluginval | `PLUGINVAL=<from source> python3 scripts/dsp-kit/validate_plugin.py --profile full --sanitizer asan --only pluginval --plugin "build-asan/.../Horizon Pad.vst3"` | `[validate] PASS - summary in build-validation/ex006-pluginval-asan-3/summary.json` (L10, six rates, 25 tests, 17 s) |
+| 4a, Steinberg | `DYLD_INSERT_LIBRARIES=<ASan runtime> build-validators/vst3sdk-build/bin/Release/validator "build-asan/.../Horizon Pad.vst3"` | `Result: 47 tests passed, 0 tests failed`, exit 0 |
+| 4b | `HORIZON_PRESET_ROOT=build-asan/test-presets python3 tools/tests/dsp_tests.py --tool ./build-asan/HorizonPadSoundTool` | `PASS  width_profile_staggered` (38 of 38) |
+
+**What it found.** UBSan in JUCE's VST3 wrapper, not in Horizon Pad's code:
+`juce_audio_plugin_client_VST3.cpp:1261:20: runtime error: index 130 out of bounds for type
+'Vst::ParamID[130]'`, in `getMidiControllerAssignment`, called by the validator's MIDI Mapping
+test, which asks for controller 130 on purpose. JUCE indexed `[channel][cc]` unchecked and
+answered with a parameter ID read past the row; the validator logs that as Info only, so it
+passed 47/0 since 2026-10-06 with 16 such lines in every log. Unfixed in JUCE 8.0.16, develop
+and master. Fixed (owner's decision, 2026-10-25) by `cmake/PatchJuce.cmake`: out-of-range
+channel or controller returns `kResultFalse`; parameter IDs, state and sound unchanged. The
+regression guard is `tools/validate/validate.py`'s validator step, which now fails on those
+Info lines: on the unpatched Release bundle `FAIL ... 47 passed, 0 failed (SDK 3.8.1); MIDI
+mapping answered 16 out-of-range controller queries (JUCE unpatched?)`, on the patched one
+`PASS ... 47 passed, 0 failed (SDK 3.8.1)`; plain pluginval L10 on the patched Release
+bundle passes (six rates, 16 s).
+
+**Not as written in the task.** `validate_plugin.py --profile full --sanitizer asan` cannot
+pass on macOS: its validator step runs the plain Steinberg validator, and ASan does not start
+in a host that only `dlopen`s it (`ERROR: Interceptors are not working. This may be because
+AddressSanitizer is loaded too late`); handing the runtime to the validator through Python
+fails because Python is an Apple binary (`Sanitizer load violates platform policy`). So the
+gate runs pluginval through the kit (`--only pluginval`) and the validator by hand with the
+runtime inserted. Reported to the owner as a kit bug.
 
 ---
 
