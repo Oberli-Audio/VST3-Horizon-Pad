@@ -362,6 +362,19 @@ string come from one function (`Source/dsp/EnvelopeMacro.h`), and a typed value
 ("0.5", "500 ms", or "40 %" for the knob position) maps back through its inverse.
 The tooltips say the other pads scale with Root.
 
+### A-012 - the company is bob Audio (2026-10-25)
+
+The owner renamed the company from Quelle Music to **bob Audio** (lowercase "b"); the
+YAML's `name` keeps its confirmed text and reads as "Horizon Pad (bob Audio)". It came
+before the first release, so the plugin's identity changed with it, by the owner's
+decision: manufacturer code `Boau` (was `Qumu`), bundle ID `com.bobaudio.horizonpad`,
+preset files `.bobpreset` with the root `<BobPreset>` under `bob Audio/Horizon Pad`.
+Old `.quellepreset` files still import, and a 0.1.0 test build's User presets and
+window size are copied once from the `Quelle Music` folders; projects saved with
+earlier test builds no longer find the plugin. In this repository's wording, "DAW"
+stands for hosts in general and "Ableton Live" is named in full where a point
+applies to it alone.
+
 ## Where the exceptions go
 
 12.5 requires a written, dated, named exception whenever a measurement fails and the

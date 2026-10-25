@@ -640,7 +640,7 @@ def check_harness(params, listing) -> list[str]:
             errors.append(f"{p['id']}: automatable differs")
     order = [i for i in (x if isinstance(x, str) else x.get("id") for x in listing) if i in table_ids]
     if order != [i for i in table_ids if i in order]:
-        errors.append("parameter order differs from the table (Live shows the first 32 in host order)")
+        errors.append("parameter order differs from the table (Ableton Live shows the first 32 in host order)")
     return errors
 
 
@@ -689,7 +689,7 @@ def check_table(params, kind="effect") -> list[str]:
     first32 = params[:32]
     for p in core:
         if p not in first32:
-            warnings.append(f"core control {p['id']} is beyond the first 32 rows; Live auto-shows only the first 32")
+            warnings.append(f"core control {p['id']} is beyond the first 32 rows; Ableton Live auto-shows only the first 32")
     for p in params:
         if p["kind"] == "macro" and p["automatable"] == "Y":
             pass

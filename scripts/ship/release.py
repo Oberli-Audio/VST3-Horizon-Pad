@@ -9,7 +9,7 @@
 Steps, in order: precheck, version, docs, tag, build, provenance, sign, package, checksums,
 smoke, publish, announce. `--dry-run` prints every command without running anything and
 checks ship.toml and the tree; `run` executes the local steps and prints the ones that
-happen on GitHub or by hand (build on the workflow, smoke test in Live, announce). Nothing
+happen on GitHub or by hand (build on the workflow, smoke test in Ableton Live, announce). Nothing
 here can delete a release or force-push; a failed step stops the run and keeps the files.
 Config: ship.toml at the repo root (release-recipe.md shows it).
 """
@@ -194,7 +194,7 @@ def checksums(c):
 
 
 def smoke(c):
-    c.say("9 smoke: download the assets from the draft release (not the build folder); `shipcheck.py release-assets <download folder>`; quit Live; replace the old bundle; start Live 10.1 under Rosetta, the Open-Anyway dance, rescan, Init preset, last session, About shows %s and the SHA" % c.version)
+    c.say("9 smoke: download the assets from the draft release (not the build folder); `shipcheck.py release-assets <download folder>`; quit Ableton Live; replace the old bundle; start Ableton Live 10.1 under Rosetta, the Open-Anyway dance, rescan, Init preset, last session, About shows %s and the SHA" % c.version)
     c.sh([sys.executable, str(HERE / "shipcheck.py"), "release-assets", "~/Downloads/release-assets", "--repo", str(c.repo)], where="hand")
     c.sh("open https://github.com/%s/releases" % c.cfg["product"].get("repo", "<owner>/<repo>"), where="hand")
 
@@ -251,7 +251,7 @@ def selftest():
         expect("every format staged", "stage/" in out)
         expect("notices in the zips", "THIRD_PARTY_NOTICES.md stage/" in out and "LICENSE, THIRD_PARTY_NOTICES.md -DestinationPath" in out and "notices.py" in out)
         expect("symbols per tag", "dsymutil" in out and "-symbols-macOS.zip" in out and "*.pdb" in out and "enable-crashdumps.reg" in out)
-        expect("announce prints the message", "Sounds different" in out and "releases/latest" in out and "Quit Live" in out)
+        expect("announce prints the message", "Sounds different" in out and "releases/latest" in out and "Quit Ableton Live" in out)
         # Tier F without identity stops
         (repo / "ship.toml").write_text((repo / "ship.toml").read_text().replace('tier = "P"', 'tier = "F"'))
         buf = io.StringIO()

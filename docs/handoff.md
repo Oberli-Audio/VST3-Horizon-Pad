@@ -14,8 +14,11 @@ here (the owner fixes the skills).
   changelog carries a state-format note, not "Sounds different". ATTACK/RELEASE keep their
   hand-written time display (paramgen has no display column yet; the owner fixes the skill).
 - Plugin codes stay Qumu / Hzpd / com.quellemusic.horizonpad (README codes table added with the D.9.9 rewrite).
+  Superseded 2026-10-25 by the owner's rebrand to bob Audio, before the first release: Boau / Hzpd /
+  com.bobaudio.horizonpad.
 - dspVersion in the state, getNumPrograms() = 1, editor scale machine-local only.
-- Presets as files now (S.4): .quellepreset per preset, Factory/ per version, User/.
+- Presets as files now (S.4): .quellepreset per preset, Factory/ per version, User/ (`.bobpreset`
+  under `bob Audio/Horizon Pad` since the rebrand of 2026-10-25; old files still import).
 
 ## Plan (numbered; tick as done) - paused 2026-10-22 by the owner
 
@@ -37,16 +40,16 @@ here (the owner fixes the skills).
    drives setScaleFactor). U.2 docs/brand-sheet.md (EX-009 footer 3.54:1, EX-010 active pill
    3.19:1); EX-011 bank loudness span. U.3 tooltips from Params::tooltipFor (+ setHelpText).
 9. [x] U.4 About panel (Diagnostics, AboutPanel, DocsData; test about_copy_is_fourteen_lines).
-10. [x] U.5 code ok (Live row: owner); U.6 Browse menu + import/export/drop (test
-    preset_file_round_trip); U.7 --reopen=20 flat at 47 MB (Live row: owner); U.8 German quick start.
+10. [x] U.5 code ok (Ableton Live row: owner); U.6 Browse menu + import/export/drop (test
+    preset_file_round_trip); U.7 --reopen=20 flat at 47 MB (Ableton Live row: owner); U.8 German quick start.
 11. [x] R.1 pass, R.2 fixed, R.3 pass, R.4 open (shipcheck's removed-parameter false positives),
     R.5 fixed, R.6 fixed (dry run v0.0.0-test, second run after an MSVC fix in AboutPanel), R.7
     fixed (release-assets OK; found and fixed the deployment target: CI built for macOS 14.0,
-    now 10.13 / 11.0, test vst3_runs_on_macos_10_13; build-info clean), R.8 open (owner, Live),
+    now 10.13 / 11.0, test vst3_runs_on_macos_10_13; build-info clean), R.8 open (owner, Ableton Live),
     R.9 pass, R.10 fixed, R.11 fixed. Draft releases and the test tag deleted.
 12. [x] Findings table in the Round 14 doc (rev 5), with the skill-bug list and the owner's items.
 
-Round 14 is done on the repo side. Open for the owner: the Live checks (U.1, U.5, U.7, R.8),
+Round 14 is done on the repo side. Open for the owner: the Ableton Live checks (U.1, U.5, U.7, R.8),
 EX-010 (cream text on the active pill), EX-011 (+/-1 LU or a 1 LU span), the README's feedback
 mail address; the skill fixes in ~/bob-skills.
 

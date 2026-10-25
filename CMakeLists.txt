@@ -96,9 +96,9 @@ endif()
 # ---------------------------------------------------------------------------
 juce_add_plugin(HorizonPad
     VERSION                     ${PRODUCT_VERSION}
-    COMPANY_NAME                "Quelle Music"
-    BUNDLE_ID                   "com.quellemusic.horizonpad"
-    PLUGIN_MANUFACTURER_CODE    Qumu
+    COMPANY_NAME                "bob Audio"
+    BUNDLE_ID                   "com.bobaudio.horizonpad"
+    PLUGIN_MANUFACTURER_CODE    Boau
     PLUGIN_CODE                 Hzpd
     FORMATS                     VST3 Standalone
     PRODUCT_NAME                "Horizon Pad"
@@ -142,10 +142,10 @@ target_sources(HorizonPad PRIVATE
 
 target_include_directories(HorizonPad PRIVATE Source "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
-# The factory bank (playbook D.6.5): one .quellepreset per preset in presets/ and
+# The factory bank (playbook D.6.5): one .bobpreset per preset in presets/ and
 # presets.csv for their order and categories (checked by presetlint.py), compiled
 # in; the plugin writes them to the Factory folder on the first run of a version.
-file(GLOB HORIZON_FACTORY_PRESETS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/presets/*.quellepreset")
+file(GLOB HORIZON_FACTORY_PRESETS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/presets/*.bobpreset")
 juce_add_binary_data(HorizonPadPresetData
     HEADER_NAME PresetData.h
     NAMESPACE   PresetData
@@ -291,8 +291,8 @@ function(horizon_configure_tool tool_target)
         # translation units see identical values to PluginProcessor.cpp's.
         "JucePlugin_Name=\"Horizon Pad\""
         "JucePlugin_Desc=\"Horizon Pad\""
-        "JucePlugin_Manufacturer=\"Quelle Music\""
-        JucePlugin_ManufacturerCode=0x51756d75
+        "JucePlugin_Manufacturer=\"bob Audio\""
+        JucePlugin_ManufacturerCode=0x426f6175
         JucePlugin_PluginCode=0x487a7064
         JucePlugin_VersionCode=${HORIZON_VERSION_CODE}
         "JucePlugin_VersionString=\"${PRODUCT_VERSION}\""
@@ -318,8 +318,8 @@ function(horizon_configure_tool tool_target)
         JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode
         JucePlugin_AUExportPrefix=Horizon_PadAU
         "JucePlugin_AUExportPrefixQuoted=\"Horizon_PadAU\""
-        JucePlugin_CFBundleIdentifier=com.quellemusic.horizonpad
-        JucePlugin_AAXIdentifier=com.quellemusic.horizonpad
+        JucePlugin_CFBundleIdentifier=com.bobaudio.horizonpad
+        JucePlugin_AAXIdentifier=com.bobaudio.horizonpad
         JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode
         JucePlugin_AAXProductId=JucePlugin_PluginCode
         JucePlugin_AAXCategory=2048
@@ -330,8 +330,8 @@ function(horizon_configure_tool tool_target)
         JucePlugin_Enable_ARA=0
         JucePlugin_ARAContentTypes=0
         JucePlugin_ARATransformationFlags=0
-        "JucePlugin_ARAFactoryID=\"com.quellemusic.horizonpad.arafactory.${PRODUCT_VERSION}\""
-        "JucePlugin_ARADocumentArchiveID=\"com.quellemusic.horizonpad.aradocumentarchive.1\""
+        "JucePlugin_ARAFactoryID=\"com.bobaudio.horizonpad.arafactory.${PRODUCT_VERSION}\""
+        "JucePlugin_ARADocumentArchiveID=\"com.bobaudio.horizonpad.aradocumentarchive.1\""
         "JucePlugin_ARACompatibleArchiveIDs=\"\""
         "JucePlugin_ManufacturerWebsite=\"\""
         "JucePlugin_ManufacturerEmail=\"\"")
@@ -472,7 +472,8 @@ else()
         larger_block_than_prepared
         output_dc_and_knee
         about_copy_is_fourteen_lines
-        preset_file_round_trip)
+        preset_file_round_trip
+        previous_brand_presets_carried_over)
 
     foreach(test_name IN LISTS HORIZON_TEST_NAMES)
         add_test(NAME ${test_name}

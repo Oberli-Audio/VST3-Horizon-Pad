@@ -19,11 +19,16 @@ namespace
     }
 
     // The size last chosen on this machine, for every instance: a small file
-    // in the settings folder (D.6.4). Before 0.1.0 it sat beside
-    // UserPresets.xml in ~/Library/Quelle Music; the first open moves it.
+    // in the settings folder (D.6.4). 0.1.0 kept it under the old company
+    // name, Quelle Music (copied once); before 0.1.0 it sat beside
+    // UserPresets.xml in ~/Library/Quelle Music (moved once).
     std::unique_ptr<juce::PropertiesFile> openEditorSettings()
     {
         const auto file = PresetFile::settingsFolder().getChildFile ("EditorSettings.xml");
+
+        if (const auto previous = PresetFile::previousSettingsFolder().getChildFile ("EditorSettings.xml"); ! file.exists() && previous.existsAsFile())
+            if (file.getParentDirectory().createDirectory())
+                previous.copyFileTo (file);
 
         if (const auto old = PresetFile::legacyFolder().getChildFile ("EditorSettings.xml"); ! file.exists() && old.existsAsFile())
             if (file.getParentDirectory().createDirectory())
@@ -53,7 +58,7 @@ namespace
         Clearing, Expanse, Bloom, then Attack, Release, Filter, Reverb,
         Width, Detune. The first eight are ordered so that a controller that
         maps its knobs to a plugin's first N host parameters in order - e.g.
-        a Launchkey's 8 knobs in Live's generic Device-knob mode - lands
+        a Launchkey's 8 knobs in Ableton Live's generic Device-knob mode - lands
         knobs 1-4 on the four pad volumes and knobs 5-8 on ATTACK/RELEASE/
         FILTER/REVERB, matching the physical Launchkey layout this GUI's
         8-column knob row was designed to mirror (see PluginEditor.h).
@@ -118,7 +123,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout HorizonPadAudioProcessor::cr
     // The ten (and only ten) host-automatable parameters: four pad volumes,
     // then the six macros. ATTACK/RELEASE/FILTER/REVERB sit right after the
     // volumes (params 5-8) so a hardware controller that maps its knobs to
-    // the plugin's first 8 host parameters - e.g. a Launchkey in Live's
+    // the plugin's first 8 host parameters - e.g. a Launchkey in Ableton Live's
     // generic Device-knob mode - lands its knobs 5-8 on them (see
     // macroIds() above for why the order matters).
     // Volume defaults are the Lagerfeuer balance scaled by the same 0.677 the
@@ -317,8 +322,8 @@ bool HorizonPadAudioProcessor::isBusesLayoutSupported (const BusesLayout& layout
 
 //==============================================================================
 // One program for the host (D.5.3): the bank lives in the plugin. With more,
-// the VST3 wrapper exports a "Program" parameter that takes one of Live's
-// auto-populated slots and is automatable; Live shows no program list anyway.
+// the VST3 wrapper exports a "Program" parameter that takes one of Ableton Live's
+// auto-populated slots and is automatable; Ableton Live shows no program list anyway.
 int HorizonPadAudioProcessor::getNumPrograms()                     { return 1; }
 int HorizonPadAudioProcessor::getCurrentProgram()                  { return 0; }
 void HorizonPadAudioProcessor::setCurrentProgram (int)             {}

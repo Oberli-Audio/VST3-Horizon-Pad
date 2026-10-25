@@ -7,7 +7,7 @@ namespace horizon
 {
 
 /*
-    The factory bank lives in presets/ at the repository root: one .quellepreset
+    The factory bank lives in presets/ at the repository root: one .bobpreset
     per preset (D.6.5), compiled in as PresetData, and presets.csv - the bank's
     order, categories and notes, checked by presetlint.py. Until 2026-10-21 it
     was a table here in 0..1; scripts that cite "Presets.cpp" for the bank's

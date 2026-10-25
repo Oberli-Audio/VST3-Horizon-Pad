@@ -70,7 +70,7 @@ own movement.
 Ten host-automatable parameters (all 0–100% of their travel; ATTACK and
 RELEASE read as a time), in this fixed order — four
 volumes, then six macros — so that a controller mapping its first 8 knobs to
-a plugin's first 8 host parameters (e.g. a Launchkey in Live's generic
+a plugin's first 8 host parameters (e.g. a Launchkey in Ableton Live's generic
 Device-knob mode) lands knobs 1–4 on the pad volumes and knobs 5–8 on
 ATTACK/RELEASE/FILTER/REVERB:
 
@@ -391,24 +391,21 @@ Then, back in this repository (each step must be clean - any sanitizer report st
 cmake --preset asan && cmake --build build-asan --target HorizonPad_VST3 HorizonPadSoundTool
 export ASAN_OPTIONS=halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
 
-# pluginval L10 at six sample rates (timeouts scaled 10x for the sanitizer)
+# the Steinberg validator and pluginval L10 at six sample rates (timeouts scaled 10x)
 caffeinate -i env PLUGINVAL=/path/to/pluginval-asan/Builds/asan/pluginval_artefacts/Release/pluginval.app/Contents/MacOS/pluginval \
-  python3 scripts/dsp-kit/validate_plugin.py --profile full --sanitizer asan --only pluginval \
+  python3 scripts/dsp-kit/validate_plugin.py --profile full --sanitizer asan \
   --plugin "build-asan/HorizonPad_artefacts/RelWithDebInfo/VST3/Horizon Pad.vst3"
-
-# the Steinberg validator is not built with ASan, so the runtime is inserted at launch
-caffeinate -i env DYLD_INSERT_LIBRARIES="$(xcrun clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" \
-  build-validators/vst3sdk-build/bin/Release/validator "build-asan/HorizonPad_artefacts/RelWithDebInfo/VST3/Horizon Pad.vst3"
 
 # the DSP test suite against the ASan sound tool
 caffeinate -i env HORIZON_PRESET_ROOT="$PWD/build-asan/test-presets" \
   python3 tools/tests/dsp_tests.py --tool ./build-asan/HorizonPadSoundTool
 ```
 
-The validator runs on its own because `validate_plugin.py` cannot hand it the runtime: on
-macOS, Python is an Apple binary, which may not load it. On Windows, CI's `asan-windows`
-job builds the sound tool with MSVC's `/fsanitize=address` (MSVC has no UBSan) and runs
-the test suite against it.
+The Steinberg validator is not built with ASan, so `validate_plugin.py` inserts the runtime
+the plugin links into the validator process alone (on macOS, Python is an Apple binary,
+which may not load it). On Windows, CI's `asan-windows` job builds the sound tool with
+MSVC's `/fsanitize=address` (MSVC has no UBSan; CMake copies the runtime DLL beside it) and
+runs the test suite against it.
 
 ### The Faust prototype
 
@@ -576,7 +573,7 @@ Source/
     PadKnob.{h,cpp}                One layer's VOL knob, glowing with the layer's level
     MacrosPanel.{h,cpp}            ATTACK/RELEASE/FILTER/REVERB/WIDTH/DETUNE
     WheelSlider.{h,cpp}            PITCH/MOD wheels
-    OutputMeter.{h,cpp}            Live output level in dBFS (read-only)
+    OutputMeter.{h,cpp}            Real-time output level in dBFS (read-only)
     FooterBar.{h,cpp}              Bottom strip: wordmark, tagline, buffer/layer/macro counts
 tools/
   install_plugin.sh                Local dev build+install to ~/Library/Audio/Plug-Ins/VST3
@@ -617,4 +614,4 @@ packaging/
 
 ---
 
-© Quelle Music. All rights reserved.
+© bob Audio. All rights reserved.

@@ -11,7 +11,7 @@ Everything here runs the real plugin DSP through HorizonPadSoundTool. The
 three regression tests at the bottom each guard a bug that was found by
 measurement and fixed - they exist so it cannot come back silently.
 """
-import argparse, hashlib, json, os, subprocess, sys, tempfile
+import argparse, hashlib, json, os, shutil, subprocess, sys, tempfile
 import numpy as np
 from scipy.io import wavfile
 
@@ -1064,14 +1064,15 @@ def test_about_copy_is_fourteen_lines():
 
 
 def test_preset_file_round_trip():
-    """Export a sound as a .quellepreset, import it into a fresh preset folder: it lands in User/,
+    """Export a sound as a .bobpreset, import it into a fresh preset folder: it lands in User/,
     keeps its name and author, and plays the same values; a file from a newer version is refused
-    with a message and nothing is half-loaded (D.6.5, D.5.3)."""
+    with a message and nothing is half-loaded; a .quellepreset written before the rebrand to
+    bob Audio (root <QuellePreset>) still imports (D.6.5, D.5.3)."""
     import re
     with tempfile.TemporaryDirectory() as tmp:
         env_a = dict(os.environ, HORIZON_PRESET_ROOT=os.path.join(tmp, "a"))
         env_b = dict(os.environ, HORIZON_PRESET_ROOT=os.path.join(tmp, "b"))
-        out = os.path.join(tmp, "Mine.quellepreset")
+        out = os.path.join(tmp, "Mine.bobpreset")
         base = ["--notes=60", "--seconds=0.3"]
         r = subprocess.run([TOOL, "--preset=glasperle", "--param=width=0.9", f"--export-preset={out}"] + base,
                            capture_output=True, text=True, env=env_a)
@@ -1088,15 +1089,55 @@ def test_preset_file_round_trip():
         if d["activePreset"] != "Glasperle":
             raise Fail(f"imported preset is named {d['activePreset']!r}, not the exported name")
         user = os.path.join(tmp, "b", "User")
-        if not any(f.endswith(".quellepreset") for f in os.listdir(user)):
-            raise Fail("the import left no file in the User folder")
+        if not any(f.endswith(".bobpreset") for f in os.listdir(user)):
+            raise Fail("the import left no .bobpreset in the User folder")
         text = open(out, encoding="utf-8").read()
+        if "<BobPreset " not in text:
+            raise Fail("the export is not a <BobPreset> document")
         newer = re.sub(r'<HorizonPadState version="\d+"', '<HorizonPadState version="9"', text)
-        newer_path = os.path.join(tmp, "Newer.quellepreset")
+        newer_path = os.path.join(tmp, "Newer.bobpreset")
         open(newer_path, "w", encoding="utf-8").write(newer)
         r = subprocess.run([TOOL, f"--import-preset={newer_path}"] + base, capture_output=True, text=True, env=env_b)
         if r.returncode != 2 or "newer" not in r.stderr.lower():
             raise Fail(f"a preset from a newer version was not refused with a message (exit {r.returncode}): {r.stderr[-200:]}")
+        old = text.replace("<BobPreset ", "<QuellePreset ").replace("</BobPreset>", "</QuellePreset>").replace('name="Glasperle"', 'name="Altglas"')
+        old_path = os.path.join(tmp, "Old.quellepreset")
+        open(old_path, "w", encoding="utf-8").write(old)
+        r = subprocess.run([TOOL, f"--import-preset={old_path}"] + base, capture_output=True, text=True, env=env_b)
+        if r.returncode != 0 or json.loads(r.stdout[r.stdout.index("{"):])["activePreset"] != "Altglas":
+            raise Fail(f"a .quellepreset from before the rebrand did not import (exit {r.returncode}): {r.stderr[-200:]}")
+
+
+def test_previous_brand_presets_carried_over():
+    """0.1.0 kept the User presets under "Quelle Music"; the first start under the bob Audio name
+    copies them into the new User folder as .bobpreset, once, and leaves the old folder as it was
+    (HORIZON_PRESET_ROOT/Previous stands in for the old folder)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        env = dict(os.environ, HORIZON_PRESET_ROOT=tmp)
+        exported = os.path.join(tmp, "x.bobpreset")
+        r = subprocess.run([TOOL, "--preset=glasperle", f"--export-preset={exported}", "--notes=60", "--seconds=0.2"],
+                           capture_output=True, text=True, env=env)
+        if r.returncode != 0:
+            raise Fail(f"export failed (exit {r.returncode}): {r.stderr[-200:]}")
+        old_user = os.path.join(tmp, "Previous", "User")
+        os.makedirs(old_user)
+        old = open(exported, encoding="utf-8").read().replace("<BobPreset ", "<QuellePreset ").replace("</BobPreset>", "</QuellePreset>")
+        open(os.path.join(old_user, "meins.quellepreset"), "w", encoding="utf-8").write(old)
+        new_user = os.path.join(tmp, "User")
+        if os.path.exists(new_user):
+            shutil.rmtree(new_user)
+        r = subprocess.run([TOOL, "--notes=60", "--seconds=0.2"], capture_output=True, text=True, env=env)
+        if r.returncode != 0:
+            raise Fail(f"the start after the rebrand failed (exit {r.returncode}): {r.stderr[-200:]}")
+        copied = os.path.join(new_user, "meins.bobpreset")
+        if not os.path.isfile(copied):
+            raise Fail(f"the 0.1.0 User preset was not carried over: {os.listdir(new_user) if os.path.isdir(new_user) else 'no User folder'}")
+        if not os.path.isfile(os.path.join(old_user, "meins.quellepreset")):
+            raise Fail("the old User folder was changed")
+        os.remove(copied)
+        subprocess.run([TOOL, "--notes=60", "--seconds=0.2"], capture_output=True, text=True, env=env)
+        if os.path.exists(copied):
+            raise Fail("the old presets were copied again into an existing User folder (must happen once)")
 
 
 TESTS = {name[5:]: fn for name, fn in sorted(globals().items())

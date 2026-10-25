@@ -52,9 +52,9 @@ SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 COLUMNS = ["slug", "name", "category", "tags", "edge", "author", "notes"]
 
 SAMPLE_CSV = """slug,name,category,tags,edge,author,notes
-init,Init,Bed,,N,Quelle Music,the parameter table's defaults
-warm,Warm Bed,Bed,soft|wide|slow,N,Quelle Music,
-edge,Edge of Light,Bright,bright|wide|airy,Y,Quelle Music,widest and brightest; translation battery
+init,Init,Bed,,N,bob Audio,the parameter table's defaults
+warm,Warm Bed,Bed,soft|wide|slow,N,bob Audio,
+edge,Edge of Light,Bright,bright|wide|airy,Y,bob Audio,widest and brightest; translation battery
 """
 
 

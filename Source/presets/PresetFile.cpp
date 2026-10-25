@@ -15,6 +15,39 @@ namespace
         const auto path = juce::SystemStats::getEnvironmentVariable ("HORIZON_PRESET_ROOT", {});
         return path.isNotEmpty() && juce::File::isAbsolutePath (path) ? juce::File (path) : juce::File();
     }
+
+    juce::File presetRootFor (const juce::String& company)
+    {
+       #if JUCE_MAC
+        return juce::File::getSpecialLocation (juce::File::userHomeDirectory)
+            .getChildFile ("Library/Audio/Presets").getChildFile (company).getChildFile ("Horizon Pad");
+       #elif JUCE_WINDOWS
+        return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+            .getChildFile ("VST3 Presets").getChildFile (company).getChildFile ("Horizon Pad");
+       #else
+        return juce::File::getSpecialLocation (juce::File::userHomeDirectory)
+            .getChildFile (".vst3/presets").getChildFile (company).getChildFile ("Horizon Pad");
+       #endif
+    }
+
+    juce::File settingsFolderFor (const juce::String& company)
+    {
+       #if JUCE_MAC
+        return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+            .getChildFile ("Application Support").getChildFile (company).getChildFile ("Horizon Pad");
+       #else
+        return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+            .getChildFile (company).getChildFile ("Horizon Pad");
+       #endif
+    }
+
+    constexpr const char* kCompany = "bob Audio";
+    constexpr const char* kPreviousCompany = "Quelle Music";
+}
+
+bool hasPresetExtension (const juce::String& path)
+{
+    return path.endsWithIgnoreCase (kExtension) || path.endsWithIgnoreCase (kPreviousExtension);
 }
 
 juce::File presetRoot()
@@ -22,16 +55,7 @@ juce::File presetRoot()
     if (const auto root = overrideRoot(); root != juce::File())
         return root;
 
-   #if JUCE_MAC
-    return juce::File::getSpecialLocation (juce::File::userHomeDirectory)
-        .getChildFile ("Library/Audio/Presets/Quelle Music/Horizon Pad");
-   #elif JUCE_WINDOWS
-    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
-        .getChildFile ("VST3 Presets").getChildFile ("Quelle Music").getChildFile ("Horizon Pad");
-   #else
-    return juce::File::getSpecialLocation (juce::File::userHomeDirectory)
-        .getChildFile (".vst3/presets/Quelle Music/Horizon Pad");
-   #endif
+    return presetRootFor (kCompany);
 }
 
 juce::File factoryFolder() { return presetRoot().getChildFile ("Factory"); }
@@ -42,13 +66,23 @@ juce::File settingsFolder()
     if (const auto root = overrideRoot(); root != juce::File())
         return root.getChildFile ("Settings");
 
-   #if JUCE_MAC
-    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-        .getChildFile ("Application Support/Quelle Music/Horizon Pad");
-   #else
-    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
-        .getChildFile ("Quelle Music").getChildFile ("Horizon Pad");
-   #endif
+    return settingsFolderFor (kCompany);
+}
+
+juce::File previousPresetRoot()
+{
+    if (const auto root = overrideRoot(); root != juce::File())
+        return root.getChildFile ("Previous");
+
+    return presetRootFor (kPreviousCompany);
+}
+
+juce::File previousSettingsFolder()
+{
+    if (const auto root = overrideRoot(); root != juce::File())
+        return root.getChildFile ("Previous").getChildFile ("Settings");
+
+    return settingsFolderFor (kPreviousCompany);
 }
 
 juce::File legacyFolder()
@@ -126,7 +160,7 @@ void readParameters (const juce::XmlElement* parameters, int version, Preset& in
 
 std::optional<Preset> read (const juce::XmlElement& xml, juce::String& error)
 {
-    if (! xml.hasTagName ("QuellePreset"))
+    if (! xml.hasTagName ("BobPreset") && ! xml.hasTagName ("QuellePreset"))
     {
         error = "Not a Horizon Pad preset.";
         return std::nullopt;
@@ -136,7 +170,7 @@ std::optional<Preset> read (const juce::XmlElement& xml, juce::String& error)
 
     if (state == nullptr)
     {
-        error = "This preset is for another Quelle Music plugin.";
+        error = "This preset is for another bob Audio plugin.";
         return std::nullopt;
     }
 
@@ -200,7 +234,7 @@ juce::String formatValue (float value)
 
 std::unique_ptr<juce::XmlElement> toXml (const Preset& preset, bool factory)
 {
-    auto xml = std::make_unique<juce::XmlElement> ("QuellePreset");
+    auto xml = std::make_unique<juce::XmlElement> ("BobPreset");
     xml->setAttribute ("name", preset.name);
     xml->setAttribute ("author", preset.author);
     xml->setAttribute ("category", preset.category);

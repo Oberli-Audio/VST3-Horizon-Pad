@@ -132,7 +132,7 @@ void HorizonPadAudioProcessorEditor::showAbout (bool openLicences)
 bool HorizonPadAudioProcessorEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
-        if (f.endsWithIgnoreCase (horizon::PresetFile::kExtension))
+        if (horizon::PresetFile::hasPresetExtension (f))
             return true;
 
     return false;
@@ -141,7 +141,7 @@ bool HorizonPadAudioProcessorEditor::isInterestedInFileDrag (const juce::StringA
 void HorizonPadAudioProcessorEditor::filesDropped (const juce::StringArray& files, int, int)
 {
     for (const auto& f : files)
-        if (f.endsWithIgnoreCase (horizon::PresetFile::kExtension))
+        if (horizon::PresetFile::hasPresetExtension (f))
             presetBar.importPreset (juce::File (f));
 }
 

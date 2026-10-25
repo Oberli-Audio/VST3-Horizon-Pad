@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<QuellePreset name="Dämmerlicht" author="Quelle Music" category="Pad"
-              description="Warm dusk light, gently settling."
-              pluginVersion="0.1.0" created="2026-10-21" factory="true">
+<BobPreset name="Dämmerlicht" author="bob Audio" category="Pad"
+           description="Warm dusk light, gently settling."
+           pluginVersion="0.1.0" created="2026-10-21" factory="true">
   <HorizonPadState version="2" dspVersion="1">
     <PARAMETERS>
       <PARAM id="rootVolume" value="39.4"/>
@@ -17,4 +17,4 @@
       <PARAM id="detuneMacro" value="50"/>
     </PARAMETERS>
   </HorizonPadState>
-</QuellePreset>
+</BobPreset>

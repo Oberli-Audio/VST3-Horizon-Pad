@@ -58,7 +58,7 @@ README_SECTIONS = {
     "known-issues": [r"^##+\s*known issues"],
     "licence": [r"^##+\s*licen[cs]e"],
     "releases-latest-link": [r"github\.com/[^/\s]+/[^/\s]+/releases/latest"],
-    "quit-live-before-update": [r"quit live"],
+    "quit-live-before-update": [r"quit ableton live|quit (your|the) daw"],
     "zip-not-source-code": [r"not .{0,20}source code|source code.{0,30}not"],
     "update-and-rollback": [r"^##+\s*update|previous release"],
 }
@@ -461,7 +461,7 @@ def message_text(repo):
     if sounds:
         lines.append(re.sub(r"\*\*", "", sounds[0]))
     lines += ["",
-              "Update: Quit Live. Download the zip for your system (not \"Source code\"). Windows: copy the whole %s.vst3 folder to C:\\Program Files\\Common Files\\VST3\\ (replace). macOS: Finder > Go > Go to Folder > ~/Library/Audio/Plug-Ins/VST3/, replace, start Live, then right away System Settings > Privacy & Security > Open Anyway, rescan. Details in the README." % name,
+              "Update: Quit Ableton Live. Download the zip for your system (not \"Source code\"). Windows: copy the whole %s.vst3 folder to C:\\Program Files\\Common Files\\VST3\\ (replace). macOS: Finder > Go > Go to Folder > ~/Library/Audio/Plug-Ins/VST3/, replace, start Ableton Live, then right away System Settings > Privacy & Security > Open Anyway, rescan. Details in the README." % name,
               "Your presets and settings stay."]
     if state_bump:
         lines.append("Projects saved with this version will not open in older versions; if you need to go back, keep the project and send me the .als.")
@@ -521,12 +521,12 @@ def selftest():
         planted("changelog behind VERSION", lambda r: (r / "VERSION").write_text("1.3.0\n"), "no section")
         planted("sounds different missing", lambda r: (r / "CHANGELOG.md").write_text((r / "CHANGELOG.md").read_text().replace("**Sounds different:**", "Changed:")), "Sounds different")
         planted("state bump unannounced", lambda r: (r / "ship.toml").write_text((r / "ship.toml").read_text().replace("state_version_bumped = false", "state_version_bumped = true")), "older versions")
-        planted("quit Live missing", lambda r: (r / "README.md").write_text((r / "README.md").read_text().replace("Quit Live", "Close it")), "quit-live")
+        planted("quit Ableton Live missing", lambda r: (r / "README.md").write_text((r / "README.md").read_text().replace("Quit Ableton Live", "Close it")), "quit-live")
         planted("notices stale", lambda r: (r / "THIRD_PARTY_NOTICES.md").write_text("# Notices\nJUCE only. Steinberg."), "not what notices.toml generates")
         planted("dependency not in the manifest", lambda r: (r / "CMakeLists.txt").write_text((r / "CMakeLists.txt").read_text() + "\nFetchContent_Declare(signalsmith-stretch GIT_REPOSITORY x)\n"), "signalsmith-stretch")
         planted("licence without reserved", lambda r: (r / "LICENSE").write_text((r / "LICENSE").read_text().replace("reserved", "kept")), "reserved")
-        planted("preset file missing", lambda r: (r / "presets" / "warm.quellepreset").unlink(), "no file for slug")
-        planted("stray preset file", lambda r: (r / "presets" / "stray.quellepreset").write_text("x"), "not in presets.csv")
+        planted("preset file missing", lambda r: (r / "presets" / "warm.bobpreset").unlink(), "no file for slug")
+        planted("stray preset file", lambda r: (r / "presets" / "stray.bobpreset").write_text("x"), "not in presets.csv")
         planted("removed parameter in prose", lambda r: (r / "README.md").write_text((r / "README.md").read_text() + "\nTurn `oldShimmer` down.\n"), "oldShimmer")
         planted("bad version", lambda r: (r / "VERSION").write_text("1.2\n"), "not x.y.z")
         planted("licence file missing", lambda r: (r / "LICENSE").unlink(), "LICENSE missing")
@@ -590,7 +590,7 @@ def selftest():
             out = buf.getvalue()
             expect("release-assets catches detritus, prefix, version and empty symbols", rc == 1 and "detritus" in out and "folder prefix" in out and "VERSION is" in out and "no .dSYM" in out and "must ride inside" in out)
         msg = message_text(repo)
-        expect("message has the parts", all(x in msg for x in ("releases/latest", "Quit Live", "Source code", "Sounds different", "previous release", "doing right before", "About panel", "Fake Pad 1.2.0: three words", "CrashDumps")))
+        expect("message has the parts", all(x in msg for x in ("releases/latest", "Quit Ableton Live", "Source code", "Sounds different", "previous release", "doing right before", "About panel", "Fake Pad 1.2.0: three words", "CrashDumps")))
         expect("known-issues text", known_issues_text(repo).splitlines()[1].startswith("- ") and "(EX-002)" in known_issues_text(repo))
         sec = changelog_section(repo, "1.2.0")
         expect("changelog section extracted", sec is not None and "Added" in sec)

@@ -68,7 +68,7 @@ inline constexpr std::array<ParamSpec, (size_t) (kNumLayers + kNumGlobalParams)>
     own validated Faust-derived DSP, and every macro acts on all four pads at
     once - so a preset is a point in this 10-dimensional blend/macro space.
 
-    Factory presets are .quellepreset files compiled into the plugin
+    Factory presets are .bobpreset files compiled into the plugin
     (presets/, in presets.csv's order); user presets are the same files in
     the User folder (PresetFile.h). Everything shown - name, category,
     author, description - is read from the file (D.6.5).

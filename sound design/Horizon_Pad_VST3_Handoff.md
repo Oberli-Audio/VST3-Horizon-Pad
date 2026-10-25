@@ -1,6 +1,6 @@
 # Horizon Pad — VST3 Handoff
 
-Quelle Music · ambient pad synth · **plugin built, compiled, and committed.**
+bob Audio · ambient pad synth · **plugin built, compiled, and committed.**
 
 Tagline: *"Wäg zom Läbe — a life of joy"*
 

@@ -137,7 +137,7 @@ void AboutPanel::paint (juce::Graphics& g)
     g.drawText ("Horizon Pad", r.removeFromTop (38), juce::Justification::centredLeft);
     g.setColour (Palette::textDim);
     g.setFont (labelFont (12.5f));
-    g.drawText ("Quelle Music", r.removeFromTop (22), juce::Justification::centredLeft);
+    g.drawText ("bob Audio", r.removeFromTop (22), juce::Justification::centredLeft);
 
     r.removeFromBottom (32);   // buttons
     auto trademark = r.removeFromBottom (34);

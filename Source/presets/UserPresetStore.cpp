@@ -49,10 +49,26 @@ namespace
 
         legacy.moveFileTo (legacy.getSiblingFile ("UserPresets-before-0.1.0.xml"));
     }
+
+    /** 0.1.0 kept the User folder under "Quelle Music": copied once, into a User
+        folder that does not exist yet, as .bobpreset (the reader takes the old
+        <QuellePreset> inside). The old folder stays as it was for an older build. */
+    void copyPreviousUserFolder()
+    {
+        const auto from = PresetFile::previousPresetRoot().getChildFile ("User");
+        const auto to = PresetFile::userFolder();
+
+        if (! from.isDirectory() || to.exists() || ! to.createDirectory())
+            return;
+
+        for (const auto& file : from.findChildFiles (juce::File::findFiles, false, juce::String ("*") + PresetFile::kPreviousExtension))
+            file.copyFileTo (to.getChildFile (file.getFileNameWithoutExtension() + PresetFile::kExtension));
+    }
 }
 
 std::vector<Preset> UserPresetStore::scan()
 {
+    copyPreviousUserFolder();
     migrateLegacyLibrary();
 
     std::vector<Preset> presets;

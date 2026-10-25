@@ -16,7 +16,7 @@ namespace horizon
 
 namespace
 {
-    /** The host's own version: JUCE's host enum stops at Live 11, so it is read
+    /** The host's own version: JUCE's host enum stops at Ableton Live 11, so it is read
         from the host application itself (its bundle on macOS, the executable's
         version resource on Windows). */
     juce::String hostVersion()

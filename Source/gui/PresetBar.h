@@ -45,7 +45,7 @@ namespace horizon::ui
 class PresetBar final : public juce::Component
 {
 public:
-    /** Imports a .quellepreset (Browse > Import, or a file dropped on the editor); shows why if refused. */
+    /** Imports a .bobpreset (Browse > Import, or a file dropped on the editor); shows why if refused. */
     void importPreset (const juce::File& file);
 
     explicit PresetBar (HorizonPadAudioProcessor&);
@@ -139,7 +139,7 @@ private:
     juce::TextButton saveButton { "+ Save preset" };
 
     // "Browse": every preset by category, your own apart, import and export of
-    // .quellepreset files (D.6.5, audio-plugins.md 8).
+    // .bobpreset files (D.6.5, audio-plugins.md 8).
     juce::TextButton browseButton { "Browse" };
     std::unique_ptr<juce::FileChooser> fileChooser;
     void showBrowseMenu();

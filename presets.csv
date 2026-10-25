@@ -1,18 +1,18 @@
 slug,name,category,tags,edge,author,notes
-init,Lagerfeuer,Pad,,N,Quelle Music,the parameter table's defaults
-alpengluehen,Alpenglühen,Pad,,N,Quelle Music,
-talwind,Talwind,In-between,,N,Quelle Music,
-frostklang,Frostklang,In-between,,N,Quelle Music,
-funkenflug,Funkenflug,Lead,,N,Quelle Music,
-steinerne-ruhe,Steinerne Ruhe,Pad,,N,Quelle Music,
-bergecho,Bergecho,Pad,,Y,Quelle Music,most reverb; translation battery
-kupferglanz,Kupferglanz,In-between,,N,Quelle Music,
-silberpfad,Silberpfad,Lead,,N,Quelle Music,
-mitternachtsblau,Mitternachtsblau,Pad,,Y,Quelle Music,"darkest, loudest bass; translation battery"
-ruhepuls,Ruhepuls,Pad,,N,Quelle Music,
-sturmfront,Sturmfront,In-between,,N,Quelle Music,
-glasperle,Glasperle,Lead,,N,Quelle Music,
-sternenzelt,Sternenzelt,Pad,,Y,Quelle Music,widest image; translation battery
-daemmerlicht,Dämmerlicht,Pad,,N,Quelle Music,
-goldstaub,Goldstaub,Pad,,N,Quelle Music,
-klarheit,Klarheit,In-between,,N,Quelle Music,
+init,Lagerfeuer,Pad,,N,bob Audio,the parameter table's defaults
+alpengluehen,Alpenglühen,Pad,,N,bob Audio,
+talwind,Talwind,In-between,,N,bob Audio,
+frostklang,Frostklang,In-between,,N,bob Audio,
+funkenflug,Funkenflug,Lead,,N,bob Audio,
+steinerne-ruhe,Steinerne Ruhe,Pad,,N,bob Audio,
+bergecho,Bergecho,Pad,,Y,bob Audio,most reverb; translation battery
+kupferglanz,Kupferglanz,In-between,,N,bob Audio,
+silberpfad,Silberpfad,Lead,,N,bob Audio,
+mitternachtsblau,Mitternachtsblau,Pad,,Y,bob Audio,"darkest, loudest bass; translation battery"
+ruhepuls,Ruhepuls,Pad,,N,bob Audio,
+sturmfront,Sturmfront,In-between,,N,bob Audio,
+glasperle,Glasperle,Lead,,N,bob Audio,
+sternenzelt,Sternenzelt,Pad,,Y,bob Audio,widest image; translation battery
+daemmerlicht,Dämmerlicht,Pad,,N,bob Audio,
+goldstaub,Goldstaub,Pad,,N,bob Audio,
+klarheit,Klarheit,In-between,,N,bob Audio,

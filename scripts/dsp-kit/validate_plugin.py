@@ -33,6 +33,14 @@ pluginval is looked for in $PLUGINVAL, on PATH, in /Applications/pluginval.app,
 then in build-validators/; --fetch-pluginval downloads the pinned release there.
 The Steinberg validator is built from the pinned VST3 SDK commit into
 build-validators/ on first use (without full Xcode, -DXCODE_VERSION is passed).
+It is never built with a sanitizer: on macOS, --sanitizer inserts the runtime the
+plugin itself links (its LC_RPATH, else xcrun clang) into the validator alone, since
+a runtime that only arrives with the dlopen'd plugin does not start. The validator
+step also fails on "MIDI Mapping supplied for ..." lines: the validator logs them as
+Info, but each is a wrong answer from the plugin (JUCE's VST3 wrapper read past an
+array this way, D.1.6).
+
+    python3 validate_plugin.py selftest      # the parsing this script relies on
 
 Exit codes: 0 all passed; 1 something failed (with --strict, also a skipped
 step); 77 every requested step was skipped (missing plugin bundle or tool) -
@@ -198,15 +206,65 @@ def step_ctest(a, logs):
     return code == 0, "%d of %s passed" % (int(m.group(2)) - failed, m.group(2))
 
 
+SANITIZER_RUNTIMES = {"asan": "libclang_rt.asan_osx_dynamic.dylib", "tsan": "libclang_rt.tsan_osx_dynamic.dylib"}
+
+
+def rpaths(otool_l):
+    """LC_RPATH directories from `otool -l` output, without @-relative entries."""
+    return [p for p in re.findall(r"^\s*path (.+?) \(offset \d+\)", otool_l, re.M) if not p.startswith("@")]
+
+
+def sanitizer_runtime(bundle, lib):
+    """The runtime the plugin was built against: Python, an Apple binary, may not load it
+    ("Sanitizer load violates platform policy"), so it goes to the validator process only."""
+    binaries = sorted(p for p in (bundle / "Contents" / "MacOS").glob("*") if p.is_file())
+    if binaries:
+        out = subprocess.run(["otool", "-l", str(binaries[0])], capture_output=True, text=True).stdout
+        for d in rpaths(out):
+            if (Path(d) / lib).is_file():
+                return Path(d) / lib
+    out = subprocess.run(["xcrun", "clang", "-print-file-name=" + lib], capture_output=True, text=True).stdout.strip()
+    return Path(out) if out and Path(out).is_file() else None
+
+
+def wrong_midi_mappings(out):
+    """Validator Info lines that are wrong answers by the plugin: a mapping for a controller
+    number >= kCountCtrlNumber or for an event bus it does not have."""
+    return sum(1 for l in out.splitlines() if "MIDI Mapping supplied for" in l)
+
+
 def step_validator(a, logs):
     if not a.plugin.exists():
         raise Unavailable("no plugin bundle at %s" % a.plugin)
     v = find_validator()
-    code, out = run([v, a.plugin], logs / "steinberg-validator.log", timeout=1800)
+    env, note = None, ""
+    if IS_MAC and a.sanitizer in SANITIZER_RUNTIMES:
+        rt = sanitizer_runtime(a.plugin, SANITIZER_RUNTIMES[a.sanitizer])
+        if rt is None:
+            return False, "no %s runtime for the validator (not in the plugin's LC_RPATH, not from xcrun clang)" % a.sanitizer
+        env, note = dict(os.environ, DYLD_INSERT_LIBRARIES=str(rt)), ", %s runtime inserted" % a.sanitizer
+    code, out = run([v, a.plugin], logs / "steinberg-validator.log", timeout=1800, env=env)
     # the exit code is the verdict (F.13.5); the counts are detail only
     m = re.search(r"Result: (\d+) tests passed, (\d+) tests failed", out)
     detail = ("%s passed, %s failed (SDK %s)" % (m.group(1), m.group(2), PINS["vst3sdk"]["version"])) if m else "exit %d, see log" % code
-    return code == 0, detail
+    wrong = wrong_midi_mappings(out)
+    if wrong:
+        detail += "; %d wrong MIDI mapping answers (logged as Info, a plugin defect: D.1.6)" % wrong
+    return code == 0 and not wrong, detail + note
+
+
+def selftest():
+    otool = ("Load command 20\n          cmd LC_RPATH\n      cmdsize 32\n         path @executable_path (offset 12)\n"
+             "Load command 21\n          cmd LC_RPATH\n      cmdsize 80\n"
+             "         path /Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin (offset 12)\n")
+    assert rpaths(otool) == ["/Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin"], rpaths(otool)
+    log = ("[MIDI Mapping]\nInfo:  ===MIDI Mapping ====================================\n"
+           + "Info:  MIDI Mapping supplied for a wrong ControllerNumbers value (bigger than the max)\n" * 16
+           + "Info:  MIDI Mapping supplied for an unknown event bus\n[Succeeded]\n")
+    assert wrong_midi_mappings(log) == 17, wrong_midi_mappings(log)
+    assert wrong_midi_mappings("[MIDI Mapping]\nInfo:  ===MIDI Mapping ===\n[Succeeded]\n") == 0
+    print("validate_plugin selftest OK: rpath parsing, wrong MIDI mapping lines")
+    return 0
 
 
 def pluginval_cmd(a, prof, seed, repeat, randomise, logs, name):
@@ -314,6 +372,8 @@ def main():
     ap.add_argument("--strict", action="store_true",
                     help="a skipped step is a failure (CI: a missing tool must not pass silently)")
     argv = sys.argv[1:]
+    if argv[:1] == ["selftest"]:
+        sys.exit(selftest())
     if argv and argv[0] in PROFILES:          # `validate_plugin.py full --plugin ...` reads as --profile full
         argv = ["--profile", argv[0]] + argv[1:]
     a = ap.parse_args(argv)

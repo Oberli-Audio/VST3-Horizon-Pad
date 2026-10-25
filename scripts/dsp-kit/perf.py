@@ -60,8 +60,12 @@ def read_max(runs, block, fs):
 
 
 def measure_cell(harness, preset, fs, block, a):
-    K.ARCH = a.arch or K.ARCH        # a native harness is started under `arch -x86_64`; Python stays native
-    runs = [profile(harness, preset, fs, block, a) for _ in range(a.runs)]
+    saved, K.ARCH = K.ARCH, a.arch or K.ARCH   # a native harness is started under `arch -x86_64`; Python stays native
+    try:
+        runs = [profile(harness, preset, fs, block, a) for _ in range(a.runs)]
+    finally:
+        K.ARCH = saved                         # one cell's slice must not leak into the next
+
     archs = {r["arch"] for r in runs}
     if a.arch and archs != {a.arch}:
         raise RuntimeError("harness %s rendered on %s, expected %s (D.2.1: measure the slice the host runs)" % (harness, archs, a.arch))

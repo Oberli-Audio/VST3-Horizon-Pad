@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Horizon Pad (Quelle Music) — a four-layer ambient pad synthesiser VST3/Standalone
+Horizon Pad (bob Audio, lowercase "b"; Quelle Music until 2026-10-25) — a four-layer ambient pad synthesiser VST3/Standalone
 plugin, built with JUCE 8.0.16 (C++17, pinned by commit; 8.0.11+ bundles the MIT VST 3 SDK). Everything is synthesised in DSP code:
 no samples, audio files, or bitmap artwork anywhere in the repo — oscillators,
 the shimmer/pitch-shift engine, and the entire GUI (including the sunset
@@ -177,18 +177,16 @@ Before every tag, all clean:
 cmake --preset asan && cmake --build build-asan --target HorizonPad_VST3 HorizonPadSoundTool
 export ASAN_OPTIONS=halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
 caffeinate -i env PLUGINVAL=<pluginval-asan>/Builds/asan/pluginval_artefacts/Release/pluginval.app/Contents/MacOS/pluginval \
-  python3 scripts/dsp-kit/validate_plugin.py --profile full --sanitizer asan --only pluginval \
+  python3 scripts/dsp-kit/validate_plugin.py --profile full --sanitizer asan \
   --plugin "build-asan/HorizonPad_artefacts/RelWithDebInfo/VST3/Horizon Pad.vst3"
-caffeinate -i env DYLD_INSERT_LIBRARIES="$(xcrun clang -print-file-name=libclang_rt.asan_osx_dynamic.dylib)" \
-  build-validators/vst3sdk-build/bin/Release/validator "build-asan/HorizonPad_artefacts/RelWithDebInfo/VST3/Horizon Pad.vst3"
 caffeinate -i env HORIZON_PRESET_ROOT="$PWD/build-asan/test-presets" \
   python3 tools/tests/dsp_tests.py --tool ./build-asan/HorizonPadSoundTool
 ```
 
-The Steinberg validator runs by hand: it is not built with ASan, ASan will not start when
-a host only `dlopen`s it ("Interceptors are not working"), and `validate_plugin.py` cannot
-pass it the runtime - Python is an Apple binary, which may not load it ("Sanitizer load
-violates platform policy"). A kit bug, reported to the owner 2026-10-25.
+The Steinberg validator is not built with ASan, and ASan will not start when a host only
+`dlopen`s it ("Interceptors are not working"), so `validate_plugin.py` (since
+sound-design-bob 4.16.0) inserts the runtime the plugin links into the validator process
+alone - Python, an Apple binary, may not load it ("Sanitizer load violates platform policy").
 
 ### CI
 
@@ -358,6 +356,6 @@ is owner-confirmed: do not edit the YAML, add a dated amendment beneath it.
 
 ## DSP work
 
-Invariants load automatically for `Source/**` and `*.dsp` (`~/.claude/rules/dsp-invariants.md`, installed from `~/bob-skills/rules/`). For design, porting, measurement, testing, review or release, and for any defect, use the **sound-design-bob** skill (synced from claude.ai; source and playbook in `~/bob-skills`). It carries the Quelle Music DSP playbook (v3.6 at 2026-10-17) in its `references/`: the core card `dsp-playbook-core.md` (read whole; section 0 maps tasks to recipes), the reference split into `dsp-selection.md` (S, algorithm choice), `dsp-foundations.md` (F), `dsp-instruments.md` (I), `dsp-effects.md` (E), `dsp-control.md` (C), `dsp-analysis.md` (A) and `dsp-development.md` (D: real-time safety, performance, testing, CI, host contract, licensing, agent workflow, task recipes) - grep them, never read them whole - and `dsp-sound-design-playbook.md` as the index. Its `scripts/dsp-kit/` holds the tested measurement library (`dspkit.py`), the harness contract new products follow, a test scaffold and the document templates. For the plugin editor, ux-ui-design-bob runs alongside on the same tier, gates and parameter table.
+Invariants load automatically for `Source/**` and `*.dsp` (`~/.claude/rules/dsp-invariants.md`, installed from `~/bob-skills/rules/`). For design, porting, measurement, testing, review or release, and for any defect, use the **sound-design-bob** skill (synced from claude.ai; source and playbook in `~/bob-skills`). It carries the bob Audio DSP playbook (v3.6 at 2026-10-17) in its `references/`: the core card `dsp-playbook-core.md` (read whole; section 0 maps tasks to recipes), the reference split into `dsp-selection.md` (S, algorithm choice), `dsp-foundations.md` (F), `dsp-instruments.md` (I), `dsp-effects.md` (E), `dsp-control.md` (C), `dsp-analysis.md` (A) and `dsp-development.md` (D: real-time safety, performance, testing, CI, host contract, licensing, agent workflow, task recipes) - grep them, never read them whole - and `dsp-sound-design-playbook.md` as the index. Its `scripts/dsp-kit/` holds the tested measurement library (`dspkit.py`), the harness contract new products follow, a test scaffold and the document templates. For the plugin editor, ux-ui-design-bob runs alongside on the same tier, gates and parameter table.
 
 The playbook is at v3.6 (2026-10-17): 37 rules tagged by track. Horizon Pad is an instrument (track I) that also owns control (C: MIDI, pedal, wheels), processing (E: the shimmer, ensemble, reverb), mix and output (F.5-F.6). Its v2 sound-design pass is the playbook's instrument worked example (I.10); see `docs/dsp-review-2026-09-26.md` (findings) and `docs/sound-design-v2.md` (changes, measurements, listening list). Audited 2026-10-17 (`docs/dsp-review-2026-10-17.md`, resolution at its end): event timing (29) passes - MIDI splits the block at sample offsets; control mappings (30) are tested through real MIDI; the output limiter's 1x `tanh` (33) is documented as deliberately unoversampled with a rate comparison beside it; the translation battery (34) passes on every preset; the suite runs clean under RTSan (35); worst-case block time (37) is measured with `--profile` (p99 6% of the deadline at 64 samples, M3 Pro) - on the budget machine it is still owed. Frozen IDs with a versioned state (36) is **not yet applicable**: Horizon Pad is unreleased and testing-only, so parameters, state and presets change freely with no migration or version flags until the owner announces a release; at that point the state gains a version and golden state files (D.5.3). Rule 32 (bypass) does not apply to an instrument.

@@ -1,4 +1,4 @@
-"""dspkit - measurement functions for Quelle Music plugin verification.
+"""dspkit - measurement functions for bob Audio plugin verification.
 
 Reusable across products: every function takes numpy arrays (samples x channels, or
 1-D mono) and a sample rate, and returns plain numbers or dicts, so a project's test

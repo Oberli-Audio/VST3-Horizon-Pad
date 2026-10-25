@@ -20,20 +20,33 @@ inline constexpr int kStateVersion = 2;
     behaviour alive behind it). */
 inline constexpr int kDspVersion = 1;
 
-inline constexpr const char* kExtension = ".quellepreset";
+inline constexpr const char* kExtension = ".bobpreset";
+
+/** What preset files were called before the rebrand to bob Audio (2026-10-25):
+    still read, so a friend's older file imports. */
+inline constexpr const char* kPreviousExtension = ".quellepreset";
+
+/** A preset file by either extension. */
+bool hasPresetExtension (const juce::String& path);
 
 /** The VST3 spec location, one folder for the product (D.6.4):
-    ~/Library/Audio/Presets/Quelle Music/Horizon Pad, or Documents\VST3
-    Presets\Quelle Music\Horizon Pad. HORIZON_PRESET_ROOT overrides it, so
+    ~/Library/Audio/Presets/bob Audio/Horizon Pad, or Documents\VST3
+    Presets\bob Audio\Horizon Pad. HORIZON_PRESET_ROOT overrides it, so
     the harness and the tests never touch the real folders. */
 juce::File presetRoot();
 juce::File factoryFolder();
 juce::File userFolder();
 
 /** Machine-local settings (the editor size): ~/Library/Application Support/
-    Quelle Music/Horizon Pad or %APPDATA%\Quelle Music\Horizon Pad (D.6.4);
+    bob Audio/Horizon Pad or %APPDATA%\bob Audio\Horizon Pad (D.6.4);
     under HORIZON_PRESET_ROOT/Settings when that is set. */
 juce::File settingsFolder();
+
+/** The same two folders under the old company name, "Quelle Music", where
+    0.1.0 test builds kept them; under HORIZON_PRESET_ROOT/Previous and
+    Previous/Settings when that is set. Read once to copy from, never written. */
+juce::File previousPresetRoot();
+juce::File previousSettingsFolder();
 
 /** Where versions before 0.1.0 kept UserPresets.xml and EditorSettings.xml. */
 juce::File legacyFolder();
@@ -46,8 +59,9 @@ juce::String slugFor (const juce::String& name);
     parameter's default, everything is clamped to the range. */
 void readParameters (const juce::XmlElement* parameters, int version, Preset& into);
 
-/** Reads a <QuellePreset> document. Refuses (nullopt, `error` set) anything
-    that is not one, or one from a newer format - never half-loaded. */
+/** Reads a <BobPreset> document, or a <QuellePreset> one written before the
+    rebrand. Refuses (nullopt, `error` set) anything that is neither, or one
+    from a newer format - never half-loaded. */
 std::optional<Preset> read (const juce::XmlElement& xml, juce::String& error);
 std::optional<Preset> read (const juce::File& file, juce::String& error);
 

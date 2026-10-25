@@ -24,7 +24,7 @@ set -euo pipefail
 VST3_PATH="${1:?Usage: $0 <path-to-Horizon-Pad.vst3> <output-dir>}"
 OUT_DIR="${2:?Usage: $0 <path-to-Horizon-Pad.vst3> <output-dir>}"
 
-IDENTIFIER="com.quellemusic.horizonpad.installer"
+IDENTIFIER="com.bobaudio.horizonpad.installer"
 VERSION="1.0.0"
 INSTALL_LOCATION="/Library/Audio/Plug-Ins/VST3"
 PKG_NAME="Horizon Pad.pkg"

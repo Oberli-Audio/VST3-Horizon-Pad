@@ -156,7 +156,7 @@ def check_info(info, expect_version=None, require_archs=None, plat=None):
     req = require_archs or (["x86_64", "arm64"] if plat == "macos" else [])
     missing = [x for x in req if x not in (info.get("archs") or [])]
     if missing:
-        errs.append("missing slice(s) %s (archs: %s); Live 10.1 under Rosetta needs x86_64, a native Live needs arm64" % (",".join(missing), ",".join(info.get("archs") or [])))
+        errs.append("missing slice(s) %s (archs: %s); Ableton Live 10.1 under Rosetta needs x86_64, a native DAW needs arm64" % (",".join(missing), ",".join(info.get("archs") or [])))
     if plat == "windows" and info.get("msvc_runtime") != "MT":
         errs.append("MSVC runtime is %r, not MT: the DLL would need the friend's redistributable" % info.get("msvc_runtime"))
     dt = info.get("deployment_target")

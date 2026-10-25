@@ -398,6 +398,23 @@ fails because Python is an Apple binary (`Sanitizer load violates platform polic
 gate runs pluginval through the kit (`--only pluginval`) and the validator by hand with the
 runtime inserted. Reported to the owner as a kit bug.
 
+### Final runs (2026-10-25, Mac, after the rebrand to bob Audio)
+
+The owner had the kit fixed (sound-design-bob 4.16.0: `validate_plugin.py` inserts the
+plugin's own sanitizer runtime into the Steinberg validator alone, and fails on wrong MIDI
+mapping answers); the kit was refreshed into `scripts/dsp-kit/`. Rerun on the rebranded build
+(`Boau`, `com.bobaudio.horizonpad`, `.bobpreset`), the commands exactly as the task gives them:
+
+| Step | Command | Last line |
+|---|---|---|
+| 4a | `PLUGINVAL=<from source> python3 scripts/dsp-kit/validate_plugin.py --profile full --sanitizer asan --plugin "build-asan/.../Horizon Pad.vst3"` | `[validate] PASS - summary in build-validation/ex006-final/summary.json` (validator 47/0 with the ASan runtime inserted, pluginval L10 at six rates, 25 tests, 18 s) |
+| 4b | `HORIZON_PRESET_ROOT=build-asan/test-presets python3 tools/tests/dsp_tests.py --tool ./build-asan/HorizonPadSoundTool` | `PASS  width_profile_staggered` (39 of 39, with `previous_brand_presets_carried_over`) |
+
+No ASan or UBSan output in any log. Windows: the `asan-windows` CI job built the sound tool
+with `/fsanitize=address` on its first run and then failed in its own setup step (it looked for
+the runtime DLL through `CMakeCache.txt`, where the Visual Studio generator keeps no compiler
+path); fixed in 88a5975, the DLL is now copied beside the tool by CMake. The job is to pass.
+
 ---
 
 ## EX-007 - Blocks over the deadline at 32 samples under Rosetta, idle CPU above 2 %
@@ -432,7 +449,7 @@ OS preempts (see the note in `tools/sound_tool/Main.cpp`); a host's audio thread
 - Idle above 4 %.
 - A friend reporting dropouts at a buffer of 64 samples or more.
 
-Friends: If Live 10 crackles at a 32-sample buffer on an Apple-silicon Mac, set the buffer to 64 or more.
+Friends: If Ableton Live 10 crackles at a 32-sample buffer on an Apple-silicon Mac, set the buffer to 64 or more.
 
 ### Rerun with the fixed tools (2026-10-22)
 
@@ -478,7 +495,7 @@ layout and caching, verifiable only in hosts.
 
 ### What would make it unacceptable
 
-- A wrong window size or blur in Live 10.1 under Rosetta or Live on Windows, at any SIZE step or
+- A wrong window size or blur in Ableton Live 10.1 under Rosetta or Ableton Live on Windows, at any SIZE step or
   after the host's own DPI change.
 - A friend asking for a size between the steps.
 
