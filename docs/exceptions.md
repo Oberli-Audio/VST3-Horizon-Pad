@@ -330,7 +330,7 @@ test run (IDs, order, names, 0..100 ranges, defaults, steps, automatable, throug
 - **Date:** 2026-10-22
 - **Raised by:** Claude, Round 14 (S.6)
 - **Rule / target:** the Tier P release gate (sound-design-bob): pluginval L10 under ASan
-- **Status:** OPEN - the Mac runs are clean (2026-10-25, "Resolution" below); the Windows CI job is to pass
+- **Status:** CLOSED 2026-10-26 - fixed: ASan + UBSan clean on the Mac, ASan clean on Windows (CI), see "Resolution" and "Windows, and the close" below
 
 ### What failed
 
@@ -414,6 +414,23 @@ No ASan or UBSan output in any log. Windows: the `asan-windows` CI job built the
 with `/fsanitize=address` on its first run and then failed in its own setup step (it looked for
 the runtime DLL through `CMakeCache.txt`, where the Visual Studio generator keeps no compiler
 path); fixed in 88a5975, the DLL is now copied beside the tool by CMake. The job is to pass.
+
+### Windows, and the close (2026-10-26)
+
+**Closed 2026-10-26.** CI run 40409256281 (commit a349db7), job `asan-windows`, MSVC 19.44.35229.0:
+`cmake -B build-asan -G "Visual Studio 17 2022" -A x64 -DHORIZON_ASAN=ON`,
+`cmake --build build-asan --target HorizonPadSoundTool --config RelWithDebInfo`, then
+`python tools/tests/dsp_tests.py --tool build-asan/RelWithDebInfo/HorizonPadSoundTool.exe` with
+`ASAN_OPTIONS=halt_on_error=1` - last line `PASS  width_profile_staggered`, 39 of 39, no
+AddressSanitizer output; every other job of the run green too.
+
+The suite had never run on Windows before; its two runs before this one showed no sanitizer
+report and failed on text, not memory. The tests decoded the tool's UTF-8 output with the
+Windows code page (8678e03), and the tool read its arguments in that code page, so
+`--preset=Alpenglühen` matched nothing (a349db7: `wmain` on Windows). (Between the runs,
+GitHub's automated anti-abuse system suspended the owner's account for one second right after a
+push on 2026-10-25, reset its password and disabled Actions for about a day; the run history up
+to then is gone.)
 
 ---
 
