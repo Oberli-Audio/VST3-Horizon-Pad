@@ -206,7 +206,7 @@ question about MIDI controller 130 and above by reading past an array (found und
 UBSan, 2026-10-25; unfixed upstream on that date).
 
 ```bash
-git clone https://github.com/bjoernoberli/VST3-Horizon-Pad.git
+git clone https://github.com/Oberli-Audio/VST3-Horizon-Pad.git
 cd VST3-Horizon-Pad
 
 cmake -B build -DCMAKE_BUILD_TYPE=Release

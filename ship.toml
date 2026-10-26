@@ -2,7 +2,7 @@
 name = "Horizon Pad"              # bundle name
 slug = "horizon-pad"              # folder names (tags stay v<VERSION> in this single-plugin repo)
 asset_name = "HorizonPad"         # version-free asset names: HorizonPad-macOS.zip, HorizonPad-Windows-x64.zip
-repo = "bjoernoberli/VST3-Horizon-Pad"
+repo = "Oberli-Audio/VST3-Horizon-Pad"
 formats = ["VST3", "Standalone"]  # AU and CLAP declined by the owner 2026-10-06
 tier = "P"                        # P: ad-hoc; F: Developer ID + notarisation
 

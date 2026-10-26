@@ -16,7 +16,7 @@ Intel) and on Windows 10 or 11, 64-bit, with a processor from about 2009 on
 Apple M3 Pro core has per block, also under Rosetta; set the buffer to 64 samples or more.
 
 ## Install
-Latest version: https://github.com/bjoernoberli/VST3-Horizon-Pad/releases/latest. Download the
+Latest version: https://github.com/Oberli-Audio/VST3-Horizon-Pad/releases/latest. Download the
 zip for your system, not "Source code". Quit your DAW first.
 
 **Windows:** unzip and copy the **whole folder** `Horizon Pad.vst3` (whatever folder it sits

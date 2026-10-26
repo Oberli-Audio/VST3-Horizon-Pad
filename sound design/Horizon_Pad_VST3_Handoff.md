@@ -7,7 +7,7 @@ Tagline: *"Wäg zom Läbe — a life of joy"*
 GUI reference (live, click-through mockup): https://claude.ai/artifact/JfHpmQcecSdVZXkESLfwVQ
 DSP source of truth (design reference — the shipped plugin is a manual C++ port of this, not a `faust2juce` build): `four_pads.dsp`
 Audio references: `four_pads_full_blend_v5.mp3` (all four layers together) plus one solo file per layer (`pad1_warm_foundation.mp3`, `pad2_analog_ensemble_v2.mp3`, `pad3_airy_choir_v3.mp3`, `pad4_motion_pad.mp3`)
-Repo: `github.com/bjoernoberli/VST3-Horizon-Pad` — built plugin delivered as a git bundle (`horizon-pad-vst3-build.bundle`) alongside `HOW_TO_APPLY.md`, since this session's own `git push` is blocked by its repo-authorization policy; merge and push the bundle from your machine.
+Repo: `github.com/Oberli-Audio/VST3-Horizon-Pad` (the account was `bjoernoberli` until 2026-10-26) — built plugin delivered as a git bundle (`horizon-pad-vst3-build.bundle`) alongside `HOW_TO_APPLY.md`, since this session's own `git push` is blocked by its repo-authorization policy; merge and push the bundle from your machine.
 
 ---
 
