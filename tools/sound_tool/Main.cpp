@@ -244,18 +244,12 @@ namespace
         }
     };
 
-    Args parseArgs (int argc, char* argv[])
+    Args parseArgs (const juce::StringArray& arguments)
     {
         Args args;
 
-        for (int i = 1; i < argc; ++i)
+        for (auto arg : arguments)
         {
-            // fromUTF8, not juce::String's const char* constructor: that
-            // constructor asserts its input is plain ASCII, so a UTF-8 argument
-            // (--preset=Alpengluehen with a real umlaut, or an --out path with
-            // one) was silently mangled into a string that matched no preset.
-            auto arg = juce::String::fromUTF8 (argv[i]);
-
             if (! arg.startsWith ("--"))
                 continue;
 
@@ -1155,9 +1149,9 @@ namespace
 // The actual entry point, wrapped so main() can guarantee MessageManager's
 // singleton is torn down (via deleteInstance()) on every exit path - JUCE's
 // leak detector otherwise flags it (and asserts) at static-teardown time.
-static int runTool (int argc, char* argv[])
+static int runTool (const juce::StringArray& arguments)
 {
-    const auto args = parseArgs (argc, argv);
+    const auto args = parseArgs (arguments);
 
     if (args.has ("help"))
     {
@@ -2236,8 +2230,25 @@ static int runTool (int argc, char* argv[])
     return nanCount > 0 || infCount > 0 ? 3 : 0;
 }
 
+// The arguments as text, with an umlaut intact (the preset Alpengluehen by its real name, an --out path): on
+// Windows main()'s argv is in the ANSI code page, so the tool takes the wide wmain()
+// arguments there; elsewhere argv is UTF-8 (fromUTF8, because juce::String's const char*
+// constructor asserts plain ASCII and silently mangled such an argument).
+#if JUCE_WINDOWS
+int wmain (int argc, wchar_t* argv[])
+#else
 int main (int argc, char* argv[])
+#endif
 {
+    juce::StringArray arguments;
+
+    for (int i = 1; i < argc; ++i)
+       #if JUCE_WINDOWS
+        arguments.add (juce::String (argv[i]));
+       #else
+        arguments.add (juce::String::fromUTF8 (argv[i]));
+       #endif
+
     // MessageManager must exist (and be bound to this thread) before we touch
     // any JUCE class that uses AsyncUpdater/ChangeBroadcaster/Timer - the
     // processor is a ChangeBroadcaster and calls sendChangeMessage() from
@@ -2246,7 +2257,7 @@ int main (int argc, char* argv[])
     // thread" assertion. It must be explicitly torn down before exit, or
     // JUCE's leak detector fires an assertion at static-teardown time.
     juce::MessageManager::getInstance();
-    const auto result = runTool (argc, argv);
+    const auto result = runTool (arguments);
 
     // Standard JUCE shutdown order (mirrors what JUCEApplicationBase does):
     // DeletedAtShutdown singletons first (juce_events' ShutdownDetector and
