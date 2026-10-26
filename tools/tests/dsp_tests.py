@@ -24,7 +24,9 @@ class Fail(Exception):
 
 
 def run(extra):
-    r = subprocess.run([TOOL] + extra, capture_output=True, text=True)
+    # The tool writes UTF-8 on every platform; text=True would decode it with the locale's
+    # code page (cp1252 on Windows) and turn preset names like "Alpenglühen" into mojibake.
+    r = subprocess.run([TOOL] + extra, capture_output=True, encoding="utf-8")
     if r.returncode != 0:
         raise Fail(f"tool exited {r.returncode}: {r.stderr[:400]}")
     return json.loads(r.stdout[r.stdout.index('{'):])
@@ -32,7 +34,7 @@ def run(extra):
 
 def list_presets():
     """--list-presets emits a JSON array, not the usual object."""
-    r = subprocess.run([TOOL, "--list-presets"], capture_output=True, text=True)
+    r = subprocess.run([TOOL, "--list-presets"], capture_output=True, encoding="utf-8")
     if r.returncode != 0:
         raise Fail(f"tool exited {r.returncode}: {r.stderr[:400]}")
     return json.loads(r.stdout[r.stdout.index('['):])
@@ -823,7 +825,7 @@ def test_parameter_table_matches_plugin():
     import csv
     paramgen = os.path.join(REPO, "scripts", "dsp-kit", "paramgen.py")
     table = os.path.join(REPO, "parameters.csv")
-    r = subprocess.run([TOOL, "--list-params"], capture_output=True, text=True)
+    r = subprocess.run([TOOL, "--list-params"], capture_output=True, encoding="utf-8")
     if r.returncode != 0 or not r.stdout.lstrip().startswith("["):
         raise Fail(f"--list-params gave no parameter list (exit {r.returncode}); the harness must answer it")
     listing = json.loads(r.stdout)
@@ -866,7 +868,7 @@ STATE_DIR = os.path.join(REPO, "tools", "tests", "state")
 
 def _state_run(extra):
     """The tool with a state flag: (exit code, JSON or None, stderr). Never raises on a non-zero exit."""
-    r = subprocess.run([TOOL, "--notes=60", "--hold=0.3", "--tail=0.2"] + extra, capture_output=True, text=True)
+    r = subprocess.run([TOOL, "--notes=60", "--hold=0.3", "--tail=0.2"] + extra, capture_output=True, encoding="utf-8")
     if r.returncode < 0:
         raise Fail(f"tool crashed (signal {-r.returncode}) on {extra}: {r.stderr[-300:]}")
     d = json.loads(r.stdout[r.stdout.index("{"):]) if "{" in r.stdout else None
@@ -1041,7 +1043,7 @@ def test_output_dc_and_knee():
 def test_about_copy_is_fourteen_lines():
     """The About box copies the fourteen diagnostics fields and nothing else
     (ux-ui-design-bob audio-plugins.md 14, ship-bob feedback-loop.md 3): no user name, no paths."""
-    r = subprocess.run([TOOL, "--diagnostics", "--sample-rate=44100", "--block=256"], capture_output=True, text=True)
+    r = subprocess.run([TOOL, "--diagnostics", "--sample-rate=44100", "--block=256"], capture_output=True, encoding="utf-8")
     if r.returncode != 0:
         raise Fail(f"--diagnostics failed (exit {r.returncode}): {r.stderr[:200]}")
     lines = r.stdout.strip("\n").split("\n")
@@ -1075,11 +1077,11 @@ def test_preset_file_round_trip():
         out = os.path.join(tmp, "Mine.bobpreset")
         base = ["--notes=60", "--seconds=0.3"]
         r = subprocess.run([TOOL, "--preset=glasperle", "--param=width=0.9", f"--export-preset={out}"] + base,
-                           capture_output=True, text=True, env=env_a)
+                           capture_output=True, encoding="utf-8", env=env_a)
         if r.returncode != 0 or not os.path.exists(out):
             raise Fail(f"export failed (exit {r.returncode}): {r.stderr[-200:]}")
         want = json.loads(r.stdout[r.stdout.index("{"):])["activeParams"]
-        r = subprocess.run([TOOL, f"--import-preset={out}"] + base, capture_output=True, text=True, env=env_b)
+        r = subprocess.run([TOOL, f"--import-preset={out}"] + base, capture_output=True, encoding="utf-8", env=env_b)
         if r.returncode != 0:
             raise Fail(f"import refused its own export (exit {r.returncode}): {r.stderr[-200:]}")
         d = json.loads(r.stdout[r.stdout.index("{"):])
@@ -1097,13 +1099,13 @@ def test_preset_file_round_trip():
         newer = re.sub(r'<HorizonPadState version="\d+"', '<HorizonPadState version="9"', text)
         newer_path = os.path.join(tmp, "Newer.bobpreset")
         open(newer_path, "w", encoding="utf-8").write(newer)
-        r = subprocess.run([TOOL, f"--import-preset={newer_path}"] + base, capture_output=True, text=True, env=env_b)
+        r = subprocess.run([TOOL, f"--import-preset={newer_path}"] + base, capture_output=True, encoding="utf-8", env=env_b)
         if r.returncode != 2 or "newer" not in r.stderr.lower():
             raise Fail(f"a preset from a newer version was not refused with a message (exit {r.returncode}): {r.stderr[-200:]}")
         old = text.replace("<BobPreset ", "<QuellePreset ").replace("</BobPreset>", "</QuellePreset>").replace('name="Glasperle"', 'name="Altglas"')
         old_path = os.path.join(tmp, "Old.quellepreset")
         open(old_path, "w", encoding="utf-8").write(old)
-        r = subprocess.run([TOOL, f"--import-preset={old_path}"] + base, capture_output=True, text=True, env=env_b)
+        r = subprocess.run([TOOL, f"--import-preset={old_path}"] + base, capture_output=True, encoding="utf-8", env=env_b)
         if r.returncode != 0 or json.loads(r.stdout[r.stdout.index("{"):])["activePreset"] != "Altglas":
             raise Fail(f"a .quellepreset from before the rebrand did not import (exit {r.returncode}): {r.stderr[-200:]}")
 
@@ -1116,7 +1118,7 @@ def test_previous_brand_presets_carried_over():
         env = dict(os.environ, HORIZON_PRESET_ROOT=tmp)
         exported = os.path.join(tmp, "x.bobpreset")
         r = subprocess.run([TOOL, "--preset=glasperle", f"--export-preset={exported}", "--notes=60", "--seconds=0.2"],
-                           capture_output=True, text=True, env=env)
+                           capture_output=True, encoding="utf-8", env=env)
         if r.returncode != 0:
             raise Fail(f"export failed (exit {r.returncode}): {r.stderr[-200:]}")
         old_user = os.path.join(tmp, "Previous", "User")
@@ -1126,7 +1128,7 @@ def test_previous_brand_presets_carried_over():
         new_user = os.path.join(tmp, "User")
         if os.path.exists(new_user):
             shutil.rmtree(new_user)
-        r = subprocess.run([TOOL, "--notes=60", "--seconds=0.2"], capture_output=True, text=True, env=env)
+        r = subprocess.run([TOOL, "--notes=60", "--seconds=0.2"], capture_output=True, encoding="utf-8", env=env)
         if r.returncode != 0:
             raise Fail(f"the start after the rebrand failed (exit {r.returncode}): {r.stderr[-200:]}")
         copied = os.path.join(new_user, "meins.bobpreset")
@@ -1135,7 +1137,7 @@ def test_previous_brand_presets_carried_over():
         if not os.path.isfile(os.path.join(old_user, "meins.quellepreset")):
             raise Fail("the old User folder was changed")
         os.remove(copied)
-        subprocess.run([TOOL, "--notes=60", "--seconds=0.2"], capture_output=True, text=True, env=env)
+        subprocess.run([TOOL, "--notes=60", "--seconds=0.2"], capture_output=True, encoding="utf-8", env=env)
         if os.path.exists(copied):
             raise Fail("the old presets were copied again into an existing User folder (must happen once)")
 
