@@ -98,7 +98,7 @@ juce_add_plugin(HorizonPad
     VERSION                     ${PRODUCT_VERSION}
     COMPANY_NAME                "Oberli Audio"
     BUNDLE_ID                   "com.oberliaudio.horizonpad"
-    PLUGIN_MANUFACTURER_CODE    Oblr
+    PLUGIN_MANUFACTURER_CODE    Obrl
     PLUGIN_CODE                 Hzpd
     FORMATS                     VST3 Standalone
     PRODUCT_NAME                "Horizon Pad"
@@ -292,7 +292,7 @@ function(horizon_configure_tool tool_target)
         "JucePlugin_Name=\"Horizon Pad\""
         "JucePlugin_Desc=\"Horizon Pad\""
         "JucePlugin_Manufacturer=\"Oberli Audio\""
-        JucePlugin_ManufacturerCode=0x4f626c72
+        JucePlugin_ManufacturerCode=0x4f62726c
         JucePlugin_PluginCode=0x487a7064
         JucePlugin_VersionCode=${HORIZON_VERSION_CODE}
         "JucePlugin_VersionString=\"${PRODUCT_VERSION}\""

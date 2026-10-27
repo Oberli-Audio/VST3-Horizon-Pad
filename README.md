@@ -87,8 +87,8 @@ and for two unreleased days `Boau`, `com.bobaudio.horizonpad`):
 
 | | Value |
 |---|---|
-| Manufacturer code | `Oblr` |
+| Manufacturer code | `Obrl` |
 | Plugin code | `Hzpd` |
 | Bundle ID | `com.oberliaudio.horizonpad` |
-| VST3 class ID (`moduleinfo.json`) | `ABCDEF019182FAEB4F626C72487A7064` |
+| VST3 class ID (`moduleinfo.json`) | `ABCDEF019182FAEB4F62726C487A7064` |
 | Formats | VST3, Standalone |

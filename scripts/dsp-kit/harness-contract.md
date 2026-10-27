@@ -1,6 +1,6 @@
 # The offline harness contract
 
-Every bob Audio plugin has an offline renderer: a CLI target that links the real
+Every Oberli Audio plugin has an offline renderer: a CLI target that links the real
 plugin sources, renders without a host, audio device or editor, and prints one JSON
 object. This file is the contract it implements, so that `dspkit.render()`, the test
 scaffold (`test_template.py`) and every measurement script work on any product without

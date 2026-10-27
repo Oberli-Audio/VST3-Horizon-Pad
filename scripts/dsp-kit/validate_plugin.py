@@ -113,6 +113,12 @@ def bundle_from(path):
 
 # ------------------------------------------------------------------ tools
 
+# OPEN, to fix at the next proper skill update (Horizon Pad, 2026-10-27): with --sanitizer, a
+# PLUGINVAL that is not a file - e.g. "~/..." passed as an `env` argument, where the shell does
+# not expand "~" - silently falls back to /Applications/pluginval.app, the signed download built
+# without the sanitizer. The run then dies on "ERROR: Interceptors are not working", which reads
+# like a sanitizer report against the plugin. Under --sanitizer: fail when $PLUGINVAL is set but
+# missing, and refuse a pluginval whose `otool -L` (macOS) shows no libclang_rt.<sanitizer> runtime.
 def find_pluginval(fetch):
     candidates = [os.environ.get("PLUGINVAL"), shutil.which("pluginval"),
                   "/Applications/pluginval.app/Contents/MacOS/pluginval"]

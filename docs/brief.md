@@ -379,7 +379,7 @@ applies to it alone.
 
 Supersedes A-012's names: the owner renamed the company **Oberli Audio** (the GitHub
 account became Oberli-Audio on 2026-10-26), still before the first release, so the
-plugin's identity follows again: manufacturer code `Oblr`, bundle ID
+plugin's identity follows again: manufacturer code `Obrl`, bundle ID
 `com.oberliaudio.horizonpad`, preset files `.oberlipreset` with the root
 `<OberliPreset>` under `Oberli Audio/Horizon Pad`. The bob Audio identity was never
 released; its `.bobpreset` files and folders are read like the Quelle Music ones.
