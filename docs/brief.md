@@ -375,6 +375,15 @@ earlier test builds no longer find the plugin. In this repository's wording, "DA
 stands for hosts in general and "Ableton Live" is named in full where a point
 applies to it alone.
 
+### A-013 - the company is Oberli Audio (2026-10-27)
+
+Supersedes A-012's names: the owner renamed the company **Oberli Audio** (the GitHub
+account became Oberli-Audio on 2026-10-26), still before the first release, so the
+plugin's identity follows again: manufacturer code `Oblr`, bundle ID
+`com.oberliaudio.horizonpad`, preset files `.oberlipreset` with the root
+`<OberliPreset>` under `Oberli Audio/Horizon Pad`. The bob Audio identity was never
+released; its `.bobpreset` files and folders are read like the Quelle Music ones.
+
 ## Where the exceptions go
 
 12.5 requires a written, dated, named exception whenever a measurement fails and the

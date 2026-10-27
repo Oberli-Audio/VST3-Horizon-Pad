@@ -41,13 +41,20 @@ namespace
        #endif
     }
 
-    constexpr const char* kCompany = "bob Audio";
-    constexpr const char* kPreviousCompany = "Quelle Music";
+    constexpr const char* kCompany = "Oberli Audio";
+    constexpr std::array<const char*, 2> kPreviousCompanies { "bob Audio", "Quelle Music" };   // newest first
 }
 
 bool hasPresetExtension (const juce::String& path)
 {
-    return path.endsWithIgnoreCase (kExtension) || path.endsWithIgnoreCase (kPreviousExtension);
+    if (path.endsWithIgnoreCase (kExtension))
+        return true;
+
+    for (const auto* previous : kPreviousExtensions)
+        if (path.endsWithIgnoreCase (previous))
+            return true;
+
+    return false;
 }
 
 juce::File presetRoot()
@@ -69,20 +76,30 @@ juce::File settingsFolder()
     return settingsFolderFor (kCompany);
 }
 
-juce::File previousPresetRoot()
+std::vector<juce::File> previousPresetRoots()
 {
     if (const auto root = overrideRoot(); root != juce::File())
-        return root.getChildFile ("Previous");
+        return { root.getChildFile ("Previous") };
 
-    return presetRootFor (kPreviousCompany);
+    std::vector<juce::File> roots;
+
+    for (const auto* company : kPreviousCompanies)
+        roots.push_back (presetRootFor (company));
+
+    return roots;
 }
 
-juce::File previousSettingsFolder()
+std::vector<juce::File> previousSettingsFolders()
 {
     if (const auto root = overrideRoot(); root != juce::File())
-        return root.getChildFile ("Previous").getChildFile ("Settings");
+        return { root.getChildFile ("Previous").getChildFile ("Settings") };
 
-    return settingsFolderFor (kPreviousCompany);
+    std::vector<juce::File> folders;
+
+    for (const auto* company : kPreviousCompanies)
+        folders.push_back (settingsFolderFor (company));
+
+    return folders;
 }
 
 juce::File legacyFolder()
@@ -160,7 +177,7 @@ void readParameters (const juce::XmlElement* parameters, int version, Preset& in
 
 std::optional<Preset> read (const juce::XmlElement& xml, juce::String& error)
 {
-    if (! xml.hasTagName ("BobPreset") && ! xml.hasTagName ("QuellePreset"))
+    if (! xml.hasTagName ("OberliPreset") && ! xml.hasTagName ("BobPreset") && ! xml.hasTagName ("QuellePreset"))
     {
         error = "Not a Horizon Pad preset.";
         return std::nullopt;
@@ -170,7 +187,7 @@ std::optional<Preset> read (const juce::XmlElement& xml, juce::String& error)
 
     if (state == nullptr)
     {
-        error = "This preset is for another bob Audio plugin.";
+        error = "This preset is for another Oberli Audio plugin.";
         return std::nullopt;
     }
 
@@ -234,7 +251,7 @@ juce::String formatValue (float value)
 
 std::unique_ptr<juce::XmlElement> toXml (const Preset& preset, bool factory)
 {
-    auto xml = std::make_unique<juce::XmlElement> ("BobPreset");
+    auto xml = std::make_unique<juce::XmlElement> ("OberliPreset");
     xml->setAttribute ("name", preset.name);
     xml->setAttribute ("author", preset.author);
     xml->setAttribute ("category", preset.category);

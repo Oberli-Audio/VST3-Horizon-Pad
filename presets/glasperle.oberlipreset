@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<BobPreset name="Glasperle" author="bob Audio" category="Lead"
-           description="Glassy bell lead - plucks bright, then sings softer."
-           pluginVersion="0.1.0" created="2026-10-21" factory="true">
+<OberliPreset name="Glasperle" author="Oberli Audio" category="Lead"
+              description="Glassy bell lead - plucks bright, then sings softer."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
   <HorizonPadState version="2" dspVersion="1">
     <PARAMETERS>
       <PARAM id="rootVolume" value="30.9"/>
@@ -17,4 +17,4 @@
       <PARAM id="detuneMacro" value="60"/>
     </PARAMETERS>
   </HorizonPadState>
-</BobPreset>
+</OberliPreset>

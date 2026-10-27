@@ -96,9 +96,9 @@ endif()
 # ---------------------------------------------------------------------------
 juce_add_plugin(HorizonPad
     VERSION                     ${PRODUCT_VERSION}
-    COMPANY_NAME                "bob Audio"
-    BUNDLE_ID                   "com.bobaudio.horizonpad"
-    PLUGIN_MANUFACTURER_CODE    Boau
+    COMPANY_NAME                "Oberli Audio"
+    BUNDLE_ID                   "com.oberliaudio.horizonpad"
+    PLUGIN_MANUFACTURER_CODE    Oblr
     PLUGIN_CODE                 Hzpd
     FORMATS                     VST3 Standalone
     PRODUCT_NAME                "Horizon Pad"
@@ -142,10 +142,10 @@ target_sources(HorizonPad PRIVATE
 
 target_include_directories(HorizonPad PRIVATE Source "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
-# The factory bank (playbook D.6.5): one .bobpreset per preset in presets/ and
+# The factory bank (playbook D.6.5): one .oberlipreset per preset in presets/ and
 # presets.csv for their order and categories (checked by presetlint.py), compiled
 # in; the plugin writes them to the Factory folder on the first run of a version.
-file(GLOB HORIZON_FACTORY_PRESETS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/presets/*.bobpreset")
+file(GLOB HORIZON_FACTORY_PRESETS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/presets/*.oberlipreset")
 juce_add_binary_data(HorizonPadPresetData
     HEADER_NAME PresetData.h
     NAMESPACE   PresetData
@@ -291,8 +291,8 @@ function(horizon_configure_tool tool_target)
         # translation units see identical values to PluginProcessor.cpp's.
         "JucePlugin_Name=\"Horizon Pad\""
         "JucePlugin_Desc=\"Horizon Pad\""
-        "JucePlugin_Manufacturer=\"bob Audio\""
-        JucePlugin_ManufacturerCode=0x426f6175
+        "JucePlugin_Manufacturer=\"Oberli Audio\""
+        JucePlugin_ManufacturerCode=0x4f626c72
         JucePlugin_PluginCode=0x487a7064
         JucePlugin_VersionCode=${HORIZON_VERSION_CODE}
         "JucePlugin_VersionString=\"${PRODUCT_VERSION}\""
@@ -318,8 +318,8 @@ function(horizon_configure_tool tool_target)
         JucePlugin_AUManufacturerCode=JucePlugin_ManufacturerCode
         JucePlugin_AUExportPrefix=Horizon_PadAU
         "JucePlugin_AUExportPrefixQuoted=\"Horizon_PadAU\""
-        JucePlugin_CFBundleIdentifier=com.bobaudio.horizonpad
-        JucePlugin_AAXIdentifier=com.bobaudio.horizonpad
+        JucePlugin_CFBundleIdentifier=com.oberliaudio.horizonpad
+        JucePlugin_AAXIdentifier=com.oberliaudio.horizonpad
         JucePlugin_AAXManufacturerCode=JucePlugin_ManufacturerCode
         JucePlugin_AAXProductId=JucePlugin_PluginCode
         JucePlugin_AAXCategory=2048
@@ -330,8 +330,8 @@ function(horizon_configure_tool tool_target)
         JucePlugin_Enable_ARA=0
         JucePlugin_ARAContentTypes=0
         JucePlugin_ARATransformationFlags=0
-        "JucePlugin_ARAFactoryID=\"com.bobaudio.horizonpad.arafactory.${PRODUCT_VERSION}\""
-        "JucePlugin_ARADocumentArchiveID=\"com.bobaudio.horizonpad.aradocumentarchive.1\""
+        "JucePlugin_ARAFactoryID=\"com.oberliaudio.horizonpad.arafactory.${PRODUCT_VERSION}\""
+        "JucePlugin_ARADocumentArchiveID=\"com.oberliaudio.horizonpad.aradocumentarchive.1\""
         "JucePlugin_ARACompatibleArchiveIDs=\"\""
         "JucePlugin_ManufacturerWebsite=\"\""
         "JucePlugin_ManufacturerEmail=\"\"")

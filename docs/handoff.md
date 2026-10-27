@@ -15,10 +15,10 @@ here (the owner fixes the skills).
   hand-written time display (paramgen has no display column yet; the owner fixes the skill).
 - Plugin codes stay Qumu / Hzpd / com.quellemusic.horizonpad (README codes table added with the D.9.9 rewrite).
   Superseded 2026-10-25 by the owner's rebrand to bob Audio, before the first release: Boau / Hzpd /
-  com.bobaudio.horizonpad.
+  com.bobaudio.horizonpad; and on 2026-10-27, Oberli Audio: Oblr / Hzpd / com.oberliaudio.horizonpad.
 - dspVersion in the state, getNumPrograms() = 1, editor scale machine-local only.
-- Presets as files now (S.4): .quellepreset per preset, Factory/ per version, User/ (`.bobpreset`
-  under `bob Audio/Horizon Pad` since the rebrand of 2026-10-25; old files still import).
+- Presets as files now (S.4): .quellepreset per preset, Factory/ per version, User/ (`.oberlipreset`
+  under `Oberli Audio/Horizon Pad` since 2026-10-27, `.bobpreset` for two days before; old files still import).
 
 ## Plan (numbered; tick as done) - paused 2026-10-22 by the owner
 

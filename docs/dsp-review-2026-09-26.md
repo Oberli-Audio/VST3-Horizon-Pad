@@ -1,6 +1,6 @@
 # Critical review: guidelines, workflow and sound design - 2026-09-26
 
-Scope: the bob Audio DSP playbook (v2.1: core card, reference, invariants, the
+Scope: the DSP playbook (v2.1: core card, reference, invariants, the
 two skills), this project's DSP workflow (gates, tools, tests, the sound-designer
 agent) and Horizon Pad's actual sound, measured. Written from `main` at `bf17ee8`.
 Everything marked **measured** was measured with `HorizonPadSoundTool` (Release,

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<BobPreset name="Sturmfront" author="bob Audio" category="In-between"
-           description="A dramatic storm front - big, wide chords that hit sooner."
-           pluginVersion="0.1.0" created="2026-10-21" factory="true">
+<OberliPreset name="Sturmfront" author="Oberli Audio" category="In-between"
+              description="A dramatic storm front - big, wide chords that hit sooner."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
   <HorizonPadState version="2" dspVersion="1">
     <PARAMETERS>
       <PARAM id="rootVolume" value="31.8"/>
@@ -17,4 +17,4 @@
       <PARAM id="detuneMacro" value="50"/>
     </PARAMETERS>
   </HorizonPadState>
-</BobPreset>
+</OberliPreset>

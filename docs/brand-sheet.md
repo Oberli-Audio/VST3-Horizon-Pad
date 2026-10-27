@@ -1,13 +1,13 @@
-# Brand sheet: bob Audio (Horizon Pad, the first plugin)
+# Brand sheet: Oberli Audio (Horizon Pad, the first plugin)
 
 Filled from ux-ui-design-bob's `brand-sheet-template.md` on 2026-10-22 (Round 14, U.2),
 with Horizon Pad's own values: they are the family's until a second plugin asks for a
 change. Source of truth for the numbers: `Source/gui/HorizonLookAndFeel.h` (`Palette`)
 and `Source/gui/HorizonScene.h` (the sky palettes and their measured contrast).
 
-Family name: bob Audio, lowercase "b" (the owner's rebrand of 2026-10-25; it was Quelle Music)
+Family name: Oberli Audio (since 2026-10-27; it was Quelle Music, then for two days bob Audio)
 Owner: Björn
-Last changed: 2026-10-25
+Last changed: 2026-10-27
 
 ## Palette tokens (dark, the only theme)
 

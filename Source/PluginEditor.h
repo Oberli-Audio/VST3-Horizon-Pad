@@ -61,7 +61,7 @@ public:
     /** Opens the About box (footer product label; the snapshot tool uses it too). */
     void showAbout (bool openLicences = false);
 
-    // A .bobpreset (or an older .quellepreset) dropped on the editor is imported (D.6.5).
+    // A .oberlipreset (or an older .bobpreset / .quellepreset) dropped on the editor is imported (D.6.5).
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
     void filesDropped (const juce::StringArray& files, int x, int y) override;
 

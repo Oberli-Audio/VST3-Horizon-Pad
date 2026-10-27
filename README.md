@@ -6,7 +6,7 @@ kopieren (Windows: `C:\Program Files\Common Files\VST3\`) und in der DAW die Plu
 lassen. Horizon Pad auf eine MIDI-Spur ziehen: es startet mit dem Preset "Lagerfeuer". Zuerst ATTACK
 für den Einsatz, FILTER für die Helligkeit und REVERB für den Raum drehen.
 
-A warm, four-layer pad instrument for worship and ambient playing, made by bob Audio.
+A warm, four-layer pad instrument for worship and ambient playing, made by Oberli Audio.
 It is a pad and lead synthesiser for a keyboard, not a sample library and not an effect.
 
 ## Requirements
@@ -40,15 +40,15 @@ new version misbehaves, take the previous release from the same page; a project 
 newer version opens in the older one unless the release notes say otherwise.
 
 **Coming from a test build made under the old name, Quelle Music:** the DAW now lists Horizon Pad
-under bob Audio as a new plugin, so projects saved with that build no longer find it. Insert
+under Oberli Audio as a new plugin, so projects saved with that build no longer find it. Insert
 Horizon Pad again and pick your sound from the preset row: your own presets and the window size
 are copied over on the first start. The old `Quelle Music` folders can be deleted after that.
 
 ## Uninstall
 Delete `Horizon Pad.vst3` from `C:\Program Files\Common Files\VST3\` or
-`~/Library/Audio/Plug-Ins/VST3/`. Settings (the window size): `%APPDATA%\bob Audio\Horizon Pad\`
-or `~/Library/Application Support/bob Audio/Horizon Pad/`. Presets:
-`Documents\VST3 Presets\bob Audio\Horizon Pad\` or `~/Library/Audio/Presets/bob Audio/Horizon Pad/`,
+`~/Library/Audio/Plug-Ins/VST3/`. Settings (the window size): `%APPDATA%\Oberli Audio\Horizon Pad\`
+or `~/Library/Application Support/Oberli Audio/Horizon Pad/`. Presets:
+`Documents\VST3 Presets\Oberli Audio\Horizon Pad\` or `~/Library/Audio/Presets/Oberli Audio/Horizon Pad/`,
 only if you also want your own presets gone.
 
 ## Quick start
@@ -81,13 +81,14 @@ VST is a registered trademark of Steinberg Media Technologies GmbH.
 
 ## For developers
 Building, testing and the design notes: [`DEVELOPING.md`](DEVELOPING.md). The plugin's identity
-never changes after a release (rule 36); it changed once before the first one, with the rebrand
-from Quelle Music to bob Audio on 2026-10-25 (it was `Qumu`, `com.quellemusic.horizonpad`):
+never changes after a release (rule 36); before the first one it changed with the company's
+name, Quelle Music to Oberli Audio (2026-10-25/27; it was `Qumu`, `com.quellemusic.horizonpad`,
+and for two unreleased days `Boau`, `com.bobaudio.horizonpad`):
 
 | | Value |
 |---|---|
-| Manufacturer code | `Boau` |
+| Manufacturer code | `Oblr` |
 | Plugin code | `Hzpd` |
-| Bundle ID | `com.bobaudio.horizonpad` |
-| VST3 class ID (`moduleinfo.json`) | `ABCDEF019182FAEB426F6175487A7064` |
+| Bundle ID | `com.oberliaudio.horizonpad` |
+| VST3 class ID (`moduleinfo.json`) | `ABCDEF019182FAEB4F626C72487A7064` |
 | Formats | VST3, Standalone |

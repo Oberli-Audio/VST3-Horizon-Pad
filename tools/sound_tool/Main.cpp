@@ -360,8 +360,8 @@ namespace
             "  --state-in=<file>      Load a session state first (any bytes; refused -> exit 2)\n"
             "  --state-out=<file>     Save the session state after the render\n"
             "  --diagnostics          Print the About box's diagnostics block and exit\n"
-            "  --import-preset=<file> Import a .bobpreset first (as the preset bar does)\n"
-            "  --export-preset=<file> Write the current sound as a .bobpreset after the render\n"
+            "  --import-preset=<file> Import a .oberlipreset first (as the preset bar does)\n"
+            "  --export-preset=<file> Write the current sound as a .oberlipreset after the render\n"
             "  --help                 Print this message and exit\n";
     }
 
@@ -1358,7 +1358,7 @@ static int runTool (const juce::StringArray& arguments)
             std::cerr << "note: " << notice.toStdString() << std::endl;
     }
 
-    // 0b) A .bobpreset file imported as the preset bar does it (copied
+    // 0b) A .oberlipreset file imported as the preset bar does it (copied
     //     into the User folder and recalled); refused -> exit 2 with the reason.
     if (args.has ("import-preset"))
     {
@@ -2112,7 +2112,7 @@ static int runTool (const juce::StringArray& arguments)
         root->setProperty ("wav", juce::var (wav));
     }
 
-    // The current sound as a .bobpreset (the preset bar's Export).
+    // The current sound as a .oberlipreset (the preset bar's Export).
     if (args.has ("export-preset"))
     {
         const auto file = juce::File::getCurrentWorkingDirectory().getChildFile (args.getString ("export-preset", ""));

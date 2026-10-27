@@ -614,4 +614,4 @@ packaging/
 
 ---
 
-© bob Audio. All rights reserved.
+© Oberli Audio. All rights reserved.

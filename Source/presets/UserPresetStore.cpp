@@ -50,19 +50,33 @@ namespace
         legacy.moveFileTo (legacy.getSiblingFile ("UserPresets-before-0.1.0.xml"));
     }
 
-    /** 0.1.0 kept the User folder under "Quelle Music": copied once, into a User
-        folder that does not exist yet, as .bobpreset (the reader takes the old
-        <QuellePreset> inside). The old folder stays as it was for an older build. */
+    /** Earlier builds kept the User folder under the company's earlier name ("Quelle
+        Music" for 0.1.0): the newest one found is copied once, into a User folder that
+        does not exist yet, as .oberlipreset (the reader takes the old root element
+        inside). The old folder stays as it was for an older build. */
     void copyPreviousUserFolder()
     {
-        const auto from = PresetFile::previousPresetRoot().getChildFile ("User");
         const auto to = PresetFile::userFolder();
 
-        if (! from.isDirectory() || to.exists() || ! to.createDirectory())
+        if (to.exists())
             return;
 
-        for (const auto& file : from.findChildFiles (juce::File::findFiles, false, juce::String ("*") + PresetFile::kPreviousExtension))
-            file.copyFileTo (to.getChildFile (file.getFileNameWithoutExtension() + PresetFile::kExtension));
+        for (const auto& root : PresetFile::previousPresetRoots())
+        {
+            const auto from = root.getChildFile ("User");
+
+            if (! from.isDirectory())
+                continue;
+
+            if (! to.createDirectory())
+                return;
+
+            for (const auto& file : from.findChildFiles (juce::File::findFiles, false, "*"))
+                if (PresetFile::hasPresetExtension (file.getFileName()))
+                    file.copyFileTo (to.getChildFile (file.getFileNameWithoutExtension() + PresetFile::kExtension));
+
+            return;
+        }
     }
 }
 

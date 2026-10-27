@@ -9,7 +9,7 @@ namespace horizon
 {
 
 /**
-    The player's own presets: one .bobpreset per preset in the User folder
+    The player's own presets: one .oberlipreset per preset in the User folder
     (PresetFile::userFolder(), D.6.4/D.6.5), shared by every instance in every
     host and never touched by an update. Message thread only.
 

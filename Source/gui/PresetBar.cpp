@@ -382,7 +382,8 @@ void PresetBar::importPresetFile()
     fileChooser = std::make_unique<juce::FileChooser> ("Import a Horizon Pad preset",
                                                        juce::File::getSpecialLocation (juce::File::userDesktopDirectory),
                                                        juce::String ("*") + horizon::PresetFile::kExtension
-                                                           + ";*" + horizon::PresetFile::kPreviousExtension);
+                                                           + ";*" + horizon::PresetFile::kPreviousExtensions[0]
+                                                           + ";*" + horizon::PresetFile::kPreviousExtensions[1]);
     fileChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [safe = juce::Component::SafePointer<PresetBar> (this)] (const juce::FileChooser& chooser)
     {

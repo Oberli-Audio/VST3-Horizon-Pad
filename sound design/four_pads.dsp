@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------
-// HORIZON PAD - core DSP engine (bob Audio)
+// HORIZON PAD - core DSP engine (Oberli Audio)
 // Faust sound-design source of truth - STATUS: validated, ready for VST3 port.
 //
 // GUI reference (Claude Design draft, matches this engine's 4-layer/8-macro

@@ -42,7 +42,7 @@
         GUI edit) keeps the *active* buffer's snapshot in sync with live
         parameter values, so switching or copying buffers is just atomics.
 
-      * User presets (.bobpreset files in the User folder) are
+      * User presets (.oberlipreset files in the User folder) are
         message-thread-only: scanned, saved, imported and deleted exclusively
         from GUI actions, so the plain std::vector needs no extra
         synchronisation - the audio thread never touches it.
@@ -112,7 +112,7 @@ public:
     const std::vector<horizon::Preset>& getPresets() const { return horizon::getFactoryPresets(); }
     void applyFactoryPreset (int index);
 
-    /** The player's presets - .bobpreset files in the User folder, shared
+    /** The player's presets - .oberlipreset files in the User folder, shared
         by every instance (UserPresetStore). Message thread. */
     const std::vector<horizon::Preset>& getUserPresets() const noexcept { return userPresets; }
     void refreshUserPresets();
@@ -120,12 +120,12 @@ public:
     void deleteUserPreset (int index);
     void applyUserPreset (int index);
 
-    /** Reads a .bobpreset (a friend's, or an exported one), copies it into
+    /** Reads a .oberlipreset (a friend's, or an exported one), copies it into
         the User folder and recalls it. Returns an empty string, or the reason
         it was refused (D.5.3: a newer file is never half-loaded). */
     juce::String importPreset (const juce::File& file);
 
-    /** Writes the current sound as a .bobpreset. Empty, or why not. */
+    /** Writes the current sound as a .oberlipreset. Empty, or why not. */
     juce::String exportPreset (const juce::File& file) const;
 
     PresetKind getActivePresetKind() const noexcept { return (PresetKind) activePresetKind.load (std::memory_order_relaxed); }

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<BobPreset name="Silberpfad" author="bob Audio" category="Lead"
-           description="Soft, singing lead to play over the pads."
-           pluginVersion="0.1.0" created="2026-10-21" factory="true">
+<OberliPreset name="Silberpfad" author="Oberli Audio" category="Lead"
+              description="Soft, singing lead to play over the pads."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
   <HorizonPadState version="2" dspVersion="1">
     <PARAMETERS>
       <PARAM id="rootVolume" value="37.7"/>
@@ -17,4 +17,4 @@
       <PARAM id="detuneMacro" value="40"/>
     </PARAMETERS>
   </HorizonPadState>
-</BobPreset>
+</OberliPreset>

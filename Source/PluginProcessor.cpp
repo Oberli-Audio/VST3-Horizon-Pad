@@ -19,16 +19,20 @@ namespace
     }
 
     // The size last chosen on this machine, for every instance: a small file
-    // in the settings folder (D.6.4). 0.1.0 kept it under the old company
-    // name, Quelle Music (copied once); before 0.1.0 it sat beside
-    // UserPresets.xml in ~/Library/Quelle Music (moved once).
+    // in the settings folder (D.6.4). Earlier builds kept it under the
+    // company's earlier name (0.1.0: Quelle Music; the newest found is copied
+    // once); before 0.1.0 it sat beside UserPresets.xml in ~/Library/Quelle
+    // Music (moved once).
     std::unique_ptr<juce::PropertiesFile> openEditorSettings()
     {
         const auto file = PresetFile::settingsFolder().getChildFile ("EditorSettings.xml");
 
-        if (const auto previous = PresetFile::previousSettingsFolder().getChildFile ("EditorSettings.xml"); ! file.exists() && previous.existsAsFile())
-            if (file.getParentDirectory().createDirectory())
-                previous.copyFileTo (file);
+        for (const auto& folder : PresetFile::previousSettingsFolders())
+        {
+            if (const auto previous = folder.getChildFile ("EditorSettings.xml"); ! file.exists() && previous.existsAsFile())
+                if (file.getParentDirectory().createDirectory())
+                    previous.copyFileTo (file);
+        }
 
         if (const auto old = PresetFile::legacyFolder().getChildFile ("EditorSettings.xml"); ! file.exists() && old.existsAsFile())
             if (file.getParentDirectory().createDirectory())

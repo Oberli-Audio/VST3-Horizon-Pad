@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<BobPreset name="Steinerne Ruhe" author="bob Audio" category="Pad"
-           description="Stillness carved in stone - minimal, slow and sparse."
-           pluginVersion="0.1.0" created="2026-10-21" factory="true">
+<OberliPreset name="Steinerne Ruhe" author="Oberli Audio" category="Pad"
+              description="Stillness carved in stone - minimal, slow and sparse."
+              pluginVersion="0.1.0" created="2026-10-21" factory="true">
   <HorizonPadState version="2" dspVersion="1">
     <PARAMETERS>
       <PARAM id="rootVolume" value="47.6"/>
@@ -17,4 +17,4 @@
       <PARAM id="detuneMacro" value="50"/>
     </PARAMETERS>
   </HorizonPadState>
-</BobPreset>
+</OberliPreset>

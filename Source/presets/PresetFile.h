@@ -2,7 +2,9 @@
 
 #include "Presets.h"
 
+#include <array>
 #include <optional>
+#include <vector>
 
 namespace horizon::PresetFile
 {
@@ -20,33 +22,35 @@ inline constexpr int kStateVersion = 2;
     behaviour alive behind it). */
 inline constexpr int kDspVersion = 1;
 
-inline constexpr const char* kExtension = ".bobpreset";
+inline constexpr const char* kExtension = ".oberlipreset";
 
-/** What preset files were called before the rebrand to bob Audio (2026-10-25):
-    still read, so a friend's older file imports. */
-inline constexpr const char* kPreviousExtension = ".quellepreset";
+/** What preset files were called under the company's earlier names: .quellepreset
+    (Quelle Music, the 0.1.0 test builds) and .bobpreset (bob Audio, 2026-10-25/26,
+    never released). Still read, so an older file imports. */
+inline constexpr std::array<const char*, 2> kPreviousExtensions { ".quellepreset", ".bobpreset" };
 
-/** A preset file by either extension. */
+/** A preset file by today's extension or an earlier one. */
 bool hasPresetExtension (const juce::String& path);
 
 /** The VST3 spec location, one folder for the product (D.6.4):
-    ~/Library/Audio/Presets/bob Audio/Horizon Pad, or Documents\VST3
-    Presets\bob Audio\Horizon Pad. HORIZON_PRESET_ROOT overrides it, so
+    ~/Library/Audio/Presets/Oberli Audio/Horizon Pad, or Documents\VST3
+    Presets\Oberli Audio\Horizon Pad. HORIZON_PRESET_ROOT overrides it, so
     the harness and the tests never touch the real folders. */
 juce::File presetRoot();
 juce::File factoryFolder();
 juce::File userFolder();
 
 /** Machine-local settings (the editor size): ~/Library/Application Support/
-    bob Audio/Horizon Pad or %APPDATA%\bob Audio\Horizon Pad (D.6.4);
+    Oberli Audio/Horizon Pad or %APPDATA%\Oberli Audio\Horizon Pad (D.6.4);
     under HORIZON_PRESET_ROOT/Settings when that is set. */
 juce::File settingsFolder();
 
-/** The same two folders under the old company name, "Quelle Music", where
-    0.1.0 test builds kept them; under HORIZON_PRESET_ROOT/Previous and
-    Previous/Settings when that is set. Read once to copy from, never written. */
-juce::File previousPresetRoot();
-juce::File previousSettingsFolder();
+/** The same two folders under the company's earlier names, newest first: "bob Audio"
+    (never released) and "Quelle Music" (the 0.1.0 test builds); under
+    HORIZON_PRESET_ROOT/Previous and Previous/Settings when that is set. Read once to
+    copy from, never written. */
+std::vector<juce::File> previousPresetRoots();
+std::vector<juce::File> previousSettingsFolders();
 
 /** Where versions before 0.1.0 kept UserPresets.xml and EditorSettings.xml. */
 juce::File legacyFolder();
@@ -59,9 +63,9 @@ juce::String slugFor (const juce::String& name);
     parameter's default, everything is clamped to the range. */
 void readParameters (const juce::XmlElement* parameters, int version, Preset& into);
 
-/** Reads a <BobPreset> document, or a <QuellePreset> one written before the
-    rebrand. Refuses (nullopt, `error` set) anything that is neither, or one
-    from a newer format - never half-loaded. */
+/** Reads an <OberliPreset> document, or a <BobPreset> or <QuellePreset> one from
+    the company's earlier names. Refuses (nullopt, `error` set) anything else, or
+    one from a newer format - never half-loaded. */
 std::optional<Preset> read (const juce::XmlElement& xml, juce::String& error);
 std::optional<Preset> read (const juce::File& file, juce::String& error);
 
