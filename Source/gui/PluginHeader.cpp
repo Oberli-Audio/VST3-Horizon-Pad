@@ -66,6 +66,10 @@ public:
 
     void set (const juce::String& newName, bool isEdited, bool isEmpty)
     {
+        // Called every frame: only a change repaints.
+        if (newName == name && isEdited == edited && isEmpty == empty)
+            return;
+
         name = newName;
         edited = isEdited;
         empty = isEmpty;

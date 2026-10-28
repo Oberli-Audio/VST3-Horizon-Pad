@@ -64,8 +64,8 @@ Parameters: [`docs/parameters.md`](docs/parameters.md). Presets: [`docs/presets.
 - If Ableton Live 10 crackles at a 32-sample buffer on an Apple-silicon Mac, set the buffer to 64 or more. (EX-007)
 
 ## Feedback
-Just tell me: what you were doing right before, what you expected to hear, and paste what the
-About box copies (click the version in the bottom left, then "Copy diagnostics"). If you can,
+Just tell me: what you were doing right before, what you expected to hear, and paste the
+details Horizon Pad copies (the menu at the top right, "Report a problem…"). If you can,
 the `.als` after Collect All and Save and a ten-second bounce. I look at reports against the
 latest release.
 Crash: macOS shows a "Report a Crash" pane on the next start, send me that report (or your DAW's

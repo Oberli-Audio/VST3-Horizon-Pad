@@ -493,6 +493,7 @@ else()
         larger_block_than_prepared
         output_dc_and_knee
         limit_led_only_past_knee
+        output_meter_per_channel
         about_copy_is_fourteen_lines
         preset_file_round_trip
         previous_brand_presets_carried_over)

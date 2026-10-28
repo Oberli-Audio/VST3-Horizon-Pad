@@ -23,6 +23,7 @@ namespace
     constexpr double kLimitHoldSeconds = 1.0;
 
     constexpr float kWellWidth = 8.0f;
+    constexpr float kWellGap = 4.0f;
     constexpr float kWellHeight = 48.0f;
     constexpr float kColumnWidth = 64.0f;
 
@@ -37,20 +38,23 @@ namespace
     }
 
     float proportionFor (float db) { return juce::jlimit (0.0f, 1.0f, (db - kFloorDb) / -kFloorDb); }
+
+    float proportionForGain (float gain) { return proportionFor (juce::Decibels::gainToDecibels (gain, kFloorDb)); }
 }
 
 OutputMeter::OutputMeter (HorizonPadAudioProcessor& processorToUse)
     : processor (processorToUse)
 {
-    setTooltip ("The output level in dBFS: RMS over 20 ms, with a line holding the recent peak. "
+    setTooltip ("The output level in dBFS, left and right: RMS over 20 ms, with a line holding the recent peak. "
                 "LIMIT lights while the output limiter holds the sound under 0 dBFS; no preset reaches it.");
     setTitle ("Output level");
     setInterceptsMouseClicks (true, false);
 }
 
-juce::Rectangle<float> OutputMeter::wellArea() const noexcept
+juce::Rectangle<float> OutputMeter::wellArea (int channel) const noexcept
 {
-    return { (kColumnWidth - kWellWidth) * 0.5f, 0.0f, kWellWidth, kWellHeight };
+    const auto left = (kColumnWidth - (2.0f * kWellWidth + kWellGap)) * 0.5f;
+    return { left + (float) channel * (kWellWidth + kWellGap), 0.0f, kWellWidth, kWellHeight };
 }
 
 juce::Rectangle<float> OutputMeter::ledArea() const noexcept
@@ -78,41 +82,53 @@ void OutputMeter::advance (double now, float dt)
         repaint (ledArea().getSmallestIntegerContainer());
     }
 
-    // --- The level and its peak line.
-    const auto levelDb = juce::Decibels::gainToDecibels (processor.getOutputLevel(), kFloorDb);
-    displayedLevel.advance (proportionFor (levelDb), dt, kRiseSeconds, kFallSeconds, 1.0e-3f);
-    const auto level = displayedLevel.value;
+    // --- Each well, and its peak line.
+    for (int ch = 0; ch < (int) channels.size(); ++ch)
+    {
+        auto& c = channels[(size_t) ch];
+        c.level.advance (proportionForGain (processor.getOutputChannelLevel (ch)), dt, kRiseSeconds, kFallSeconds, 1.0e-3f);
 
-    if (level >= peakLevel)
-    {
-        peakLevel = level;
-        peakHoldUntil = now + kPeakHoldSeconds;
+        if (c.level.value >= c.peak)
+        {
+            c.peak = c.level.value;
+            c.peakHoldUntil = now + kPeakHoldSeconds;
+        }
+        else if (now > c.peakHoldUntil)
+        {
+            c.peak = juce::jmax (c.level.value, c.peak - kPeakFallPerSecond * dt);
+        }
     }
-    else if (now > peakHoldUntil)
-    {
-        peakLevel = juce::jmax (level, peakLevel - kPeakFallPerSecond * dt);
-    }
+
+    // --- The number: both channels together, as before.
+    displayedLevel.advance (proportionForGain (processor.getOutputLevel()), dt, kRiseSeconds, kFallSeconds, 1.0e-3f);
 
     // Redrawn at the ambient rate, and only for a change of at least a pixel
-    // of the well - or to land exactly on empty, or to show or hide the peak line.
+    // of a well - or to land exactly on empty, or to show or hide a peak line.
     if (now - shownAt < motion::kAmbientFrameSeconds)
         return;
 
     const auto pixels = kWellHeight - 2.0f;
     const auto peakVisible = [] (float peak, float lvl) { return peak > 0.01f && peak > lvl + 0.004f; };
 
-    const auto levelMoved = std::abs (level - shownLevel) * pixels >= 1.0f || (level <= 0.0f && shownLevel > 0.0f);
-    const auto peakMoved = std::abs (peakLevel - shownPeak) * pixels >= 1.0f
-                         || peakVisible (peakLevel, level) != peakVisible (shownPeak, shownLevel);
-    const auto db = level > 0.0f ? juce::roundToInt (level * -kFloorDb + kFloorDb) : std::numeric_limits<int>::min();
-
-    if (levelMoved || peakMoved)
+    for (int ch = 0; ch < (int) channels.size(); ++ch)
     {
-        shownLevel = level;
-        shownPeak = peakLevel;
-        shownAt = now;
-        repaint (wellArea().getSmallestIntegerContainer().expanded (1));
+        auto& c = channels[(size_t) ch];
+        const auto level = c.level.value;
+        const auto levelMoved = std::abs (level - c.shownLevel) * pixels >= 1.0f || (level <= 0.0f && c.shownLevel > 0.0f);
+        const auto peakMoved = std::abs (c.peak - c.shownPeak) * pixels >= 1.0f
+                             || peakVisible (c.peak, level) != peakVisible (c.shownPeak, c.shownLevel);
+
+        if (levelMoved || peakMoved)
+        {
+            c.shownLevel = level;
+            c.shownPeak = c.peak;
+            shownAt = now;
+            repaint (wellArea (ch).getSmallestIntegerContainer().expanded (1));
+        }
     }
+
+    const auto shown = displayedLevel.value;
+    const auto db = shown > 0.0f ? juce::roundToInt (shown * -kFloorDb + kFloorDb) : std::numeric_limits<int>::min();
 
     if (db != shownDb)
     {
@@ -124,44 +140,48 @@ void OutputMeter::advance (double now, float dt)
 
 void OutputMeter::paint (juce::Graphics& g)
 {
-    // --- The well.
-    const auto well = wellArea();
-    g.setColour (Tokens::surfaceSunken);
-    g.fillRoundedRectangle (well, Tokens::radiusXs);
-
-    const auto inner = well.reduced (1.0f);
-
-    if (shownLevel > 0.0f)
+    // --- The wells, left and right.
+    for (int ch = 0; ch < (int) channels.size(); ++ch)
     {
-        juce::Graphics::ScopedSaveState save (g);
-        juce::Path clip;
-        clip.addRoundedRectangle (inner, Tokens::radiusXs - 1.0f);
-        g.reduceClipRegion (clip);
+        const auto& c = channels[(size_t) ch];
+        const auto well = wellArea (ch);
+        g.setColour (Tokens::surfaceSunken);
+        g.fillRoundedRectangle (well, Tokens::radiusXs);
 
-        const auto top = inner.getBottom() - inner.getHeight() * shownLevel;
-        const auto hotLine = inner.getBottom() - inner.getHeight() * proportionFor (kHotDb);
+        const auto inner = well.reduced (1.0f);
 
-        g.setColour (Tokens::meterLevel);
-        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (inner.getX(), juce::jmax (top, hotLine),
-                                                                inner.getRight(), inner.getBottom()));
-
-        if (top < hotLine)
+        if (c.shownLevel > 0.0f)
         {
-            g.setColour (Tokens::meterHot);
-            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (inner.getX(), top, inner.getRight(), hotLine));
+            juce::Graphics::ScopedSaveState save (g);
+            juce::Path clip;
+            clip.addRoundedRectangle (inner, Tokens::radiusXs - 1.0f);
+            g.reduceClipRegion (clip);
+
+            const auto top = inner.getBottom() - inner.getHeight() * c.shownLevel;
+            const auto hotLine = inner.getBottom() - inner.getHeight() * proportionFor (kHotDb);
+
+            g.setColour (Tokens::meterLevel);
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (inner.getX(), juce::jmax (top, hotLine),
+                                                                    inner.getRight(), inner.getBottom()));
+
+            if (top < hotLine)
+            {
+                g.setColour (Tokens::meterHot);
+                g.fillRect (juce::Rectangle<float>::leftTopRightBottom (inner.getX(), top, inner.getRight(), hotLine));
+            }
         }
-    }
 
-    if (shownPeak > 0.01f && shownPeak > shownLevel + 0.004f)
-    {
-        const auto y = inner.getBottom() - inner.getHeight() * shownPeak;
-        g.setColour (Tokens::ink);
-        g.fillRect (juce::Rectangle<float> (inner.getX(), juce::jlimit (inner.getY(), inner.getBottom() - 1.0f, y - 0.5f),
-                                            inner.getWidth(), 1.0f));
-    }
+        if (c.shownPeak > 0.01f && c.shownPeak > c.shownLevel + 0.004f)
+        {
+            const auto y = inner.getBottom() - inner.getHeight() * c.shownPeak;
+            g.setColour (Tokens::ink);
+            g.fillRect (juce::Rectangle<float> (inner.getX(), juce::jlimit (inner.getY(), inner.getBottom() - 1.0f, y - 0.5f),
+                                                inner.getWidth(), 1.0f));
+        }
 
-    g.setColour (Tokens::line);
-    g.drawRoundedRectangle (well.reduced (0.5f), Tokens::radiusXs - 0.5f, 1.0f);
+        g.setColour (Tokens::line);
+        g.drawRoundedRectangle (well.reduced (0.5f), Tokens::radiusXs - 0.5f, 1.0f);
+    }
 
     // --- LIMIT.
     {

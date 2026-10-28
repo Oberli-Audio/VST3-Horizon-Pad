@@ -7,8 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Horizon Pad (Oberli Audio; Quelle Music until 2026-10-25, briefly bob Audio until 2026-10-27; GitHub account Oberli-Audio) — a four-layer ambient pad synthesiser VST3/Standalone
 plugin, built with JUCE 8.0.16 (C++17, pinned by commit; 8.0.11+ bundles the MIT VST 3 SDK). Everything is synthesised in DSP code:
 no samples, audio files, or bitmap artwork anywhere in the repo — oscillators,
-the shimmer/pitch-shift engine, and the entire GUI (including the sunset
-banner and mountain range) are drawn/generated in code.
+the shimmer/pitch-shift engine, and the entire GUI (including the sky and its
+mountain ridge) are drawn/generated in code. The editor bundles two kinds of
+data, both vector: the Rubik typeface (OFL, `assets/fonts/`) and the Oberli
+marks (SVG, `assets/logo/`), compiled in as `UiData`.
 
 ## Build commands
 
@@ -288,9 +290,12 @@ section has the full semantics of each macro; the friends' README is D.9.9's. Al
 - User presets (`UserPresetStore`, `UserPresets.xml`) are message-thread-only
   — created/read/deleted exclusively from GUI actions, so no extra sync is
   needed.
-- For the editor, the audio thread publishes output and per-layer RMS over a
-  20 ms window (atomics; the mix itself is untouched, null-tested
-  bit-identical) and the processor bumps a preset-recall and an A/B-switch
+- For the editor, the audio thread publishes output, per-channel and per-layer RMS
+  over a 20 ms window, and whether a sample passed the output limiter's knee in it
+  (since 2026-10-28: `getOutputChannelLevel()` for the meter's two wells, test
+  `output_meter_per_channel`; `isLimiting()` for the LIMIT LED, test `limit_led_only_past_knee`)
+  - atomics; the mix itself is untouched, null-tested
+  bit-identical - and the processor bumps a preset-recall and an A/B-switch
   counter (release/acquire, after the active-preset fields are set) so the
   editor can tell a recall from automation.
 
@@ -299,50 +304,57 @@ full thread-safety model before touching processor state.
 
 ### GUI (`Source/gui/`)
 
-A 1080×748 layout, pixel-accurate to a design handoff — every child paints
-its own precise layout rather than scaling a shared "design surface"; the
-footer's SIZE menu scales the whole editor 75-200% with a transform on top of
-the host's own scale (`setScaleFactor`; a machine-local preference in
-`EditorSettings.xml`, never in the session, since 0.1.0 - EX-008 records that the
-skill wants a content-component transform and host resizing instead). Since the UI review of
-2026-10-17 every knob behaves like a DAW knob (`AnimatedKnob::bindParameter`:
-double-click reset, the host's right-click menu, Tab and arrow keys, an
-accessible name) and no control takes keyboard focus on a click, so the
-space bar keeps reaching the host. ATTACK/RELEASE read as Root's time
-(`dsp/EnvelopeMacro.h`, the same text in the host); OUTPUT reads dBFS; the
-active preset dims to half gold once the sound is edited away from it
-(`isActivePresetModified()`, compared, not tracked). `HorizonLookAndFeel` centralizes
-palette/typography/the ring knob painter; other classes are one widget each
-(`PadKnob` = one layer's VOL knob, `MacrosPanel` = the six macros in three
-rows, `WheelSlider` =
-PITCH/MOD, `PresetBar`, `OutputMeter`, `FooterBar`, `TitleBanner`), and
-`HorizonScene` is the sunset panel behind them all.
+**Editor F (2026-10-28), built from the Oberli Audio design system**
+(https://claude.ai/artifact/GK9BTMQuZhZz8pxvhHsytp; sketches on the Design canvas
+https://claude.ai/artifact/T6bGd6t8Nec1U7UfFL7Tgh; brief, owner decisions and review in
+`docs/editor-f-brief.md` and `docs/editor-f-review.md`; tokens and measurements in
+`docs/brand-sheet.md`). Charcoal theme, mango accent, Rubik, flat chrome, the knob drawn
+like the O of the logo. 1160×548 at 100 %, top to bottom: `PluginHeader` (the Oberli
+mark, "Horizon Pad", A/B and copy, the preset pill with " *" when edited, the version,
+the menu button); `SkyDisplay`, the sky (`HorizonScene`) as a 1104×294 display with
+`radius-lg` corners, where a recalled preset's name and description fade in at the
+top-left; and `ControlStrip`, one row: WHEELS (`WheelSlider`, always first on the left),
+PADS and MACROS (`KnobColumn` = an `AnimatedKnob`, its label, its value - the
+parameter's own text - and for a pad its layer's level bar), OUTPUT (`OutputMeter`: the
+20 ms RMS of each channel in its own well and the LIMIT LED, lit from `isLimiting()` while the limiter works
+and 1 s after). Overlays are drawn inside the editor, never as windows: `HeaderMenu`
+(Load preset…, Save preset…, GUI scale 75/100/125/150/200 %, Report a problem… which
+copies the diagnostics, About), `PresetDrawer` (Pads, In-between, Leads, Yours; search;
+one click loads and keeps it open), `SavePresetCard`, and `AboutPanel`, the back of the
+panel in Bone. `HorizonLookAndFeel.h` holds the tokens (`Tokens`), Rubik (`type`, with
+`tnum` on every value), the thin-line icons, the marks and `drawKnob`; `Buttons.h` the
+button styles and the focus ring; `ReadoutBubble` the drag readout and confirmations.
 
-**Motion (2026-10-07, owner's picks from a proposal menu).** Things move
-only because the sound changed: `HorizonScene` follows FILTER (time of day:
-50% is the designed palette, 0% dusk-blue, 100% golden hour), REVERB (haze on
-the ridge; 20% is the designed blur) and WIDTH (the glow's spread; 40% is the
-designed glow); knobs (`AnimatedKnob`) glide after a preset recall or A/B
-switch in a left-to-right wave, but follow a hand on the knob at once, and
-warm on hover/drag; a recalled preset's name and description fade in under
-the wordmark; each pad card glows with its layer's real output; the first
-time an instance's editor opens the sky rises from night, the logo's sun
-comes up and the knobs sweep up (reopening shows it as it is). The
-value a knob shows is eased; the parameter never is. One frame callback
-(`advanceFrame`, driven by `VBlankAttachment`, capped near 60 fps, with a
-30 Hz timer fallback) replaces the old 15 Hz polling timer, and each widget
-repaints only what changed. Painting is kept cheap (measured 2026-10-14 on a
-Retina M3 Pro): the panel is cached at the screen's pixel density and drawn
-1:1 (full redraw 21 -> 3.7 ms; a 1x cache stretched through a clip was 96% of
-all painting), knobs are buffered images, the pad glows are pre-rendered
-sprites, and motion that runs by itself (pad glows, meter) repaints at about
-30 fps and only for visible steps. The panel fills the window edge to edge,
-square: the design's rounded corners left the host's background showing in
-a rectangular plugin window. The palettes keep the panel text near the
-design's own contrast at the bright end (measured numbers in `HorizonScene.h`)
-and above it everywhere darker - check a change with
-`HorizonPadGuiSnapshot` (`tools/gui_snapshot/`, target not built by default),
-which renders the editor offscreen to PNG at any state.
+The GUI scale is a transform on top of the host's own scale (`setScaleFactor`; a
+machine-local preference in `EditorSettings.xml`, never in the session - EX-008 records
+that the skill wants a content-component transform and host resizing instead). Every
+knob behaves like a DAW knob (`AnimatedKnob::bindParameter`: drag with Shift for fine,
+double-click reset, the host's right-click menu, Tab and arrow keys, an accessible
+name), and no control takes keyboard focus on a click, so the space bar keeps reaching
+the host; focus shows as the system's 2 px `ink` ring. ATTACK/RELEASE read as Root's
+time (`dsp/EnvelopeMacro.h`, the same text in the host).
+
+**Motion (2026-10-07, owner's picks; kept in editor F).** Things move only because the
+sound changed: `HorizonScene` follows FILTER (time of day: 50% is the designed palette,
+0% dusk-blue, 100% golden hour), REVERB (haze on the ridge; 20% is the designed blur)
+and WIDTH (the glow's spread; 40% is the designed glow), scaled to its display (ridge
+min(120, h·0.3), glow by w/1080); knobs glide after a preset recall or A/B switch in a
+left-to-right wave, but follow a hand on the knob at once; a recalled preset's title
+fades in on the sky; each pad's level bar follows its layer's real output; the first
+time an instance's editor opens the sky rises from night and the knobs sweep up
+(reopening shows it as it is; the Oberli mark is never animated). No hover glow:
+outside the Scene nothing glows. The value a knob shows is eased; the parameter never
+is. One frame callback (`advanceFrame`, driven by `VBlankAttachment`, capped near 60
+fps, with a 30 Hz timer fallback), and each widget repaints only what changed. Painting
+is kept cheap: the sky is cached at the screen's pixel density with its rounded corners
+built in and drawn 1:1, the title on it is cached with its shadow, knobs are buffered
+images, and motion that runs by itself (level bars, meter) repaints at about 30 fps and
+only for visible steps. Text on the sky passes 4.5:1 over the whole FILTER range (a
+soft `ground` shadow under it; measured, `docs/brand-sheet.md`) - check a change with
+`HorizonPadGuiSnapshot` (`tools/gui_snapshot/`, target not built by default), which
+renders the editor offscreen to PNG at any state, scale, overlay (`--menu`, `--drawer`,
+`--save-card`, `--about`, `--licences`), dragged knob (`--drag=<id>`) or title on the
+sky (`--title`).
 
 ## Tier P process
 

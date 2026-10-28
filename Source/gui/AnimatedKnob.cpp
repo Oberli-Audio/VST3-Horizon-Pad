@@ -22,6 +22,10 @@ AnimatedKnob::AnimatedKnob()
     // knob-sweep: 270 degrees, the gap centred at the bottom.
     setRotaryParameters (juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
 
+    // Shift held: fine adjustment (the Knob card), JUCE's velocity mode at a
+    // quarter of the speed instead of its default Ctrl/Alt/Cmd swap.
+    setVelocityModeParameters (0.25, 1, 0.0, true, juce::ModifierKeys::shiftModifier);
+
     // Kept as an image: a knob that has not changed is copied, not drawn
     // again, when the level bars and the meter beside it repaint.
     setBufferedToImage (true);

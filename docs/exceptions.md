@@ -523,7 +523,7 @@ layout and caching, verifiable only in hosts.
 - **Date:** 2026-10-22
 - **Raised by:** Claude, Round 14 (U.2)
 - **Rule / target:** U.2: every text over 4.5:1 (3:1 for large text); the footer is 12.5 px bold
-- **Status:** OPEN - the UI review of 2026-10-17 set the footer's own bar at 3:1
+- **Status:** CLOSED 2026-10-28 - editor F removed the footer (see Resolution at the end)
 
 ### What failed, and by how much
 
@@ -549,6 +549,13 @@ different sky, a design decision.
 **Leave the footer as is.** Accepted by the owner at 3.2-3.8:1 (5.9:1 at night); the triggers
 above stay.
 
+### Resolution (2026-10-28, editor F)
+
+The footer is gone (docs/editor-f-brief.md): the product and version live in the header, on
+`surface-raised` (version `ink-subtle`, 5.4:1), and the tagline moved to the About page (Bone,
+`ink-muted`). The only text left on the sky is a recalled preset's name and description, which
+passes 4.5:1 over the whole range (docs/brand-sheet.md, measured with `snapshot_contrast.py`).
+
 ---
 
 ## EX-010 - The active preset pill's gold text is 3.19:1
@@ -556,7 +563,7 @@ above stay.
 - **Date:** 2026-10-22
 - **Raised by:** Claude, Round 14 (U.2)
 - **Rule / target:** text 4.5:1 (visual-design.md 4); the pill text is about 13 px
-- **Status:** OPEN - a fix is proposed, the owner decides (a visible change to an approved design)
+- **Status:** CLOSED 2026-10-28 - editor F replaced the pills (see Resolution at the end)
 
 ### What failed, and by how much
 
@@ -598,6 +605,13 @@ fill blend toward the card colour instead of gold, keeping the gold border (crea
 above 7:1 on every sky) - a change to the pill's look, the owner's call.
 
 - **Unacceptable if:** any sky takes the active pill below 3.5:1.
+
+### Resolution (2026-10-28, editor F)
+
+The preset pills on the sky are gone. The current preset is named in the header's preset pill
+(`ink` on `surface-sunken`, 14.8:1; the edited mark `accent-ink`, 7.7:1) and marked in the
+preset drawer with an `accent` dot on `surface-panel`; no preset text sits on the sky but the
+recalled title, which passes 4.5:1 (docs/brand-sheet.md).
 
 ### Resolution
 

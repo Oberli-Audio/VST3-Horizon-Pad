@@ -2,6 +2,9 @@
 
 #include <UiData.h>
 
+#include <map>
+#include <tuple>
+
 namespace horizon::ui
 {
 
@@ -26,12 +29,32 @@ namespace
         }
 
         std::array<juce::Typeface::Ptr, 5> faces;
+
+        // Every style the editor draws, built once: a copy of a Font shares its
+        // shaped native font, so paint() never builds one again. Message thread.
+        std::map<std::tuple<int, int, int, bool>, juce::Font> fonts;
     };
 
     juce::Typeface::Ptr typefaceFor (type::Weight weight)
     {
         const juce::SharedResourcePointer<Typefaces> typefaces;
         return typefaces->faces[(size_t) weight];
+    }
+
+    juce::Font buildFont (juce::Typeface::Ptr face, float px, float trackingEm, bool tabular)
+    {
+        auto options = juce::FontOptions (face).withPointHeight (px);
+
+        if (tabular)
+            options = options.withFeatureEnabled ("tnum");
+
+        juce::Font f (options);
+
+        // JUCE adds tracking as a multiple of the line height; the tokens give it in em.
+        if (! juce::exactlyEqual (trackingEm, 0.0f))
+            f.setExtraKerningFactor (trackingEm * px / f.getHeight());
+
+        return f;
     }
 
     std::unique_ptr<juce::Drawable> drawableFrom (const char* data, int size)
@@ -61,18 +84,13 @@ namespace
 //==============================================================================
 juce::Font type::font (Weight weight, float px, float trackingEm, bool tabular)
 {
-    auto options = juce::FontOptions (typefaceFor (weight)).withPointHeight (px);
+    const juce::SharedResourcePointer<Typefaces> typefaces;
+    const auto key = std::make_tuple ((int) weight, juce::roundToInt (px * 100.0f), juce::roundToInt (trackingEm * 1000.0f), tabular);
 
-    if (tabular)
-        options = options.withFeatureEnabled ("tnum");
+    if (const auto found = typefaces->fonts.find (key); found != typefaces->fonts.end())
+        return found->second;
 
-    juce::Font f (options);
-
-    // JUCE adds tracking as a multiple of the line height; the tokens give it in em.
-    if (! juce::exactlyEqual (trackingEm, 0.0f))
-        f.setExtraKerningFactor (trackingEm * px / f.getHeight());
-
-    return f;
+    return typefaces->fonts.emplace (key, buildFont (typefaces->faces[(size_t) weight], px, trackingEm, tabular)).first->second;
 }
 
 void type::draw (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> lineBox,

@@ -10,11 +10,13 @@ namespace horizon::ui
 
 /**
     The OUTPUT column, last on the right: the Meter card's look on the same
-    measurement as before - the output's RMS over 20 ms in dBFS, a quick-up,
-    slow-down bar, and a peak line that holds the recent highest reading
-    for 1.2 s and then falls. One 8 px well, 48 px tall with a 1 px `line`
+    measurement as before - RMS over 20 ms in dBFS, a quick-up, slow-down
+    bar, and a peak line that holds the recent highest reading for 1.2 s and
+    then falls. Two 8 px wells, left and right (each channel's own RMS,
+    getOutputChannelLevel(), owner 2026-10-28), 48 px tall with a 1 px `line`
     border, `meter-level` below -6 dBFS and `meter-hot` above, the peak line
-    in `ink`; under it "RMS" (what the number is) and the value.
+    in `ink`; under them "RMS" (what the number is) and the value, the RMS
+    of both channels together as before.
 
     Beside it the LIMIT LED (the Meter card's clip LED, owner 2026-10-28):
     outlined with `ink-subtle` text while idle, lit in `meter-hot` with
@@ -39,17 +41,23 @@ public:
     void paint (juce::Graphics&) override;
 
 private:
-    juce::Rectangle<float> wellArea() const noexcept;
+    /** One well's ballistics and what it last drew. */
+    struct Channel
+    {
+        motion::Follower level;        // 0..1 of the well
+        float peak = 0.0f;
+        double peakHoldUntil = 0.0;
+        float shownLevel = 0.0f, shownPeak = 0.0f;
+    };
+
+    juce::Rectangle<float> wellArea (int channel) const noexcept;
     juce::Rectangle<float> ledArea() const noexcept;
     juce::Rectangle<float> valueBox() const noexcept;
 
     HorizonPadAudioProcessor& processor;
 
-    motion::Follower displayedLevel;   // 0..1 of the well
-    float peakLevel = 0.0f;
-    double peakHoldUntil = 0.0;
-
-    float shownLevel = 0.0f, shownPeak = 0.0f;
+    std::array<Channel, 2> channels;
+    motion::Follower displayedLevel;   // both channels, for the number
     int shownDb = std::numeric_limits<int>::min();
     double shownAt = 0.0;
 

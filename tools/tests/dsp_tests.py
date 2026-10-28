@@ -1063,6 +1063,28 @@ def test_limit_led_only_past_knee():
                        f"(peak {d['levels']['peakDb']:.2f} dBFS) - no factory preset reaches the knee")
 
 
+def test_output_meter_per_channel():
+    """The meter's two wells read each channel's own RMS (owner 2026-10-28).
+
+    The last window the processor publishes must equal that channel's RMS over the render's
+    last 20 ms: 48 kHz in 480-sample blocks, so the 960-sample window ends on the last sample.
+    One note at WIDTH 100 % puts its voice's spread to one side (6.5 dB apart, seed 4), so a
+    summed or swapped meter cannot pass.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "m.wav")
+        d = run(["--notes=60", "--param=width=1", "--hold=2", "--tail=0", "--sample-rate=48000",
+                 "--block=480", "--seed=4", f"--out={p}"])
+        x, _ = read(p)
+    want = np.sqrt(np.mean(x[-960:] ** 2, axis=0))
+    got = np.array([d["levels"]["meterRmsL"], d["levels"]["meterRmsR"]])
+    if abs(20 * np.log10(want[0] / want[1])) < 1.0:
+        raise Fail(f"the render's channels are within 1 dB ({want}); the test cannot tell left from right")
+    err = 20 * np.log10(np.maximum(got, 1e-12) / want)
+    if np.any(np.abs(err) > 0.01):
+        raise Fail(f"meter L/R {got} vs the render's last window {want}: off by {err} dB")
+
+
 def test_about_copy_is_fourteen_lines():
     """The About box copies the fourteen diagnostics fields and nothing else
     (ux-ui-design-bob audio-plugins.md 14, ship-bob feedback-loop.md 3): no user name, no paths."""

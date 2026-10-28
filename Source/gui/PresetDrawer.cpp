@@ -62,6 +62,8 @@ public:
         if (user)
         {
             deleteButton = std::make_unique<IconButton> (icons::Id::close, "Delete " + name);
+            deleteButton->setTooltip ("Delete \"" + name + "\". It goes to the Trash (the Recycle Bin on Windows), "
+                                      "so you can get it back from there.");
             deleteButton->setIconColour (Tokens::inkMuted);
             deleteButton->setWantsKeyboardFocus (false);
             addAndMakeVisible (*deleteButton);

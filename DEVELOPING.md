@@ -122,25 +122,32 @@ it's left. These are intentionally *not* automation lanes — see
 
 ### The editor
 
-- **Knobs** drag vertically; **double-click** resets to the default;
+- **Knobs** drag vertically, **Shift** for fine steps; while you drag, the
+  value shows above the knob. **Double-click** resets to the default;
   **right-click** opens the host's own menu for that parameter (automation,
   MIDI mapping) - in the standalone, a "Reset to default" menu. **Tab**
   walks every control, the arrow keys move the focused one; a mouse click
   never takes keyboard focus, so the space bar always reaches the host's
   transport.
-- **Presets**: the arrows either side of the row step through the factory
-  presets and then your own. The active preset is lit gold; once you change
-  the sound it dims to half gold - click it to recall it again.
-- **OUTPUT** reads in dBFS (RMS over 20 ms, ticks at 0 / -6 / -12 / -24 /
-  -48, the line holds the recent peak). It is a reference, not a control;
-  the limiter never lets the output past -0.04 dBFS.
-- **SIZE** (footer, right) scales the window to 75 / 100 / 125 / 150 / 200%.
-  The choice belongs to your computer: every Horizon Pad opens at the size you
-  chose last, whichever project it is in.
+- **Presets**: the header's pill names the preset; its arrows step through
+  the factory presets and then your own, and " *" after the name means you
+  have changed the sound since. Click the name for the preset drawer: Pads,
+  In-between, Leads and Yours, a search, and Export… for a file to give a
+  friend. One click loads a preset and leaves the drawer open, so you can
+  audition one after another; Esc or a click outside closes it.
+- **A / B** (header): two versions of the sound side by side; the arrows
+  button next to them copies the one you hear onto the other.
+- **OUTPUT** reads in dBFS (RMS over 20 ms; the line holds the recent peak).
+  It is a reference, not a control. **LIMIT** lights while the output
+  limiter holds the sound under -0.04 dBFS; no factory preset reaches it.
+- **Menu** (header, right): Load preset…, Save preset…, GUI scale (75 / 100
+  / 125 / 150 / 200 %), Report a problem… (copies the details a report
+  needs), About Horizon Pad. The GUI scale belongs to your computer: every
+  Horizon Pad opens at the size you chose last, whichever project it is in.
 - The sky follows the sound: FILTER sets the time of day, REVERB hazes the
-  ridge, WIDTH spreads the glow; each pad card glows with its own layer. The
-  first time the editor opens on an instance the sun rises; after that it
-  opens as it is.
+  ridge, WIDTH spreads the glow; each pad's bar shows its own layer's level.
+  The first time the editor opens on an instance the sky rises from night;
+  after that it opens as it is.
 
 ### A/B buffers and user presets
 
@@ -443,7 +450,7 @@ rather than copying them, so it cannot drift from the prototype.
   Developer ID on this project) — Gatekeeper will warn on first launch (see
   Installing below for the workaround). This needs the project owner's own
   Apple Developer credentials to resolve; out of scope for a code change.
-- **No free resizing**: the window scales in five steps (SIZE, 75-200%),
+- **No free resizing**: the window scales in five steps (GUI scale in the menu, 75-200%),
   not by dragging its corner.
 - 64-bit (double-precision) audio processing is not implemented —
   `supportsDoublePrecisionProcessing()` is not overridden, so it defaults to
@@ -546,9 +553,9 @@ CMakeLists.txt                     JUCE CMake API, FetchContent, juce_add_plugin
 Source/
   PluginProcessor.{h,cpp}          APVTS, voice allocation/stealing, state,
                                     A/B buffers, programs
-  PluginEditor.{h,cpp}             1080x748 layout (scaled by SIZE), pixel-accurate to
-                                    the design handoff; the frame loop that
-                                    drives every animation
+  PluginEditor.{h,cpp}             1160x548 layout (editor F, scaled by GUI scale): header,
+                                    sky, control row, overlays; the frame loop
+                                    that drives every animation
   dsp/
     HorizonTypes.h                 kNumLayers/kMaxVoices/kNumGlobalParams etc.
     PerformanceState.h             Lock-free PITCH/MOD (not host parameters)
@@ -562,19 +569,25 @@ Source/
   presets/
     Presets.{h,cpp}                17 factory programs (9 pads, 5 in-between, 3 leads) + parameter IDs
     UserPresetStore.{h,cpp}        On-disk user preset library (message-thread only)
-  gui/
-    HorizonLookAndFeel.{h,cpp}     Palette, typography, ring knob and card painters
-    HorizonScene.{h,cpp}           The sunset panel: FILTER sets the time of day,
+  gui/                             Editor F, the Oberli Audio design system (docs/editor-f-brief.md)
+    HorizonLookAndFeel.{h,cpp}     Tokens, Rubik, icons, the Oberli marks, the knob painter
+    Buttons.{h,cpp}                Icon and text buttons, the focus ring
+    HorizonScene.{h,cpp}           The sky: FILTER sets the time of day,
                                     REVERB the haze, WIDTH the glow's spread
+    SkyDisplay.{h,cpp}             The sky's framed display, the recalled preset's title
     Motion.h                       Spring and follower used by every animation
-    AnimatedKnob.{h,cpp}           Ring knob that glides to new values, with hover/drag glow
-    TitleBanner.{h,cpp}            Logo, wordmark, recalled preset's title, sunrise on open
-    PresetBar.{h,cpp}              Factory + user presets, save flow, A/B buffers
-    PadKnob.{h,cpp}                One layer's VOL knob, glowing with the layer's level
-    MacrosPanel.{h,cpp}            ATTACK/RELEASE/FILTER/REVERB/WIDTH/DETUNE
+    AnimatedKnob.{h,cpp}           The Knob card's knob, gliding to new values
+    KnobColumn.{h,cpp}             A knob with its label, value and (pads) level bar
     WheelSlider.{h,cpp}            PITCH/MOD wheels
-    OutputMeter.{h,cpp}            Real-time output level in dBFS (read-only)
-    FooterBar.{h,cpp}              Bottom strip: wordmark, tagline, buffer/layer/macro counts
+    OutputMeter.{h,cpp}            Output RMS in dBFS and the LIMIT LED (read-only)
+    ControlStrip.{h,cpp}           The row: WHEELS, PADS, MACROS, OUTPUT
+    PluginHeader.{h,cpp}           Mark, name, A/B and copy, preset pill, version, menu button
+    HeaderMenu.{h,cpp}             The menu, with the GUI scale submenu
+    PresetDrawer.{h,cpp}           Presets by category, search, your own, export
+    SavePresetCard.{h,cpp}         "Save preset…": the name field
+    ReadoutBubble.{h,cpp}          A knob's drag readout; short confirmations
+    AboutPanel.{h,cpp}             The back of the panel: details, licences
+assets/                            The editor's bundled data (UiData): Rubik (OFL), the Oberli marks (SVG)
 tools/
   install_plugin.sh                Local dev build+install to ~/Library/Audio/Plug-Ins/VST3
   sound_tool/Main.cpp              HorizonPadSoundTool - offline DSP render+analysis CLI

@@ -170,6 +170,14 @@ public:
         for the editor's live meter. 0..1. */
     float getOutputLevel() const noexcept { return outputLevel.load (std::memory_order_relaxed); }
 
+    /** One output channel's RMS (0 left, 1 right) over the same window, for
+        the meter's two wells (owner 2026-10-28). A mono output gives its one
+        channel for both. 0..1. */
+    float getOutputChannelLevel (int channel) const noexcept
+    {
+        return outputChannelLevels[(size_t) juce::jlimit (0, 1, channel)].load (std::memory_order_relaxed);
+    }
+
     /** True when the output limiter worked in the last meter window: a
         sample passed its knee (0.80, -1.9 dBFS) on the way in. For the
         editor's LIMIT LED; read only, the audio is the same either way.
@@ -284,6 +292,9 @@ private:
 
     bool limitedInWindow = false;                 // audio thread
     std::atomic<bool> limiting { false };
+
+    std::array<float, 2> outputChannelSumSquares {};          // audio thread
+    std::array<std::atomic<float>, 2> outputChannelLevels {};
 
     std::atomic<int> presetRecallCount { 0 };
     std::atomic<int> bufferSwitchCount { 0 };

@@ -23,7 +23,8 @@ namespace horizon::ui
         glow: outside the Scene nothing glows.
 
     Once bound to its parameter (bindParameter()) it behaves like every
-    DAW knob (UI review 2026-10-17): double-click resets to the parameter's
+    DAW knob (UI review 2026-10-17): a vertical or horizontal drag, Shift
+    for fine, the scroll wheel in steps; double-click resets to the parameter's
     default, right-click opens the host's own menu for that parameter
     (automation, MIDI mapping; a plain "Reset" menu in the standalone), and
     it is reachable by Tab with the arrow keys changing it and the 2 px

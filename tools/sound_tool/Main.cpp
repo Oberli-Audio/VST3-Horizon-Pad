@@ -1955,6 +1955,10 @@ static int runTool (const juce::StringArray& arguments)
         levels->setProperty ("peakDb", peak > 0.0 ? 20.0 * std::log10 (peak) : -300.0);
         levels->setProperty ("blocks", blocksRendered);
         levels->setProperty ("limitingBlocks", blocksLimiting);   // blocks after which isLimiting() was true
+
+        // The editor's meter wells as last published: each channel's RMS over the final window.
+        levels->setProperty ("meterRmsL", (double) processor.getOutputChannelLevel (0));
+        levels->setProperty ("meterRmsR", (double) processor.getOutputChannelLevel (1));
         levels->setProperty ("rms", rms);
         levels->setProperty ("rmsDb", rms > 0.0 ? 20.0 * std::log10 (rms) : -300.0);
         levels->setProperty ("dcOffsetL", dcL);

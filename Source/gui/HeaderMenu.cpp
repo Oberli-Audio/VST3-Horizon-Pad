@@ -26,6 +26,7 @@ public:
         : FlatButton (text), owner (ownerToUse), icon (iconToUse)
     {
         setButtonText (text);
+        setWantsKeyboardFocus (false);   // the menu itself takes the keys; its highlight is the focus
     }
 
     void paintButton (juce::Graphics& g, bool over, bool down) override

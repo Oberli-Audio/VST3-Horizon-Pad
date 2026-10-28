@@ -296,8 +296,12 @@ void HorizonPadAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     outputSumSquares = 0.0f;
     layerSumSquares.fill (0.0f);
     limitedInWindow = false;
+    outputChannelSumSquares.fill (0.0f);
     outputLevel.store (0.0f, std::memory_order_relaxed);
     limiting.store (false, std::memory_order_relaxed);
+
+    for (auto& level : outputChannelLevels)
+        level.store (0.0f, std::memory_order_relaxed);
 
     for (auto& level : layerLevels)
         level.store (0.0f, std::memory_order_relaxed);
@@ -1059,9 +1063,13 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     for (int ch = 0; ch < meterChannels; ++ch)
     {
         const auto* data = buffer.getReadPointer (ch);
+        auto& channelSumSquares = outputChannelSumSquares[(size_t) ch];
 
         for (int n = 0; n < numSamples; ++n)
+        {
             outputSumSquares += data[n] * data[n];
+            channelSumSquares += data[n] * data[n];
+        }
     }
 
     meterSampleCount += numSamples;
@@ -1077,6 +1085,16 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         const auto perOutputSample = 1.0f / ((float) juce::jmax (1, meterChannels) * (float) meterSampleCount);
 
         outputLevel.store (std::sqrt (outputSumSquares * perOutputSample), std::memory_order_relaxed);
+
+        // Each channel on its own, for the meter's two wells; a mono output
+        // shows its one channel in both.
+        for (size_t ch = 0; ch < outputChannelLevels.size(); ++ch)
+        {
+            const auto sum = outputChannelSumSquares[meterChannels > 1 ? ch : 0];
+            outputChannelLevels[ch].store (std::sqrt (sum / (float) meterSampleCount), std::memory_order_relaxed);
+        }
+
+        outputChannelSumSquares.fill (0.0f);
 
         for (size_t i = 0; i < layerLevels.size(); ++i)
         {
