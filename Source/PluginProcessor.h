@@ -149,7 +149,7 @@ public:
         Message thread. */
     bool isActivePresetModified() const;
 
-    /** The editor's size as a factor of its designed 1080 x 748 (0.75-2.0):
+    /** The editor's size as a factor of its designed 1160 x 548 (0.75-2.0):
         a machine-local preference, not part of the session (ux-ui-design-bob
         audio-plugins.md 9) - every instance opens at the size last chosen on
         this machine (EditorSettings.xml in PresetFile::settingsFolder()).
@@ -169,6 +169,12 @@ public:
     /** Output RMS (both channels) over the last meter window (kMeterWindowSeconds),
         for the editor's live meter. 0..1. */
     float getOutputLevel() const noexcept { return outputLevel.load (std::memory_order_relaxed); }
+
+    /** True when the output limiter worked in the last meter window: a
+        sample passed its knee (0.80, -1.9 dBFS) on the way in. For the
+        editor's LIMIT LED; read only, the audio is the same either way.
+        No factory preset reaches the knee (see the output stage). */
+    bool isLimiting() const noexcept { return limiting.load (std::memory_order_relaxed); }
 
     /** One layer's RMS after its VOL gain and before the shared reverb, over the
         same window - what that pad contributes right now. For the pad cards'
@@ -275,6 +281,9 @@ private:
 
     std::atomic<float> outputLevel { 0.0f };
     std::array<std::atomic<float>, (size_t) horizon::kNumLayers> layerLevels {};
+
+    bool limitedInWindow = false;                 // audio thread
+    std::atomic<bool> limiting { false };
 
     std::atomic<int> presetRecallCount { 0 };
     std::atomic<int> bufferSwitchCount { 0 };

@@ -1,323 +1,295 @@
 #include "HorizonLookAndFeel.h"
 
+#include <UiData.h>
+
 namespace horizon::ui
 {
 
+namespace
+{
+    /** The five Rubik weights, registered once and kept while any editor
+        (its LookAndFeel holds one) is alive. */
+    struct Typefaces
+    {
+        Typefaces()
+        {
+            const std::pair<const char*, int> files[] {
+                { UiData::RubikRegular_ttf,   UiData::RubikRegular_ttfSize },
+                { UiData::RubikMedium_ttf,    UiData::RubikMedium_ttfSize },
+                { UiData::RubikSemiBold_ttf,  UiData::RubikSemiBold_ttfSize },
+                { UiData::RubikBold_ttf,      UiData::RubikBold_ttfSize },
+                { UiData::RubikExtraBold_ttf, UiData::RubikExtraBold_ttfSize },
+            };
+
+            for (size_t i = 0; i < faces.size(); ++i)
+                faces[i] = juce::Typeface::createSystemTypefaceFor (files[i].first, (size_t) files[i].second);
+        }
+
+        std::array<juce::Typeface::Ptr, 5> faces;
+    };
+
+    juce::Typeface::Ptr typefaceFor (type::Weight weight)
+    {
+        const juce::SharedResourcePointer<Typefaces> typefaces;
+        return typefaces->faces[(size_t) weight];
+    }
+
+    std::unique_ptr<juce::Drawable> drawableFrom (const char* data, int size)
+    {
+        return juce::Drawable::createFromImageData (data, (size_t) size);
+    }
+
+    // Icon card path data, on the 16-unit grid.
+    const char* iconPath (icons::Id id)
+    {
+        switch (id)
+        {
+            case icons::Id::chevronLeft:  return "M10 3.5 5.5 8l4.5 4.5";
+            case icons::Id::chevronRight: return "M6 3.5 10.5 8 6 12.5";
+            case icons::Id::menu:         return "M3 4.5h10M3 8h10M3 11.5h10";
+            case icons::Id::copy:         return "M2.5 5.5h9M9 3l2.5 2.5L9 8M13.5 10.5h-9M7 8l-2.5 2.5L7 13";
+            case icons::Id::load:         return "M8 9.5v-7M5 5.5l3-3 3 3M3 11v2.5h10V11";
+            case icons::Id::save:         return "M8 2.5v7M5 6.5l3 3 3-3M3 11v2.5h10V11";
+            case icons::Id::about:        return "M8 7.5v3.5M8 5h.01";
+            case icons::Id::close:        return "M4.5 4.5l7 7M11.5 4.5l-7 7";
+        }
+
+        return "";
+    }
+}
+
+//==============================================================================
+juce::Font type::font (Weight weight, float px, float trackingEm, bool tabular)
+{
+    auto options = juce::FontOptions (typefaceFor (weight)).withPointHeight (px);
+
+    if (tabular)
+        options = options.withFeatureEnabled ("tnum");
+
+    juce::Font f (options);
+
+    // JUCE adds tracking as a multiple of the line height; the tokens give it in em.
+    if (! juce::exactlyEqual (trackingEm, 0.0f))
+        f.setExtraKerningFactor (trackingEm * px / f.getHeight());
+
+    return f;
+}
+
+void type::draw (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> lineBox,
+                 const juce::Font& f, juce::Colour colour, juce::Justification justification)
+{
+    g.setFont (f);
+    g.setColour (colour);
+    g.drawText (text, lineBox, justification, false);
+}
+
+float type::width (const juce::Font& f, const juce::String& text)
+{
+    return juce::GlyphArrangement::getStringWidth (f, text);
+}
+
+//==============================================================================
+void icons::draw (juce::Graphics& g, Id id, juce::Rectangle<float> area, juce::Colour colour)
+{
+    const auto scale = juce::jmin (area.getWidth(), area.getHeight()) / 16.0f;
+    const auto transform = juce::AffineTransform::scale (scale)
+                               .translated (area.getCentreX() - 8.0f * scale, area.getCentreY() - 8.0f * scale);
+
+    auto path = juce::Drawable::parseSVGPath (iconPath (id));
+
+    if (id == Id::about)
+        path.addEllipse (2.0f, 2.0f, 12.0f, 12.0f);
+
+    g.setColour (colour);
+    g.strokePath (path, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded),
+                  transform);
+}
+
+//==============================================================================
+std::unique_ptr<juce::Drawable> logo::nameOnBone()
+{
+    return drawableFrom (UiData::oberlibone_svg, UiData::oberlibone_svgSize);
+}
+
+std::unique_ptr<juce::Drawable> logo::lockupOnCharcoal()
+{
+    return drawableFrom (UiData::oberliaudiocharcoal_svg, UiData::oberliaudiocharcoal_svgSize);
+}
+
+//==============================================================================
+void drawKnob (juce::Graphics& g, juce::Rectangle<float> box, float proportion, bool focused)
+{
+    const auto size = juce::jmin (box.getWidth(), box.getHeight());
+    const auto centre = box.getCentre();
+    const auto v = juce::jlimit (0.0f, 1.0f, proportion);
+
+    // Angles clockwise from 12 o'clock, as Path::addCentredArc takes them.
+    const auto start = juce::degreesToRadians (-135.0f);
+    const auto end = juce::degreesToRadians (135.0f);
+    const auto angle = start + (end - start) * v;
+
+    const auto radius = 0.46f * size;
+    const auto stroke = size <= 32.0f ? 2.0f : 3.0f;
+    const juce::PathStrokeType arcStroke (stroke, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+
+    juce::Path track;
+    track.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, start, end, true);
+    g.setColour (Tokens::lineStrong);
+    g.strokePath (track, arcStroke);
+
+    if (angle - start > 0.009f)   // half a degree
+    {
+        juce::Path arc;
+        arc.addCentredArc (centre.x, centre.y, radius, radius, 0.0f, start, angle, true);
+        g.setColour (Tokens::accent);
+        g.strokePath (arc, arcStroke);
+    }
+
+    const auto capRadius = 0.36f * size;
+    const auto cap = juce::Rectangle<float> (2.0f * capRadius, 2.0f * capRadius).withCentre (centre);
+    g.setColour (Tokens::surfacePanel);
+    g.fillEllipse (cap);
+    g.setColour (Tokens::lineControl);
+    g.drawEllipse (cap, 1.5f);
+
+    // The pointer, from the 100-unit master drawing.
+    const auto unit = size / 100.0f;
+    juce::Path pointer;
+    pointer.addRoundedRectangle (box.getX() + (box.getWidth() - size) * 0.5f + 43.88f * unit,
+                                 box.getY() + (box.getHeight() - size) * 0.5f + 19.4f * unit,
+                                 12.24f * unit, 24.48f * unit, 6.12f * unit);
+    g.setColour (Tokens::accent);
+    g.fillPath (pointer, juce::AffineTransform::rotation (angle, centre.x, centre.y));
+
+    if (focused)
+        drawFocusRing (g, cap, capRadius);
+}
+
+void drawFocusRing (juce::Graphics& g, juce::Rectangle<float> controlBounds, float corner)
+{
+    // 3 px gap, then 2 px of ink: the stroke's centre sits 4 px out.
+    g.setColour (Tokens::ink);
+    g.drawRoundedRectangle (controlBounds.expanded (4.0f), corner + 4.0f, 2.0f);
+}
+
+void drawPopCard (juce::Graphics& g, juce::Rectangle<float> bounds, float corner,
+                  juce::Colour fill, juce::Colour border)
+{
+    juce::Path shape;
+    shape.addRoundedRectangle (bounds, corner);
+    Tokens::popShadow().drawForPath (g, shape);
+
+    g.setColour (fill);
+    g.fillPath (shape);
+    g.setColour (border);
+    g.drawRoundedRectangle (bounds.reduced (0.5f), corner - 0.5f, 1.0f);
+}
+
+//==============================================================================
 HorizonLookAndFeel::HorizonLookAndFeel()
 {
-    setColour (juce::ResizableWindow::backgroundColourId, Palette::background);
-    setColour (juce::Label::textColourId,                 Palette::text);
-    setColour (juce::Slider::rotarySliderFillColourId,    Palette::layerAccents[0]);
-    setColour (juce::Slider::rotarySliderOutlineColourId, Palette::knobTrack);
-    setColour (juce::Slider::trackColourId,               Palette::cardBg);
-    setColour (juce::Slider::thumbColourId,               Palette::gold);
-    setColour (juce::Slider::textBoxTextColourId,         Palette::textDim);
-    setColour (juce::Slider::textBoxOutlineColourId,      juce::Colours::transparentBlack);
-    setColour (juce::TextButton::buttonColourId,          juce::Colours::transparentBlack);
-    setColour (juce::TextButton::buttonOnColourId,        Palette::pillActiveBg);
-    setColour (juce::TextButton::textColourOffId,         Palette::text);
-    setColour (juce::TextButton::textColourOnId,          Palette::gold);
-    setColour (juce::TooltipWindow::backgroundColourId,   Palette::cardBg);
+    // Holds the typefaces for as long as this LookAndFeel lives.
+    static_cast<void> (typefaceFor (type::Weight::regular));
+
+    setColour (juce::ResizableWindow::backgroundColourId, Tokens::ground);
+    setColour (juce::TextEditor::textColourId,            Tokens::ink);
+    setColour (juce::TextEditor::backgroundColourId,      Tokens::surfaceSunken);
+    setColour (juce::TextEditor::outlineColourId,         Tokens::line);
+    setColour (juce::TextEditor::focusedOutlineColourId,  Tokens::ink);
+    setColour (juce::TextEditor::highlightColourId,       Tokens::lineControl);
+    setColour (juce::TextEditor::highlightedTextColourId, Tokens::ink);
+    setColour (juce::CaretComponent::caretColourId,       Tokens::ink);
+    setColour (juce::ScrollBar::thumbColourId,            Tokens::lineControl);
+    setColour (juce::TooltipWindow::textColourId,         Tokens::onReadout);
+    setColour (juce::AlertWindow::backgroundColourId,     Tokens::surfaceRaised);
+    setColour (juce::AlertWindow::textColourId,           Tokens::ink);
+    setColour (juce::AlertWindow::outlineColourId,        Tokens::lineControl);
+    setColour (juce::TextButton::buttonColourId,          Tokens::surfacePanel);
+    setColour (juce::TextButton::textColourOffId,         Tokens::ink);
+    setColour (juce::Label::textColourId,                 Tokens::ink);
 }
 
-juce::Font HorizonLookAndFeel::getLabelFont (juce::Label& label)
+juce::Typeface::Ptr HorizonLookAndFeel::getTypefaceForFont (const juce::Font& f)
 {
-    return labelFont ((float) juce::jmax (10, label.getHeight() - 2));
+    // Anything asking for the default face gets Rubik: JUCE's own text
+    // editors, alert windows and tooltips included.
+    if (f.getTypefaceName() == juce::Font::getDefaultSansSerifFontName()
+        || f.getTypefaceName() == juce::Font::getDefaultSerifFontName())
+        return typefaceFor (f.isBold() ? type::Weight::bold : type::Weight::regular);
+
+    return LookAndFeel_V4::getTypefaceForFont (f);
 }
 
-juce::Font HorizonLookAndFeel::getTextButtonFont (juce::TextButton&, int buttonHeight)
+//==============================================================================
+std::unique_ptr<juce::TextLayout> HorizonLookAndFeel::layoutTooltip (const juce::String& text) const
 {
-    return labelFont (juce::jlimit (10.0f, 17.0f, (float) buttonHeight * 0.5f), true);
+    // The parameter table's sentence, then its generated range and default
+    // (" Range ...") on a line of its own at 75 %.
+    const auto sentence = text.upToFirstOccurrenceOf (" Range ", false, false).trim();
+    const auto range = text.fromFirstOccurrenceOf (" Range ", true, false).trim();
+
+    juce::AttributedString s;
+    s.setJustification (juce::Justification::topLeft);
+    s.setWordWrap (juce::AttributedString::byWord);
+    s.setLineSpacing (5.0f);
+    s.append (sentence, type::font (type::Weight::regular, 12.0f), Tokens::onReadout);
+
+    if (range.isNotEmpty())
+        s.append ("\n" + range, type::font (type::Weight::regular, 12.0f, 0.0f, true), Tokens::onReadout.withAlpha (0.75f));
+
+    auto layout = std::make_unique<juce::TextLayout>();
+    layout->createLayoutWithBalancedLineLengths (s, 240.0f - 2.0f * 8.0f);
+    return layout;
 }
 
-void HorizonLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& button,
-                                               const juce::Colour& backgroundColour,
-                                               bool shouldDrawButtonAsHighlighted,
-                                               bool shouldDrawButtonAsDown)
+juce::Rectangle<int> HorizonLookAndFeel::getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
+                                                           juce::Rectangle<int> parentArea)
 {
-    auto bounds = button.getLocalBounds().toFloat().reduced (0.5f);
-    const auto corner = bounds.getHeight() * 0.5f; // full pill, matching the design's preset/tab buttons
+    const auto layout = layoutTooltip (tipText);
+    const auto w = juce::roundToInt (layout->getWidth() + 16.0f);
+    const auto h = juce::roundToInt (layout->getHeight() + 12.0f);
 
-    auto fill = backgroundColour;
-
-    if (shouldDrawButtonAsDown)
-        fill = fill.brighter (0.25f);
-    else if (shouldDrawButtonAsHighlighted)
-        fill = fill.brighter (0.12f);
-
-    if (fill.getFloatAlpha() > 0.001f)
-    {
-        g.setColour (fill);
-        g.fillRoundedRectangle (bounds, corner);
-    }
-
-    const auto& props = button.getProperties();
-
-    // A preset pill whose highlight PresetBar fades in and out: the gold
-    // fill and border follow "activeAmount" (0..1) instead of snapping with
-    // the toggle state, which stays the truth for accessibility. (PresetBar
-    // gives these pills a transparent buttonOnColourId, so the fill above
-    // never doubles this one.)
-    if (props.contains ("activeAmount"))
-    {
-        const auto amount = juce::jlimit (0.0f, 1.0f, (float) props["activeAmount"]);
-
-        if (amount > 0.001f)
-        {
-            // A card-coloured shade first, then the gold tint: the sky behind can be
-            // golden-hour bright, and the cream name must stay readable (EX-010).
-            g.setColour (Palette::pillActiveShade.withMultipliedAlpha (amount));
-            g.fillRoundedRectangle (bounds, corner);
-
-            auto activeFill = Palette::pillActiveBg.withMultipliedAlpha (amount);
-
-            if (shouldDrawButtonAsDown)
-                activeFill = activeFill.brighter (0.25f);
-            else if (shouldDrawButtonAsHighlighted)
-                activeFill = activeFill.brighter (0.12f);
-
-            g.setColour (activeFill);
-            g.fillRoundedRectangle (bounds, corner);
-        }
-
-        g.setColour (Palette::pillBorder.interpolatedWith (Palette::gold, amount));
-        g.drawRoundedRectangle (bounds, corner, 1.0f);
-        return;
-    }
-
-    if ((bool) props.getWithDefault ("noBorder", false))
-        return;
-
-    juce::Colour borderColour = button.getToggleState() ? Palette::gold : Palette::pillBorder;
-
-    if (! button.getToggleState() && props.contains ("borderColour"))
-        borderColour = juce::Colour ((juce::uint32) (int) props["borderColour"]);
-
-    if ((bool) props.getWithDefault ("dashedBorder", false) && ! button.getToggleState())
-    {
-        juce::Path pillPath;
-        pillPath.addRoundedRectangle (bounds, corner);
-
-        juce::Path dashed;
-        const float dashLengths[] { 4.0f, 3.0f };
-        juce::PathStrokeType (1.0f).createDashedStroke (dashed, pillPath, dashLengths, 2);
-        g.setColour (borderColour);
-        g.fillPath (dashed);
-        return;
-    }
-
-    g.setColour (borderColour);
-    g.drawRoundedRectangle (bounds, corner, 1.0f);
+    // Below and right of the pointer, so the control's own value stays visible.
+    return juce::Rectangle<int> (screenPos.x > parentArea.getCentreX() ? screenPos.x - (w + 12) : screenPos.x + 12,
+                                 screenPos.y > parentArea.getCentreY() ? screenPos.y - (h + 8) : screenPos.y + 20,
+                                 w, h).constrainedWithin (parentArea);
 }
 
-void HorizonLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int width, int height,
-                                           float sliderPos, float rotaryStartAngle, float rotaryEndAngle,
-                                           juce::Slider& slider)
+void HorizonLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text, int width, int height)
 {
-    // Every knob in the editor is an AnimatedKnob, which paints itself with
-    // drawRingKnob() from its eased value; this covers any plain Slider.
-    drawRingKnob (g, juce::Rectangle<int> (x, y, width, height).toFloat(), sliderPos,
-                  rotaryStartAngle, rotaryEndAngle,
-                  slider.findColour (juce::Slider::rotarySliderFillColourId),
-                  slider.findColour (juce::Slider::rotarySliderOutlineColourId));
+    const auto bounds = juce::Rectangle<float> ((float) width, (float) height);
+
+    g.setColour (Tokens::readout);
+    g.fillRoundedRectangle (bounds, Tokens::radiusSm);
+
+    layoutTooltip (text)->draw (g, bounds.reduced (8.0f, 6.0f));
 }
 
-void drawRingKnob (juce::Graphics& g, juce::Rectangle<float> area, float proportion,
-                   float rotaryStartAngle, float rotaryEndAngle, juce::Colour accent, juce::Colour trackColour,
-                   float hover, float drag)
+//==============================================================================
+void HorizonLookAndFeel::fillTextEditorBackground (juce::Graphics& g, int width, int height, juce::TextEditor& editor)
 {
-    // Ring + dot style, matching the design handoff's ringKnob() helper: a
-    // thin dark track ring, an accent-coloured ring lit up to the current
-    // value, a dark cap, and a small glowing dot marking the exact value
-    // position - not a thick glowing filled arc (an earlier iteration of
-    // this look and feel).
-    auto bounds = area.reduced (2.0f);
-    const auto size = juce::jmin (bounds.getWidth(), bounds.getHeight());
-    bounds = bounds.withSizeKeepingCentre (size, size);
-
-    const auto centre = bounds.getCentre();
-    const auto arcThickness = juce::jmax (2.0f, size * 0.1f);
-    const auto arcRadius = size * 0.5f - arcThickness * 0.5f;
-    const auto sliderPos = juce::jlimit (0.0f, 1.0f, proportion);
-    const auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
-
-    const juce::PathStrokeType ringStroke (arcThickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
-
-    // --- Track (the full 270 degree sweep, dark). Hovering warms it a
-    // little toward the knob's colour.
-    {
-        juce::Path track;
-        track.addCentredArc (centre.x, centre.y, arcRadius, arcRadius, 0.0f,
-                             rotaryStartAngle, rotaryEndAngle, true);
-        g.setColour (trackColour.interpolatedWith (accent, 0.14f * hover));
-        g.strokePath (track, ringStroke);
-    }
-
-    // --- Value ring: lit from the start up to the current value, same
-    // thickness as the track (a ring reading as "how full", not a fader).
-    // While dragged, a soft wider halo of the same arc lights it up.
-    if (sliderPos > 0.001f)
-    {
-        juce::Path value;
-        value.addCentredArc (centre.x, centre.y, arcRadius, arcRadius, 0.0f,
-                             rotaryStartAngle, angle, true);
-
-        if (drag > 0.001f)
-        {
-            g.setColour (accent.withAlpha (0.20f * drag));
-            g.strokePath (value, juce::PathStrokeType (arcThickness * 2.4f, juce::PathStrokeType::curved,
-                                                       juce::PathStrokeType::rounded));
-        }
-
-        g.setColour (accent.brighter (0.12f * juce::jmax (hover, drag)));
-        g.strokePath (value, ringStroke);
-    }
-
-    // --- Dark cap (mostly empty centre - the design's knobs read as rings,
-    // not solid dials).
-    const auto capRadius = arcRadius - arcThickness * 1.0f;
-
-    if (capRadius > 2.0f)
-    {
-        const auto capBounds = juce::Rectangle<float> (capRadius * 2.0f, capRadius * 2.0f)
-                                   .withCentre (centre);
-
-        g.setColour (Palette::knobInner);
-        g.fillEllipse (capBounds);
-    }
-
-    // --- Glowing dot at the current value's position along the ring; its
-    // glow brightens on hover and swells while dragged.
-    {
-        const auto dotCentre = centre.getPointOnCircumference (arcRadius, angle);
-        const auto dotRadius = juce::jmax (2.5f, size * 0.057f);
-        const auto haloDiameter = dotRadius * (3.2f + 1.4f * drag);
-
-        g.setColour (accent.withAlpha (0.30f + 0.12f * hover + 0.20f * drag));
-        g.fillEllipse (juce::Rectangle<float> (haloDiameter, haloDiameter).withCentre (dotCentre));
-
-        g.setColour (accent);
-        g.fillEllipse (juce::Rectangle<float> (dotRadius * 2.0f, dotRadius * 2.0f).withCentre (dotCentre));
-    }
+    g.setColour (editor.findColour (juce::TextEditor::backgroundColourId));
+    g.fillRoundedRectangle (juce::Rectangle<float> ((float) width, (float) height), Tokens::radiusMd);
 }
 
-void HorizonLookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int width, int height,
-                                           float sliderPos, float minSliderPos, float maxSliderPos,
-                                           const juce::Slider::SliderStyle style, juce::Slider& slider)
+void HorizonLookAndFeel::drawTextEditorOutline (juce::Graphics& g, int width, int height, juce::TextEditor& editor)
 {
-    // A flat track with a solid pill thumb - matching the design's
-    // pitchTrackStyle/pitchThumbStyle exactly (no fill-from-rest bar).
-    juce::ignoreUnused (minSliderPos, maxSliderPos, style);
-
-    auto bounds = juce::Rectangle<int> (x, y, width, height).toFloat();
-    const auto trackWidth = juce::jmin (bounds.getWidth(), 24.0f);
-    auto track = bounds.withSizeKeepingCentre (trackWidth, bounds.getHeight());
-
-    g.setColour (Palette::cardBg);
-    g.fillRoundedRectangle (track, trackWidth * 0.5f);
-    g.setColour (Palette::pillBorder);
-    g.drawRoundedRectangle (track.reduced (0.5f), trackWidth * 0.5f, 1.0f);
-
-    // Thumb: a rounded pill, sized and positioned exactly as the design's
-    // 20x24 thumb inside a 24-wide track (2px margin each side).
-    const auto thumbWidth = trackWidth * 0.83f;
-    const auto thumbHeight = 24.0f;
-    auto thumb = juce::Rectangle<float> (thumbWidth, thumbHeight)
-                    .withCentre ({ bounds.getCentreX(), sliderPos });
-
-    const auto accent = slider.findColour (juce::Slider::thumbColourId);
-
-    g.setColour (accent.withAlpha (0.5f));
-    g.fillRoundedRectangle (thumb.expanded (3.0f), (thumbHeight + 6.0f) * 0.5f);
-
-    g.setColour (accent);
-    g.fillRoundedRectangle (thumb, thumbHeight * 0.28f);
+    const auto bounds = juce::Rectangle<float> ((float) width, (float) height).reduced (0.5f);
+    g.setColour (editor.findColour (editor.hasKeyboardFocus (true) ? juce::TextEditor::focusedOutlineColourId
+                                                                   : juce::TextEditor::outlineColourId));
+    g.drawRoundedRectangle (bounds, Tokens::radiusMd - 0.5f, 1.0f);
 }
 
-void drawPanel (juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour fill, float corner)
+void HorizonLookAndFeel::drawScrollbar (juce::Graphics& g, juce::ScrollBar&, int x, int y, int width, int height,
+                                        bool isScrollbarVertical, int thumbStartPosition, int thumbSize,
+                                        bool isMouseOver, bool isMouseDown)
 {
-    g.setColour (fill);
-    g.fillRoundedRectangle (bounds, corner);
+    auto thumb = isScrollbarVertical ? juce::Rectangle<int> (x, thumbStartPosition, width, thumbSize)
+                                     : juce::Rectangle<int> (thumbStartPosition, y, thumbSize, height);
+    thumb = thumb.reduced (2);
 
-    g.setColour (Palette::cardBorder);
-    g.drawRoundedRectangle (bounds.reduced (0.5f), corner, 1.0f);
-}
-
-ColumnSlots computeColumnSlots (juce::Rectangle<int> cardBounds)
-{
-    auto r = cardBounds.reduced (12, 16);
-
-    ColumnSlots slots;
-    slots.icon = r.removeFromTop (30);
-    r.removeFromTop (6);
-    slots.label = r.removeFromTop (20);
-    r.removeFromTop (6);
-    slots.caption = r.removeFromTop (32);
-    r.removeFromTop (6);
-    slots.value = r.removeFromBottom (22);
-    r.removeFromBottom (6);
-    slots.control = r;
-
-    return slots;
-}
-
-void drawColumnCard (juce::Graphics& g, juce::Rectangle<float> bounds)
-{
-    g.setColour (Palette::cardBg);
-    g.fillRoundedRectangle (bounds, 14.0f);
-
-    g.setColour (Palette::cardBorder);
-    g.drawRoundedRectangle (bounds.reduced (0.5f), 14.0f, 1.0f);
-}
-
-ControlLayout computePadControlLayout (juce::Rectangle<int> area)
-{
-    constexpr int kLabel = 14, kGapAbove = 4, kKnob = 78, kGapBelow = 5, kValue = 22;
-    constexpr int kGroup = kLabel + kGapAbove + kKnob + kGapBelow + kValue;
-
-    area = area.withSizeKeepingCentre (area.getWidth(), juce::jmin (area.getHeight(), kGroup));
-
-    ControlLayout c;
-    c.label = area.removeFromTop (kLabel);
-    area.removeFromTop (kGapAbove);
-    c.control = area.removeFromTop (kKnob);
-    area.removeFromTop (kGapBelow);
-    c.value = area.removeFromTop (kValue);
-    return c;
-}
-
-MacroGridLayout computeMacroGridLayout (juce::Rectangle<int> area)
-{
-    // In the 214px control area of a 346px grid card this leaves 66px rows
-    // and 37px knobs - smaller than the 42px of the old 2x2 grid, the price
-    // of six macros in the card the design gave four.
-    constexpr int kLabel = 11, kGap = 2, kValue = 14, kDividerGap = 3;
-
-    MacroGridLayout m;
-    area.removeFromTop (2);
-
-    const auto rowHeight = (area.getHeight() - 2 * (2 * kDividerGap + 1)) / 3;
-    m.knobSize = juce::jlimit (28, 42, rowHeight - kLabel - kValue - 2 * kGap);
-
-    for (size_t i = 0; i < m.rows.size(); ++i)
-    {
-        auto row = area.removeFromTop (rowHeight);
-        auto& r = m.rows[i];
-        r.label = row.removeFromTop (kLabel);
-        row.removeFromTop (kGap);
-        r.value = row.removeFromBottom (kValue);
-        row.removeFromBottom (kGap);
-        r.control = row;
-
-        if (i + 1 < m.rows.size())
-        {
-            area.removeFromTop (kDividerGap);
-            m.dividerYs[i] = area.getY();
-            area.removeFromTop (1 + kDividerGap);
-        }
-    }
-
-    return m;
+    g.setColour ((isMouseOver || isMouseDown) ? Tokens::inkSubtle : Tokens::lineControl);
+    g.fillRoundedRectangle (thumb.toFloat(), (float) juce::jmin (thumb.getWidth(), thumb.getHeight()) * 0.5f);
 }
 
 } // namespace horizon::ui

@@ -295,7 +295,9 @@ void HorizonPadAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     meterSampleCount = 0;
     outputSumSquares = 0.0f;
     layerSumSquares.fill (0.0f);
+    limitedInWindow = false;
     outputLevel.store (0.0f, std::memory_order_relaxed);
+    limiting.store (false, std::memory_order_relaxed);
 
     for (auto& level : layerLevels)
         level.store (0.0f, std::memory_order_relaxed);
@@ -1014,6 +1016,10 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     constexpr float kCeiling    = 0.995f; // -0.04 dBFS - asymptote, never exceeded
     constexpr float kRange      = kCeiling - kKnee;
 
+    // For the editor's LIMIT LED: did anything reach the knee in this meter
+    // window? Read only, the samples themselves are untouched.
+    bool passedKnee = false;
+
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
         auto* data = buffer.getWritePointer (ch);
@@ -1022,6 +1028,7 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
         {
             const auto x = data[n] * kOutputGain;
             const auto a = std::abs (x);
+            passedKnee = passedKnee || a > kKnee;
 
             // Continuous and C1 at the knee, since tanh'(0) = 1.
             const auto limited = a <= kKnee
@@ -1058,9 +1065,13 @@ void HorizonPadAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     }
 
     meterSampleCount += numSamples;
+    limitedInWindow = limitedInWindow || passedKnee;
 
     if (meterSampleCount >= meterWindowSamples)
     {
+        limiting.store (limitedInWindow, std::memory_order_relaxed);
+        limitedInWindow = false;
+
         // Layers are always rendered in stereo; the output may be mono.
         const auto perLayerSample = 1.0f / (2.0f * (float) meterSampleCount);
         const auto perOutputSample = 1.0f / ((float) juce::jmax (1, meterChannels) * (float) meterSampleCount);

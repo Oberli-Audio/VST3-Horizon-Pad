@@ -6,13 +6,11 @@ namespace horizon::ui
 
 namespace
 {
-    // Standard peak/VU-meter convention: map the level in dB, not raw linear
-    // amplitude, onto the fill. Ear and eye both track level logarithmically,
-    // so a linear mapping crowds this DSP's whole normal RMS range into the
-    // meter's bottom sliver (previously patched over with an arbitrary *3.0
-    // linear boost that only "worked" for typical playing levels and still
-    // pinned to 100% well before actual clipping).
+    // The level in dB onto the well: ear and eye both track level
+    // logarithmically, so a linear fill would crowd the instrument's whole
+    // normal range into the bottom sliver.
     constexpr float kFloorDb = -48.0f;
+    constexpr float kHotDb = -6.0f;
 
     // Ballistics: quick up, slower down. The peak line holds, then falls a
     // third of the meter per second.
@@ -21,9 +19,12 @@ namespace
     constexpr double kPeakHoldSeconds = 1.2;
     constexpr float kPeakFallPerSecond = 0.33f;
 
-    // Ticks on the scale, dBFS. The labels sit left of the track.
-    constexpr std::array<float, 5> kTicksDb { 0.0f, -6.0f, -12.0f, -24.0f, -48.0f };
-    constexpr int kTickLabelWidth = 26;
+    // The LIMIT LED stays lit this long after the limiter last worked.
+    constexpr double kLimitHoldSeconds = 1.0;
+
+    constexpr float kWellWidth = 8.0f;
+    constexpr float kWellHeight = 48.0f;
+    constexpr float kColumnWidth = 64.0f;
 
     const juce::String minus = juce::String::fromUTF8 ("\xe2\x88\x92");   // a real minus sign
 
@@ -34,28 +35,52 @@ namespace
 
         return (db < 0 ? minus + juce::String (-db) : juce::String (db)) + " dB";
     }
+
+    float proportionFor (float db) { return juce::jlimit (0.0f, 1.0f, (db - kFloorDb) / -kFloorDb); }
 }
 
 OutputMeter::OutputMeter (HorizonPadAudioProcessor& processorToUse)
     : processor (processorToUse)
 {
-    setTooltip ("Output level in dBFS - RMS over 20 ms, with a line holding the recent peak. "
-                "A reference only, not a control; the output never goes over -0.04 dBFS.");
+    setTooltip ("The output level in dBFS: RMS over 20 ms, with a line holding the recent peak. "
+                "LIMIT lights while the output limiter holds the sound under 0 dBFS; no preset reaches it.");
+    setTitle ("Output level");
+    setInterceptsMouseClicks (true, false);
 }
 
-juce::Rectangle<float> OutputMeter::trackArea() const
+juce::Rectangle<float> OutputMeter::wellArea() const noexcept
 {
-    // A slim rounded column, matching meterOuterStyle exactly.
-    const auto slots = computeColumnSlots (getLocalBounds());
-    return slots.control.withSizeKeepingCentre (26, slots.control.getHeight()).toFloat();
+    return { (kColumnWidth - kWellWidth) * 0.5f, 0.0f, kWellWidth, kWellHeight };
+}
+
+juce::Rectangle<float> OutputMeter::ledArea() const noexcept
+{
+    const auto w = std::ceil (type::width (type::label(), "LIMIT")) + 10.0f;
+    return { (float) kWidth - w, 0.0f, w, 16.0f };
+}
+
+juce::Rectangle<float> OutputMeter::valueBox() const noexcept
+{
+    return { 0.0f, kWellHeight + 4.0f + 12.0f + 8.0f, kColumnWidth, 16.0f };
 }
 
 void OutputMeter::advance (double now, float dt)
 {
-    const auto levelDb = juce::Decibels::gainToDecibels (processor.getOutputLevel(), kFloorDb);
-    const auto target = juce::jlimit (0.0f, 1.0f, (levelDb - kFloorDb) / -kFloorDb);
+    // --- LIMIT: lit while the limiter works, and a second after.
+    if (processor.isLimiting())
+        limitLitUntil = now + kLimitHoldSeconds;
 
-    displayedLevel.advance (target, dt, kRiseSeconds, kFallSeconds, 1.0e-3f);
+    const auto lit = now < limitLitUntil;
+
+    if (lit != limitShown)
+    {
+        limitShown = lit;
+        repaint (ledArea().getSmallestIntegerContainer());
+    }
+
+    // --- The level and its peak line.
+    const auto levelDb = juce::Decibels::gainToDecibels (processor.getOutputLevel(), kFloorDb);
+    displayedLevel.advance (proportionFor (levelDb), dt, kRiseSeconds, kFallSeconds, 1.0e-3f);
     const auto level = displayedLevel.value;
 
     if (level >= peakLevel)
@@ -69,12 +94,11 @@ void OutputMeter::advance (double now, float dt)
     }
 
     // Redrawn at the ambient rate, and only for a change of at least a pixel
-    // of the track - or to land exactly on empty, or to show or hide the peak line.
+    // of the well - or to land exactly on empty, or to show or hide the peak line.
     if (now - shownAt < motion::kAmbientFrameSeconds)
         return;
 
-    const auto track = trackArea();
-    const auto pixels = track.getHeight();
+    const auto pixels = kWellHeight - 2.0f;
     const auto peakVisible = [] (float peak, float lvl) { return peak > 0.01f && peak > lvl + 0.004f; };
 
     const auto levelMoved = std::abs (level - shownLevel) * pixels >= 1.0f || (level <= 0.0f && shownLevel > 0.0f);
@@ -87,83 +111,81 @@ void OutputMeter::advance (double now, float dt)
         shownLevel = level;
         shownPeak = peakLevel;
         shownAt = now;
-        repaint (track.getSmallestIntegerContainer().expanded (1));
+        repaint (wellArea().getSmallestIntegerContainer().expanded (1));
     }
 
     if (db != shownDb)
     {
         shownDb = db;
         shownAt = now;
-        repaint (computeColumnSlots (getLocalBounds()).value);
+        repaint (valueBox().getSmallestIntegerContainer());
     }
 }
 
 void OutputMeter::paint (juce::Graphics& g)
 {
-    drawColumnCard (g, getLocalBounds().toFloat());
+    // --- The well.
+    const auto well = wellArea();
+    g.setColour (Tokens::surfaceSunken);
+    g.fillRoundedRectangle (well, Tokens::radiusXs);
 
-    const auto slots = computeColumnSlots (getLocalBounds());
+    const auto inner = well.reduced (1.0f);
 
-    g.setColour (Palette::iconGlyph);
-    g.setFont (juce::Font (juce::FontOptions().withHeight (TypeScale::icon)));
-    g.drawText (juce::String::fromUTF8 ("\xe2\x86\x92"), slots.icon, juce::Justification::centred); // "→"
-
-    g.setColour (Palette::textKnobLabel);
-    g.setFont (labelFont (TypeScale::label, true));
-    g.drawText ("OUTPUT", slots.label, juce::Justification::centred);
-
-    g.setColour (Palette::textDim);
-    g.setFont (labelFont (TypeScale::caption).italicised());
-    g.drawFittedText ("the valley", slots.caption, juce::Justification::centred, 2);
-
-    const auto track = trackArea();
-    g.setColour (Palette::meterBg);
-    g.fillRoundedRectangle (track, 11.0f);
-
-    // --- dB scale: short ticks and labels left of the track.
+    if (shownLevel > 0.0f)
     {
-        const auto inner = track.reduced (1.0f);
-        g.setFont (labelFont (11.0f));
+        juce::Graphics::ScopedSaveState save (g);
+        juce::Path clip;
+        clip.addRoundedRectangle (inner, Tokens::radiusXs - 1.0f);
+        g.reduceClipRegion (clip);
 
-        for (auto tick : kTicksDb)
+        const auto top = inner.getBottom() - inner.getHeight() * shownLevel;
+        const auto hotLine = inner.getBottom() - inner.getHeight() * proportionFor (kHotDb);
+
+        g.setColour (Tokens::meterLevel);
+        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (inner.getX(), juce::jmax (top, hotLine),
+                                                                inner.getRight(), inner.getBottom()));
+
+        if (top < hotLine)
         {
-            const auto y = inner.getBottom() - inner.getHeight() * (tick - kFloorDb) / -kFloorDb;
-            g.setColour (Palette::textDim);
-            g.fillRect (juce::Rectangle<float> (track.getX() - 6.0f, y - 0.5f, 4.0f, 1.0f));
-
-            const auto label = juce::Rectangle<float> (track.getX() - 8.0f - (float) kTickLabelWidth,
-                                                       y - 7.0f, (float) kTickLabelWidth, 14.0f)
-                                   .withY (juce::jlimit (inner.getY() - 3.0f, inner.getBottom() - 11.0f, y - 7.0f));
-            g.drawText (tick < 0.0f ? minus + juce::String (juce::roundToInt (-tick)) : juce::String ("0"),
-                        label.toNearestInt(), juce::Justification::centredRight);
+            g.setColour (Tokens::meterHot);
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (inner.getX(), top, inner.getRight(), hotLine));
         }
     }
 
-    const auto level = shownLevel;
-    auto fill = track.reduced (1.0f);
-    const auto inner = fill;
-    fill.setTop (fill.getBottom() - fill.getHeight() * level);
-
-    if (fill.getHeight() > 0.5f)
-    {
-        juce::ColourGradient grad (Palette::meterFillLow, fill.getX(), fill.getBottom(),
-                                   Palette::meterFillHigh, fill.getX(), fill.getY(), false);
-        g.setGradientFill (grad);
-        g.fillRoundedRectangle (fill, 10.0f);
-    }
-
-    // --- Peak line: where the level was a moment ago.
-    if (shownPeak > 0.01f && shownPeak > level + 0.004f)
+    if (shownPeak > 0.01f && shownPeak > shownLevel + 0.004f)
     {
         const auto y = inner.getBottom() - inner.getHeight() * shownPeak;
-        const auto line = juce::Rectangle<float> (inner.getX() + 4.0f, y - 1.0f, inner.getWidth() - 8.0f, 2.0f);
-        g.setColour (Palette::meterFillHigh.withAlpha (0.85f));
-        g.fillRoundedRectangle (line.withY (juce::jlimit (inner.getY(), inner.getBottom() - 2.0f, line.getY())), 1.0f);
+        g.setColour (Tokens::ink);
+        g.fillRect (juce::Rectangle<float> (inner.getX(), juce::jlimit (inner.getY(), inner.getBottom() - 1.0f, y - 0.5f),
+                                            inner.getWidth(), 1.0f));
     }
 
-    g.setColour (Palette::textValue);
-    g.setFont (labelFont (TypeScale::value, true));
-    g.drawText (dbText (shownDb), slots.value, juce::Justification::centred);
+    g.setColour (Tokens::line);
+    g.drawRoundedRectangle (well.reduced (0.5f), Tokens::radiusXs - 0.5f, 1.0f);
+
+    // --- LIMIT.
+    {
+        const auto led = ledArea();
+
+        if (limitShown)
+        {
+            g.setColour (Tokens::meterHot);
+            g.fillRoundedRectangle (led, Tokens::radiusXs);
+        }
+        else
+        {
+            g.setColour (Tokens::lineControl);
+            g.drawRoundedRectangle (led.reduced (0.5f), Tokens::radiusXs - 0.5f, 1.0f);
+        }
+
+        type::draw (g, "LIMIT", led, type::label(), limitShown ? Tokens::ground : Tokens::inkSubtle,
+                    juce::Justification::centred);
+    }
+
+    // --- What the number is, and the number.
+    const auto labelBox = juce::Rectangle<float> (0.0f, kWellHeight + 4.0f, kColumnWidth, 12.0f);
+    type::draw (g, "RMS", labelBox, type::label(), Tokens::inkMuted, juce::Justification::centred);
+    type::draw (g, dbText (shownDb), valueBox(), type::value(), Tokens::ink, juce::Justification::centred);
 }
 
 } // namespace horizon::ui

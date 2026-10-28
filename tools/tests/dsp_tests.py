@@ -1040,6 +1040,29 @@ def test_output_dc_and_knee():
 
 
 
+def test_limit_led_only_past_knee():
+    """The editor's LIMIT LED (owner 2026-10-28) lights only while the output limiter works.
+
+    isLimiting() is a meter flag beside the output level: a sample passed the knee (0.80,
+    -1.94 dBFS) in the last 20 ms window. It must be up at the limiter's own extreme (all four
+    volumes, WIDTH, FILTER and REVERB at 100 %, eight voices at full velocity) and down for the
+    default patch and the bank's edge presets in a chord - no factory preset reaches the knee.
+    """
+    extreme = ["--param=root=1", "--param=clearing=1", "--param=expanse=1", "--param=bloom=1",
+               "--param=width=1", "--param=filter=1", "--param=reverb=1",
+               "--notes=48,52,55,60,64,67,72,76", "--velocity=1.0", "--hold=2", "--tail=0.5", "--seed=1"]
+    d = run(extreme)
+    if d["levels"]["limitingBlocks"] < 1:
+        raise Fail(f"LIMIT never lit at the limiter's extreme (peak {d['levels']['peakDb']:.2f} dBFS)")
+    quiet = [("default patch", [])] + [(p["name"], [f"--preset={p['slug']}"]) for p in list_presets() if p.get("edge") == "Y"
+                                       or p["slug"] in ("mitternachtsblau", "bergecho", "sternenzelt")]
+    for name, args in quiet:
+        d = run(args + ["--seed=1", "--notes=48,55,60,64,67", "--hold=3", "--tail=1"])
+        if d["levels"]["limitingBlocks"] != 0:
+            raise Fail(f"LIMIT lit for {name} in {d['levels']['limitingBlocks']} of {d['levels']['blocks']} blocks "
+                       f"(peak {d['levels']['peakDb']:.2f} dBFS) - no factory preset reaches the knee")
+
+
 def test_about_copy_is_fourteen_lines():
     """The About box copies the fourteen diagnostics fields and nothing else
     (ux-ui-design-bob audio-plugins.md 14, ship-bob feedback-loop.md 3): no user name, no paths."""

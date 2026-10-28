@@ -7,9 +7,9 @@ namespace horizon::ui
 {
 
 /**
-    The one shared panel that is the whole plugin window - sunset sky
-    gradient, a low glow, a blurred mountain ridge along the bottom - drawn
-    as a slow picture of the patch:
+    The Scene (design system round 11): Horizon Pad's sky, drawn in a framed
+    display above the control row - a sunset gradient, a low glow and a
+    blurred mountain ridge - as a slow picture of the patch:
 
       FILTER -> time of day. 50% (the macro's neutral, the designed
                 brightness) is the palette exactly as designed; darker
@@ -23,31 +23,26 @@ namespace horizon::ui
 
     Each follows its parameter on a spring: about 1 s after a preset recall
     (beginRecallGlide), quicker under a hand on the knob, so a preset change
-    is a change of light rather than a cut.
+    is a change of light rather than a cut. It is the one place in the
+    editor with gradients and blur; it never takes the accent.
 
-    The text drawn straight on the panel has to stay readable across the
-    whole range. Measured with tools/gui_snapshot (2026-10-07), as designed
-    (FILTER 50%) -> golden hour (100%): preset pills 5.3 -> 4.7:1, wordmark
-    3.6 -> 3.35:1 (36 px: large text). The footer, the design's own weakest
-    spot (2.1-2.2:1 in its original grey-beige), is cream since 2026-10-17:
-    3.8 -> 3.2:1, and 5.9:1 at night - measured against the rows just above
-    and below its glyphs, the brightest pixel. Golden hour still keeps the
-    lower sky and glow at the designed brightness for it. Every setting
-    below 50% is darker, so higher. Re-measure after a palette change.
+    Scaled to its display (editor F, 2026-10-28): the ridge is
+    min(120, h * 0.3) high (88 px in the 294 px display), its blur and the
+    glow's centre scale with it, and the glow's diameter with w / 1080 - the
+    numbers of the 1080 x 748 window it once filled. The display's 14 px
+    corners (`radius-lg`) and its 1 px `line` border are part of the
+    picture: the corners outside the curve are the editor's ground.
 
-    It fills the window edge to edge, opaque, with a 1 px border along the
-    edge. (The design's panel had 24 px rounded corners - right on the dark
-    web page of the handoff, wrong in a host's rectangular plugin window,
-    where the unpainted corners showed the host's own background. Square
-    since 2026-10-14.)
+    Text on the sky (SkyDisplay's recalled preset title) is measured over
+    the whole FILTER range with ux-ui-design-bob snapshot_contrast.py; the
+    numbers are in SkyDisplay.h. Re-measure after a palette change.
 
     Rendered into an image at the screen's own pixel density and
-    re-rendered only while something moves - only the lower band when just
-    REVERB or WIDTH move - so every repaint, even of a few pixels behind a
-    glowing pad, is a plain 1:1 copy. (Until 2026-10-14 the image was 1x,
-    stretched to Retina inside a rounded-corner clip: 16 ms per full redraw
-    on an M3 Pro, and 96% of the editor's painting time; drawn 1:1 it is
-    0.3 ms.) Message thread only.
+    re-rendered only while something moves, so every repaint is a plain 1:1
+    copy with no clip (the corners are built in). (Until 2026-10-14 the
+    image was 1x, stretched to Retina inside a rounded-corner clip: 16 ms
+    per full redraw on an M3 Pro; drawn 1:1 it is 0.3 ms.) Message thread
+    only.
 */
 class HorizonScene
 {
@@ -70,16 +65,13 @@ public:
     /** Advances the springs. Returns what needs repainting. */
     Change advance (float dt) noexcept;
 
-    /** The band Change::lower affects: the glow and the ridge. */
+    /** The band Change::lower affects in a display of `bounds`: the glow
+        and the ridge. */
     static juce::Rectangle<int> lowerRegion (juce::Rectangle<int> bounds) noexcept;
 
-    /** Paints the panel, border included - opaque over all of `bounds`. */
+    /** Paints the display, rounded corners and border included - opaque
+        over all of `bounds`. */
     void paint (juce::Graphics&, juce::Rectangle<float> bounds);
-
-    /** The sky gradient's colour `proportionDown` of the way down the window
-        (0 = top), without the glow - for components that fade into the sky
-        (the preset row's scroll cue). */
-    juce::Colour skyColourAt (float proportionDown) const;
 
 private:
     juce::ColourGradient skyGradient (float top, float bottom) const;
@@ -104,6 +96,8 @@ private:
     };
 
     std::vector<RidgeMask> ridgeMasks;
+    float ridgeHeight = 120.0f;         // min(120, h * 0.3) of the display
+    float ridgeScale = 1.0f;            // ridgeHeight / 120: blur and glow offset
     juce::Image ridgeMask;              // the blend for the current haze, half resolution
     float ridgeMaskSigma = -1.0f;
     juce::Rectangle<int> ridgeBounds;   // where the mask lands, in panel coordinates (full resolution)

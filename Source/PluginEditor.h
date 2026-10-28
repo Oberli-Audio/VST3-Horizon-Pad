@@ -3,63 +3,81 @@
 #include "PluginProcessor.h"
 
 #include "gui/HorizonLookAndFeel.h"
-#include "gui/HorizonScene.h"
-#include "gui/TitleBanner.h"
-#include "gui/PresetBar.h"
-#include "gui/PadKnob.h"
-#include "gui/WheelSlider.h"
-#include "gui/MacrosPanel.h"
-#include "gui/OutputMeter.h"
-#include "gui/FooterBar.h"
+#include "gui/PluginHeader.h"
+#include "gui/SkyDisplay.h"
+#include "gui/ControlStrip.h"
+#include "gui/HeaderMenu.h"
+#include "gui/PresetDrawer.h"
+#include "gui/SavePresetCard.h"
 #include "gui/AboutPanel.h"
+#include "gui/ReadoutBubble.h"
 
 /**
-    The editor: one shared panel (HorizonScene - sky, glow, mountain ridge)
-    behind a title banner, a preset row, an 8-column knob grid (PITCH, MOD,
-    the four pad knobs, the macros grid, OUTPUT), and a footer strip - a
-    pixel-accurate recreation of the Claude Design GUI handoff ("Horizon
-    Pad.dc.html"), read directly rather than approximated. There is no
-    on-screen keyboard: play from a MIDI keyboard/controller, matching a real
-    Launchkey-style workflow (the eight knobs mirror a Launchkey 25's eight
-    knobs, and the wheels mirror its pitch/mod wheels).
+    The editor, sketch F of the Oberli Audio redraw ("sky over the strip",
+    owner's pick 2026-10-27; docs/editor-f-brief.md): the Charcoal theme
+    with the mango accent and Rubik, flat chrome, and the knob drawn like the
+    O of the logo. Top to bottom, 1160 x 548 at 100 %:
 
-    The window size and every inset below (kTopBottomPadding etc.) are taken
-    straight from the handoff's own CSS (panelStyle's padding, presetsRowStyle's
-    margin-top, mainGridStyle's gap, ...), scaled 1:1 - not eyeballed.
+      - the PluginHeader (48 px): the Oberli mark, "Horizon Pad", A/B and
+        copy, the preset pill, the version, the menu button;
+      - 28 px in, the Scene - today's sky (HorizonScene: FILTER the time of
+        day, REVERB the haze, WIDTH the glow) as a 1104 x 294 display, where
+        a recalled preset's name fades in at the top-left;
+      - 24 px below it, one row of controls (ControlStrip): WHEELS, PADS,
+        MACROS, OUTPUT.
 
-    One layout, drawn at a chosen size: every child paints its own precise
-    layout in the designed 1080 x 748 coordinates, and the SIZE menu in the
-    footer scales the whole editor to 75 / 100 / 125 / 150 / 200% (a transform on
-    top of whatever scale the host itself applies - setScaleFactor() keeps
-    the two apart). Everything is vector or cached at the screen's pixel
-    density, so no size blurs. A machine-local preference every instance
-    opens at, never in the session (HorizonPadAudioProcessor::getEditorScale()).
+    Overlays never open windows: the menu drops from the header
+    (HeaderMenu), the presets slide in from the left (PresetDrawer), "Save
+    preset…" is a small card (SavePresetCard), About turns the panel round
+    (AboutPanel). Esc or a click elsewhere closes the open one. There is no
+    on-screen keyboard: play from a MIDI keyboard or controller.
 
-    Motion. Everything moves because the sound changed, and only then:
-      - the scene follows FILTER (time of day), REVERB (haze) and WIDTH
-        (the glow's spread);
+    One layout, drawn at a chosen size: the menu's GUI scale (75, 100, 125,
+    150, 200 %) scales the whole editor with a transform on top of the
+    host's own scale (setScaleFactor() keeps the two apart; EX-008). A
+    machine-local preference every instance opens at, never in the session
+    (HorizonPadAudioProcessor::getEditorScale()). Everything is vector, or
+    cached at the screen's pixel density, so no size blurs.
+
+    Motion. Things move because the sound changed, and only then:
+      - the sky follows FILTER, REVERB and WIDTH;
       - knobs glide after a preset recall or A/B switch, in a left-to-right
         wave, while a hand on a knob is followed at once (AnimatedKnob);
-      - a recalled preset's name and description fade in under the wordmark;
-      - each pad card glows with its layer's real output;
+      - a recalled preset's name and description fade in on the sky;
+      - each pad's level bar follows its layer's real output;
       - the first time the editor opens on an instance, the sky rises from
-        night, the logo's sun comes up from behind its peaks and the knobs
-        sweep up to their values; reopening the window shows it as it is.
+        night and the knobs sweep up to their values; reopening the window
+        shows it as it is. (The Oberli mark is never animated.)
     One frame callback (advanceFrame) drives it all, from the display's
     vertical blank while the editor is on screen, capped near 60 fps; each
     piece repaints only its own changed area, so a quiet editor costs
-    nothing. It also replaces the old 15 Hz polling timer.
+    nothing.
 */
 class HorizonPadAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                              public juce::FileDragAndDropTarget,
+                                             public horizon::ui::ReadoutHost,
                                              private juce::Timer
 {
 public:
     explicit HorizonPadAudioProcessorEditor (HorizonPadAudioProcessor&);
     ~HorizonPadAudioProcessorEditor() override;
 
-    /** Opens the About box (footer product label; the snapshot tool uses it too). */
+    /** Turns the panel round to About (the menu; the snapshot tool too). */
     void showAbout (bool openLicences = false);
+
+    /** Opens the menu, and with `scaleSubmenu` its GUI scale submenu. */
+    void showMenu (bool scaleSubmenu = false);
+
+    void showPresetDrawer();
+    void showSavePresetCard();
+
+    /** Fades the active preset's name and description in on the sky, as a
+        recall does (and tools/gui_snapshot's --title, at any FILTER). */
+    void showRecalledPresetTitle();
+
+    /** Shows a knob's drag readout without a mouse (tools/gui_snapshot).
+        Returns false for an unknown parameter ID. */
+    bool previewDrag (const juce::String& parameterId);
 
     // A .oberlipreset (or an older .bobpreset / .quellepreset) dropped on the editor is imported (D.6.5).
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
@@ -67,9 +85,10 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
 
     /** The host's own scale (Windows per-monitor DPI, some Linux hosts); the
-        player's SIZE choice is multiplied on top. */
+        player's GUI scale is multiplied on top. */
     void setScaleFactor (float newScale) override;
 
     /** One animation frame at `nowSeconds` (Time::getMillisecondCounterHiRes()
@@ -78,23 +97,33 @@ public:
         with a clock of its own. */
     void advanceFrame (double nowSeconds);
 
+    // ReadoutHost: a knob's value above its cap while it is dragged.
+    void showDragReadout (juce::Component& source, juce::Rectangle<float> capInSource, const juce::String& text) override;
+    void hideDragReadout() override;
+
+    static constexpr int kWindowWidth = 1160;
+    static constexpr int kWindowHeight = 548;
+
 private:
     void timerCallback() override;
 
     void pullSceneTargets();
-    void startWave (double startTime, bool fromZero);
-    void showRecalledPresetTitle();
     void applyScale();
+
+    void closeOverlays();
+    void toggleMenu();
+    void togglePresetDrawer();
+    void importPresetFile();
+    void importPreset (const juce::File&);
+    void exportPresetFile();
+    void reportProblem();
+    void showToast (const juce::String& text, juce::Rectangle<int> anchor);
 
     static double clockNow() noexcept { return juce::Time::getMillisecondCounterHiRes() * 0.001; }
 
-    // The design's panel is 1080px wide with 36px top/bottom and 40px
-    // left/right padding; the window height follows from stacking its own
-    // header/divider/presets/grid/footer measurements exactly.
-    static constexpr int kWindowWidth = 1080;
-    static constexpr int kWindowHeight = 748;
-    static constexpr int kSidePadding = 40;
-    static constexpr int kTopBottomPadding = 36;
+    static constexpr int kBodyPadding = 28;
+    static constexpr int kSkyHeight = 294;
+    static constexpr int kSkyToStrip = 24;
 
     // AudioProcessorEditor's own `processor` member is the plain
     // AudioProcessor; the frame callback needs the meters and recall counters.
@@ -103,27 +132,23 @@ private:
     std::atomic<float>* reverbParam = nullptr;
     std::atomic<float>* widthParam = nullptr;
 
-    juce::Rectangle<int> dividerBounds;
-    float presetRowProportion = 0.34f;   // the preset row's centre, as a proportion of the window height
-
     horizon::ui::HorizonLookAndFeel lookAndFeel;
-    horizon::ui::HorizonScene scene;
 
-    horizon::ui::TitleBanner titleBanner;
-    horizon::ui::PresetBar presetBar;
+    horizon::ui::PluginHeader header;
+    horizon::ui::SkyDisplay sky;
+    horizon::ui::ControlStrip strip;
 
-    horizon::ui::WheelSlider pitchWheel, modWheel;
-    horizon::ui::PadKnob rootKnob, clearingKnob, expanseKnob, bloomKnob;
-    horizon::ui::MacrosPanel macrosPanel;
-    horizon::ui::OutputMeter outputMeter;
+    horizon::ui::PresetDrawer drawer;
+    horizon::ui::HeaderMenu menu;
+    horizon::ui::SavePresetCard saveCard;
+    horizon::ui::AboutPanel about;
+    horizon::ui::ReadoutBubble dragReadout, toast;
 
-    horizon::ui::FooterBar footerBar;
-    horizon::ui::AboutPanel aboutPanel;
-
-    // Every control below sets its own setTooltip() text; without an actual
-    // TooltipWindow instance somewhere in the component tree, that text is
-    // stored but never shown - this is what makes it appear on hover.
+    // Without a TooltipWindow somewhere in the tree, setTooltip() text is
+    // stored but never shown. 600 ms, as the Tooltip card says.
     juce::TooltipWindow tooltipWindow;
+
+    std::unique_ptr<juce::FileChooser> fileChooser;
 
     // --- Frame state.
     double lastFrameTime = -1.0;

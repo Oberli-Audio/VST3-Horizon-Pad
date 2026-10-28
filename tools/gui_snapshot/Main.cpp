@@ -28,8 +28,13 @@
       # The sunrise on open, every 0.1 s for 2 s.
       HorizonPadGuiSnapshot --time=2 --frames=/tmp/sunrise --frame-every=0.1 --out=/tmp/last.png
 
-      # The ring knob at rest, hovered, half-dragged and dragged - states an
-      # offscreen editor cannot reach, since nothing moves a mouse over it.
+      # Editor F's overlays and states a mouse would reach: the menu with its
+      # GUI scale submenu, the preset drawer, the save card, FILTER being dragged.
+      HorizonPadGuiSnapshot --menu --out=/tmp/menu.png
+      HorizonPadGuiSnapshot --drawer --out=/tmp/drawer.png
+      HorizonPadGuiSnapshot --param=filterMacro=0.64 --drag=filterMacro --out=/tmp/turning.png
+
+      # The Knob card at knob-sm, knob-md and knob-lg: rest, low, high, focused.
       HorizonPadGuiSnapshot --knob-sheet --scale=2 --out=/tmp/knobs.png
 
     Flags are applied in order: preset, then params.
@@ -56,6 +61,8 @@ namespace
         juce::File framesDir;
         bool knobSheet = false;
         bool about = false, licences = false;
+        bool menu = false, drawer = false, saveCard = false, title = false;
+        juce::String drag;
         int reopen = 0;
     };
 
@@ -73,8 +80,13 @@ namespace
             "  --frames=<dir>          also write frame_NNNN.png every --frame-every seconds\n"
             "  --frame-every=<s>       frame interval for --frames (default 0.1)\n"
             "  --scale=<factor>        pixel scale, e.g. 2 for Retina (default 1)\n"
-            "  --knob-sheet            instead: the ring knob at rest / hover / drag, per accent colour\n"
-            "  --about / --licences    open the About box (diagnostics / licence texts) before the snapshot\n"
+            "  --knob-sheet            instead: the knob at 32 / 48 / 64 px, at rest, low, high and focused\n"
+            "  --about / --licences    turn the panel to About (details / licence texts) before the snapshot\n"
+            "  --menu                  open the menu with its GUI scale submenu\n"
+            "  --drawer                open the preset drawer\n"
+            "  --save-card             open the Save preset card\n"
+            "  --drag=<id>             show this knob as dragged (its readout above the cap)\n"
+            "  --title                 show the active preset's title on the sky from the start, at any FILTER\n"
             "  --reopen=<n>            instead: open, play and paint the editor n times; report memory (U.7)\n";
     }
 
@@ -98,6 +110,11 @@ namespace
             else if (arg.startsWith ("--frame-every="))     o.frameEvery = value.getDoubleValue();
             else if (arg == "--knob-sheet")                 o.knobSheet = true;
             else if (arg == "--about")                      o.about = true;
+            else if (arg == "--menu")                       o.menu = true;
+            else if (arg == "--drawer")                     o.drawer = true;
+            else if (arg == "--save-card")                  o.saveCard = true;
+            else if (arg == "--title")                      o.title = true;
+            else if (arg.startsWith ("--drag="))            o.drag = value;
             else if (arg.startsWith ("--reopen="))          o.reopen = arg.fromFirstOccurrenceOf ("=", false, false).getIntValue();
             else if (arg == "--licences")                   o.licences = o.about = true;
             else if (arg.startsWith ("--param="))
@@ -147,36 +164,31 @@ namespace
         return stream.openedOk() && juce::PNGImageFormat().writeImageToStream (image, stream);
     }
 
-    /** Rows: a pad knob (78 px) and a macro knob (37 px) per accent; columns:
-        rest, hover, half-way through a drag, dragged. */
+    /** Rows: knob-sm, knob-md, knob-lg; columns: at pointer-rest (38
+        degrees, how every illustration shows it), low, high, focused - on
+        the Charcoal ground. */
     juce::Image renderKnobSheet (float scale)
     {
         using namespace horizon::ui;
-        constexpr int cell = 110;
-        const juce::Colour accents[] { Palette::layerAccents[0], Palette::layerAccents[1],
-                                       Palette::layerAccents[2], Palette::layerAccents[3] };
-        const float states[][2] { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 0.5f }, { 1.0f, 1.0f } };
-        const auto start = juce::MathConstants<float>::pi * 1.25f;
-        const auto end = juce::MathConstants<float>::pi * 2.75f;
+        constexpr int cell = 96;
+        const float sizes[] { 32.0f, 48.0f, 64.0f };
+        const float values[] { (38.0f + 135.0f) / 270.0f, 0.1f, 0.9f, 0.62f };
 
-        const auto width = cell * juce::numElementsInArray (states);
-        const auto height = cell * 2 * juce::numElementsInArray (accents);
+        const auto width = cell * juce::numElementsInArray (values);
+        const auto height = cell * juce::numElementsInArray (sizes);
         juce::Image image (juce::Image::ARGB, juce::roundToInt ((float) width * scale),
                            juce::roundToInt ((float) height * scale), true);
         juce::Graphics g (image);
         g.addTransform (juce::AffineTransform::scale (scale));
-        g.fillAll (Palette::cardBg);
+        g.fillAll (Tokens::ground);
 
-        for (int a = 0; a < juce::numElementsInArray (accents); ++a)
-            for (int row = 0; row < 2; ++row)
-                for (int col = 0; col < juce::numElementsInArray (states); ++col)
-                {
-                    const auto size = row == 0 ? 78.0f : 37.0f;
-                    const auto area = juce::Rectangle<float> ((float) (col * cell), (float) ((a * 2 + row) * cell),
-                                                              (float) cell, (float) cell).withSizeKeepingCentre (size, size);
-                    drawRingKnob (g, area, 0.62f, start, end, accents[a], Palette::knobTrack,
-                                  states[col][0], states[col][1]);
-                }
+        for (int row = 0; row < juce::numElementsInArray (sizes); ++row)
+            for (int col = 0; col < juce::numElementsInArray (values); ++col)
+            {
+                const auto area = juce::Rectangle<float> ((float) (col * cell), (float) (row * cell), (float) cell, (float) cell)
+                                      .withSizeKeepingCentre (sizes[row], sizes[row]);
+                drawKnob (g, area, values[col], col == 3);
+            }
 
         return image;
     }
@@ -301,6 +313,9 @@ int main (int argc, char** argv)
     if (options->about)
         editor->showAbout (options->licences);
 
+    if (options->title)
+        editor->showRecalledPresetTitle();
+
     juce::AudioBuffer<float> audio (2, kFrameSamples);
     juce::MidiBuffer midi;
 
@@ -328,6 +343,20 @@ int main (int argc, char** argv)
 
         editor->advanceFrame (now);
 
+        // Overlays open on the last frame, after any recall, as a hand would.
+        if (frame == frames - 1)
+        {
+            if (options->menu)     editor->showMenu (true);
+            if (options->drawer)   editor->showPresetDrawer();
+            if (options->saveCard) editor->showSavePresetCard();
+
+            if (options->drag.isNotEmpty() && ! editor->previewDrag (options->drag))
+            {
+                std::cerr << "Unknown parameter for --drag: " << options->drag << "\n";
+                return 2;
+            }
+        }
+
         if (framesPerDump > 0 && frame % framesPerDump == 0)
             writePng (editor->createComponentSnapshot (editor->getLocalBounds(), true, options->scale),
                       options->framesDir.getChildFile ("frame_" + juce::String (dumped++).paddedLeft ('0', 4) + ".png"));
@@ -340,6 +369,18 @@ int main (int argc, char** argv)
     json->setProperty ("out", options->out.getFullPathName());
     json->setProperty ("simulatedSeconds", (double) frames * kFrameSeconds);
     json->setProperty ("scale", options->scale);
+
+    auto* ui = new juce::DynamicObject();
+    ui->setProperty ("about", options->about);
+    ui->setProperty ("licences", options->licences);
+    ui->setProperty ("menu", options->menu);
+    ui->setProperty ("drawer", options->drawer);
+    ui->setProperty ("saveCard", options->saveCard);
+    ui->setProperty ("drag", options->drag);
+    ui->setProperty ("presetModified", processor.isActivePresetModified());
+    ui->setProperty ("limiting", processor.isLimiting());
+    json->setProperty ("ui", juce::var (ui));
+    json->setProperty ("activePresetName", processor.getActivePresetName());
 
     auto* params = new juce::DynamicObject();
     for (auto* p : processor.getParameters())

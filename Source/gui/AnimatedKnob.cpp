@@ -1,4 +1,5 @@
 #include "AnimatedKnob.h"
+#include "ReadoutBubble.h"
 
 namespace horizon::ui
 {
@@ -15,23 +16,14 @@ namespace
     constexpr float kSettleEpsilon = 5.0e-4f;
 }
 
-void setUpRingKnob (juce::Slider& slider, juce::Colour accent)
+AnimatedKnob::AnimatedKnob()
+    : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox)
 {
-    slider.setColour (juce::Slider::rotarySliderFillColourId, accent);
-    slider.setColour (juce::Slider::rotarySliderOutlineColourId, Palette::knobTrack);
-    slider.setRotaryParameters (juce::MathConstants<float>::pi * 1.25f,
-                                juce::MathConstants<float>::pi * 2.75f,
-                                true);
-}
+    // knob-sweep: 270 degrees, the gap centred at the bottom.
+    setRotaryParameters (juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
 
-AnimatedKnob::AnimatedKnob (int marginToUse)
-    : juce::Slider (juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox),
-      margin (marginToUse)
-{
-    // Kept as an image: the pad cards repaint the glow around their knob up
-    // to 30 times a second while a layer sounds, and a knob that has not
-    // changed is then copied instead of drawn again (its arcs were a third
-    // of the editor's painting while playing).
+    // Kept as an image: a knob that has not changed is copied, not drawn
+    // again, when the level bars and the meter beside it repaint.
     setBufferedToImage (true);
 }
 
@@ -45,6 +37,21 @@ void AnimatedKnob::bindParameter (juce::RangedAudioParameter& parameterToUse, co
     setMouseClickGrabsKeyboardFocus (false);
 }
 
+juce::String AnimatedKnob::textFor (double sliderValue) const
+{
+    if (parameter == nullptr)
+        return juce::String (juce::roundToInt (sliderValue));
+
+    return parameter->getText (parameter->convertTo0to1 ((float) sliderValue), 0);
+}
+
+juce::Rectangle<float> AnimatedKnob::capBounds() const noexcept
+{
+    const auto box = getLocalBounds().toFloat();
+    const auto size = juce::jmin (box.getWidth(), box.getHeight());
+    return juce::Rectangle<float> (0.72f * size, 0.72f * size).withCentre (box.getCentre());
+}
+
 void AnimatedKnob::mouseDown (const juce::MouseEvent& e)
 {
     if (e.mods.isPopupMenu() && parameter != nullptr)
@@ -54,6 +61,38 @@ void AnimatedKnob::mouseDown (const juce::MouseEvent& e)
     }
 
     juce::Slider::mouseDown (e);
+    dragging = true;
+    updateReadout (true);
+}
+
+void AnimatedKnob::mouseDrag (const juce::MouseEvent& e)
+{
+    juce::Slider::mouseDrag (e);
+    updateReadout (dragging);
+}
+
+void AnimatedKnob::mouseUp (const juce::MouseEvent& e)
+{
+    juce::Slider::mouseUp (e);
+    dragging = false;
+    updateReadout (dragPreview);
+}
+
+void AnimatedKnob::setDragPreview (bool shouldShow)
+{
+    dragPreview = shouldShow;
+    updateReadout (shouldShow);
+}
+
+void AnimatedKnob::updateReadout (bool show)
+{
+    if (auto* host = findParentComponentOfClass<ReadoutHost>())
+    {
+        if (show)
+            host->showDragReadout (*this, capBounds(), textFor (getValue()));
+        else
+            host->hideDragReadout();
+    }
 }
 
 void AnimatedKnob::showContextMenu()
@@ -97,6 +136,9 @@ void AnimatedKnob::valueChanged()
         syncDisplay();
     else
         display.target = (float) valueToProportionOfLength (getValue());
+
+    if (dragging || dragPreview)
+        updateReadout (true);
 }
 
 void AnimatedKnob::beginWave (double startTime, bool fromZero) noexcept
@@ -114,49 +156,23 @@ void AnimatedKnob::beginWave (double startTime, bool fromZero) noexcept
 
 bool AnimatedKnob::advance (double now, float dt)
 {
-    // Fades: in quickly, out a little slower, so a pass of the mouse leaves
-    // a short afterglow instead of a flicker.
-    const bool hoverMoved = hover.advance (isMouseOverOrDragging() ? 1.0f : 0.0f, dt, 0.06f, 0.22f);
-    const bool dragMoved = drag.advance (isMouseButtonDown() ? 1.0f : 0.0f, dt, 0.05f, 0.30f);
-    bool glideMoved = false;
+    if (now < holdUntil)
+        return false;
 
-    if (now >= holdUntil)
-    {
-        glideMoved = display.advance (dt, waveGlide ? kWaveOmega : kFollowOmega, kSettleEpsilon);
+    const auto moved = display.advance (dt, waveGlide ? kWaveOmega : kFollowOmega, kSettleEpsilon);
 
-        if (display.isSettled())
-            waveGlide = false;
-    }
+    if (display.isSettled())
+        waveGlide = false;
 
-    const auto changed = hoverMoved || dragMoved || glideMoved;
-
-    if (changed)
+    if (moved)
         repaint();
 
-    return changed;
+    return moved;
 }
 
 void AnimatedKnob::paint (juce::Graphics& g)
 {
-    const auto rotary = getRotaryParameters();
-
-    drawRingKnob (g, getLocalBounds().reduced (margin).toFloat(), display.value,
-                  rotary.startAngleRadians, rotary.endAngleRadians,
-                  findColour (juce::Slider::rotarySliderFillColourId),
-                  findColour (juce::Slider::rotarySliderOutlineColourId),
-                  hover.value, drag.value);
-
-    // Keyboard focus (Tab): a thin ring just outside the knob, in its colour.
-    if (hasKeyboardFocus (false))
-    {
-        g.setColour (findColour (juce::Slider::rotarySliderFillColourId).withAlpha (0.85f));
-        g.drawEllipse (getLocalBounds().reduced (margin).toFloat().expanded ((float) margin - 1.5f), 1.5f);
-    }
-}
-
-bool AnimatedKnob::hitTest (int x, int y)
-{
-    return getLocalBounds().reduced (margin).contains (x, y);
+    drawKnob (g, getLocalBounds().toFloat(), display.value, hasKeyboardFocus (false));
 }
 
 } // namespace horizon::ui

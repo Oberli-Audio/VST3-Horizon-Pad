@@ -11,16 +11,36 @@ namespace
     constexpr float kRecallOmega  = 4.7f;  // ~1 s
     constexpr float kSunriseOmega = 3.4f;  // ~1.4 s
 
-    // The low glow (a sun just behind the ridge): centre 40 px above the
-    // window's bottom edge, 640 px across before WIDTH stretches it.
+    // The designed geometry, for the 1080 x 748 window the sky once filled;
+    // a display scales it (geometryFor()). The low glow (a sun just behind
+    // the ridge): centre 40 px above the bottom edge, 640 px across before
+    // WIDTH stretches it. The ridge: the bottom 120 px.
+    constexpr float kDesignedWidth = 1080.0f;
     constexpr float kGlowDiameter = 640.0f;
     constexpr float kGlowCentreFromBottom = 40.0f;
-
-    // The ridge: the bottom 120 px, plus margins so the widest blur can
-    // feather inside the mask instead of being cut off at its edges.
     constexpr float kRidgeHeight = 120.0f;
+
+    // Margins around the ridge mask, so the widest blur can feather inside
+    // the mask instead of being cut off at its edges.
     constexpr int kRidgeSideMargin = 48;
     constexpr int kRidgeBlurMargin = 48;
+
+    // The display's corners (radius-lg).
+    constexpr float kCornerRadius = 14.0f;
+
+    struct Geometry
+    {
+        float ridgeHeight, ridgeScale, glowDiameter, glowFromBottom;
+    };
+
+    /** The sketch's numbers: ridge min(120, h * 0.3), its blur and the
+        glow's centre by that ratio, the glow's diameter by w / 1080. */
+    Geometry geometryFor (juce::Rectangle<int> bounds) noexcept
+    {
+        const auto ridge = juce::jmin (kRidgeHeight, (float) bounds.getHeight() * 0.3f);
+        const auto scale = ridge / kRidgeHeight;
+        return { ridge, scale, kGlowDiameter * (float) bounds.getWidth() / kDesignedWidth, kGlowCentreFromBottom * scale };
+    }
 
     //==========================================================================
     // OKLab mixing: the palette came from oklch() values in the design
@@ -76,16 +96,21 @@ namespace
     //==========================================================================
     // FILTER at 50% (its neutral, the sound design's own brightness) is the
     // panel exactly as designed; 0% is night falling, 100% golden hour.
-    // Kept dark enough at every point that the wordmark, the preset pills and
-    // the footer - drawn straight on the panel - stay readable.
+    // Kept dark enough at every point that the recalled preset's title,
+    // drawn straight on the sky, stays readable (SkyDisplay).
     struct Stops { juce::Colour top, upper, lower, bottom, glow; };
 
+    // The sky as designed (the 2026-09 handoff's colours, picked off a
+    // sunset-over-mountains photo and darkened at the top for text).
     const Stops& designedStops()
     {
-        static const Stops s { Palette::panelGradientTop, Palette::panelGradientUpper,
-                               Palette::panelGradientLower, Palette::panelGradientBottom, Palette::glow };
+        static const Stops s { juce::Colour (0xff4a4f43), juce::Colour (0xff8a6a3c),
+                               juce::Colour (0xffb35a24), juce::Colour (0xffcf4a1c), juce::Colour (0x38f5b464) };
         return s;
     }
+
+    // The ridge's own dark, before REVERB lifts it toward the air.
+    const juce::Colour skyline { 0xff10141b };
 
     const Stops& nightStops()
     {
@@ -238,7 +263,8 @@ HorizonScene::Change HorizonScene::advance (float dt) noexcept
 
 juce::Rectangle<int> HorizonScene::lowerRegion (juce::Rectangle<int> bounds) noexcept
 {
-    const auto top = bounds.getBottom() - (int) (kGlowCentreFromBottom + kGlowDiameter * 0.5f) - 2;
+    const auto geometry = geometryFor (bounds);
+    const auto top = bounds.getBottom() - (int) (geometry.glowFromBottom + geometry.glowDiameter * 0.5f) - 2;
     return bounds.withTop (juce::jmax (bounds.getY(), top));
 }
 
@@ -249,11 +275,6 @@ juce::ColourGradient HorizonScene::skyGradient (float top, float bottom) const
     grad.addColour (0.55, p.upper);
     grad.addColour (0.82, p.lower);
     return grad;
-}
-
-juce::Colour HorizonScene::skyColourAt (float proportionDown) const
-{
-    return skyGradient (0.0f, 1.0f).getColourAtPosition (juce::jlimit (0.0, 1.0, (double) proportionDown));
 }
 
 void HorizonScene::paint (juce::Graphics& g, juce::Rectangle<float> bounds)
@@ -268,7 +289,8 @@ void HorizonScene::paint (juce::Graphics& g, juce::Rectangle<float> bounds)
 
     if (cache.isNull() || cache.getWidth() != pixelWidth || cache.getHeight() != pixelHeight)
     {
-        if (ridgeBounds.getWidth() != area.getWidth() + 2 * kRidgeSideMargin)
+        if (ridgeBounds.getWidth() != area.getWidth() + 2 * kRidgeSideMargin
+            || ! juce::approximatelyEqual (ridgeHeight, geometryFor (area).ridgeHeight))
             ridgeMasks.clear();
 
         cache = juce::Image (juce::Image::ARGB, pixelWidth, pixelHeight, true);
@@ -293,11 +315,11 @@ void HorizonScene::renderCache (juce::Rectangle<int> bounds, juce::Rectangle<int
                                                             .getIntersection (cache.getBounds());
     const auto r = bounds.toFloat();
     const auto p = paletteAt (timeOfDay.value);
+    const auto geometry = geometryFor (bounds);
 
-    // --- Sky: vertical only, the same across any row (PresetBar relies on
-    // that for its fade colour, see skyColourAt()) - so it is filled a row
-    // at a time, one colour per row, the same colours a gradient fill gives.
-    // CoreGraphics' own gradient fill took 8.8 ms for the window at 2x.
+    // --- Sky: vertical only, the same across any row - so it is filled a
+    // row at a time, one colour per row, the same colours a gradient fill
+    // gives. CoreGraphics' own gradient fill took 8.8 ms for the window at 2x.
     {
         const auto grad = skyGradient (0.0f, 1.0f);
         const juce::Image::BitmapData data (cache, pixelRegion.getX(), pixelRegion.getY(),
@@ -319,19 +341,20 @@ void HorizonScene::renderCache (juce::Rectangle<int> bounds, juce::Rectangle<int
 
     // --- The low glow, drawn before the ridge so the mountains read as a
     // dark silhouette cut into it. WIDTH stretches it sideways; 40% (the
-    // default) is the designed 640 px.
+    // default) is the designed width.
     {
         const auto glow = p.glow.withMultipliedAlpha (glowLevel.value);
-        const juce::Point<float> centre (r.getCentreX(), r.getBottom() - kGlowCentreFromBottom);
+        const juce::Point<float> centre (r.getCentreX(), r.getBottom() - geometry.glowFromBottom);
         const auto stretch = 0.45f + 1.4f * spread.value;   // a narrow spot (mono) to a band across the horizon
+        const auto diameter = geometry.glowDiameter;
 
         juce::ColourGradient radial (glow, centre.x, centre.y,
-                                     glow.withAlpha (0.0f), centre.x, centre.y - kGlowDiameter * 0.5f, true);
+                                     glow.withAlpha (0.0f), centre.x, centre.y - diameter * 0.5f, true);
 
         juce::Graphics::ScopedSaveState save (g);
         g.addTransform (juce::AffineTransform::scale (stretch, 1.0f, centre.x, centre.y));
         g.setGradientFill (radial);
-        g.fillEllipse (juce::Rectangle<float> (kGlowDiameter, kGlowDiameter).withCentre (centre));
+        g.fillEllipse (juce::Rectangle<float> (diameter, diameter).withCentre (centre));
     }
 
     // --- The ridge: soft dark waves, blurred more as REVERB rises and
@@ -339,20 +362,26 @@ void HorizonScene::renderCache (juce::Rectangle<int> bounds, juce::Rectangle<int
     if (ridgeMasks.empty())
         buildRidgeMasks (bounds);
 
-    blendRidgeMask (ridgeSigma (haze.value));
+    blendRidgeMask (ridgeSigma (haze.value) * ridgeScale);
 
     const auto lift = 0.32f * juce::jmax (0.0f, (haze.value - 0.2f) / 0.8f);
-    g.setColour (mixOklab (Palette::skyline.withAlpha (1.0f), p.lower, lift));
+    g.setColour (mixOklab (skyline, p.lower, lift));
     g.drawImage (ridgeMask, ridgeBounds.toFloat(), juce::RectanglePlacement::stretchToFit, true);
 
-    // --- The border, along the window's edge. The panel fills the window
-    // edge to edge: a host's plugin window is rectangular, and the rounded
-    // corners the design had (on a dark web page) left four unpainted
-    // corners for the host's own background to show through.
-    // Half a pixel wide: the design's 1 px stroke sat centred on the
-    // panel's edge, so only its inner half ever showed.
-    g.setColour (Palette::panelBorder);
-    g.drawRect (r, 0.5f);
+    // --- The display's frame: the ground outside its rounded corners, then
+    // the 1 px `line` border, so the cache is the whole display and drawing
+    // it needs no clip.
+    {
+        juce::Path outside;
+        outside.addRectangle (r);
+        outside.addRoundedRectangle (r, kCornerRadius);
+        outside.setUsingNonZeroWinding (false);
+        g.setColour (Tokens::ground);
+        g.fillPath (outside);
+
+        g.setColour (Tokens::line);
+        g.drawRoundedRectangle (r.reduced (0.5f), kCornerRadius - 0.5f, 1.0f);
+    }
 }
 
 void HorizonScene::buildRidgeMasks (juce::Rectangle<int> bounds)
@@ -360,16 +389,20 @@ void HorizonScene::buildRidgeMasks (juce::Rectangle<int> bounds)
     // Masks are built at half resolution: after even the lightest blur
     // there is no detail a full-resolution mask would add, and it makes the
     // four blurs (once per editor) four times cheaper.
+    const auto geometry = geometryFor (bounds);
+    ridgeHeight = geometry.ridgeHeight;
+    ridgeScale = geometry.ridgeScale;
+
     const auto width = bounds.getWidth() + 2 * kRidgeSideMargin;
-    const auto height = (int) kRidgeHeight + 2 * kRidgeBlurMargin;
+    const auto height = juce::roundToInt (ridgeHeight) + 2 * kRidgeBlurMargin;
 
     ridgeBounds = { bounds.getX() - kRidgeSideMargin,
-                    bounds.getBottom() - (int) kRidgeHeight - kRidgeBlurMargin, width, height };
+                    bounds.getBottom() - juce::roundToInt (ridgeHeight) - kRidgeBlurMargin, width, height };
     maskWidth = (width + 1) / 2;
     maskHeight = (height + 1) / 2;
 
     // The ridge outline - the same points the design always used, as
-    // percentages of the visible width and of the 120 px ridge height - is
+    // percentages of the visible width and of the ridge height - is
     // solid down past the bottom margin, so the blur feathers inside the
     // mask and the true bottom edge stays opaque. It runs flat out into the
     // side margins for the same reason.
@@ -389,7 +422,7 @@ void HorizonScene::buildRidgeMasks (juce::Rectangle<int> bounds)
         const auto pointAt = [&] (const float* pct)
         {
             return juce::Point<float> ((float) kRidgeSideMargin + pct[0] * 0.01f * visibleWidth,
-                                       top + pct[1] * 0.01f * kRidgeHeight);
+                                       top + pct[1] * 0.01f * ridgeHeight);
         };
 
         juce::Path ridge;
@@ -418,8 +451,9 @@ void HorizonScene::buildRidgeMasks (juce::Rectangle<int> bounds)
 
     ridgeMasks.clear();
 
-    for (auto sigma : { 9.0f, 14.0f, 21.0f, 30.0f })
+    for (auto designedSigma : { 9.0f, 14.0f, 21.0f, 30.0f })
     {
+        const auto sigma = designedSigma * ridgeScale;
         RidgeMask mask { sigma, coverage };
         gaussianBlur (mask.coverage, maskWidth, maskHeight, sigma * 0.5f); // half resolution
         ridgeMasks.push_back (std::move (mask));

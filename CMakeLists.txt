@@ -129,15 +129,19 @@ target_sources(HorizonPad PRIVATE
     Source/presets/UserPresetStore.cpp
 
     Source/gui/HorizonLookAndFeel.cpp
+    Source/gui/Buttons.cpp
     Source/gui/HorizonScene.cpp
+    Source/gui/SkyDisplay.cpp
     Source/gui/AnimatedKnob.cpp
-    Source/gui/TitleBanner.cpp
-    Source/gui/PresetBar.cpp
-    Source/gui/PadKnob.cpp
-    Source/gui/MacrosPanel.cpp
+    Source/gui/KnobColumn.cpp
     Source/gui/WheelSlider.cpp
     Source/gui/OutputMeter.cpp
-    Source/gui/FooterBar.cpp
+    Source/gui/ControlStrip.cpp
+    Source/gui/PluginHeader.cpp
+    Source/gui/HeaderMenu.cpp
+    Source/gui/PresetDrawer.cpp
+    Source/gui/SavePresetCard.cpp
+    Source/gui/ReadoutBubble.cpp
     Source/gui/AboutPanel.cpp)
 
 target_include_directories(HorizonPad PRIVATE Source "${CMAKE_CURRENT_BINARY_DIR}/generated")
@@ -159,6 +163,22 @@ juce_add_binary_data(HorizonPadDocsData
     NAMESPACE   DocsData
     SOURCES     LICENSE THIRD_PARTY_NOTICES.md)
 set_target_properties(HorizonPadDocsData PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
+# The editor's type and marks (editor F, the Oberli Audio design system): Rubik's
+# five static weights as Google Fonts serves them, unmodified (SIL OFL 1.1,
+# LICENSES/OFL-1.1.txt and THIRD_PARTY_NOTICES.md), and the Logo group's two SVGs,
+# drawn as vectors.
+juce_add_binary_data(HorizonPadUiData
+    HEADER_NAME UiData.h
+    NAMESPACE   UiData
+    SOURCES     assets/fonts/Rubik-Regular.ttf
+                assets/fonts/Rubik-Medium.ttf
+                assets/fonts/Rubik-SemiBold.ttf
+                assets/fonts/Rubik-Bold.ttf
+                assets/fonts/Rubik-ExtraBold.ttf
+                assets/logo/oberli-bone.svg
+                assets/logo/oberli-audio-charcoal.svg)
+set_target_properties(HorizonPadUiData PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
 target_compile_definitions(HorizonPad PUBLIC
     JUCE_WEB_BROWSER=0
@@ -194,6 +214,7 @@ target_link_libraries(HorizonPad
     PRIVATE
         HorizonPadPresetData
         HorizonPadDocsData
+        HorizonPadUiData
         juce::juce_audio_utils
         juce::juce_dsp
     PUBLIC
@@ -471,6 +492,7 @@ else()
         newer_state_loads_what_it_understands
         larger_block_than_prepared
         output_dc_and_knee
+        limit_led_only_past_knee
         about_copy_is_fourteen_lines
         preset_file_round_trip
         previous_brand_presets_carried_over)

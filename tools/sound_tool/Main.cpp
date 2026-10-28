@@ -1631,6 +1631,9 @@ static int runTool (const juce::StringArray& arguments)
         blockStartSec.reserve (blockMicros.capacity());
     }
 
+    // The editor's LIMIT LED reads isLimiting() once per frame; here, once per block.
+    int blocksRendered = 0, blocksLimiting = 0;
+
     auto renderAll = [&]
     {
     int position = 0;
@@ -1702,6 +1705,9 @@ static int runTool (const juce::StringArray& arguments)
         {
             processBlockRealtime (processor, block, midi);
         }
+
+        ++blocksRendered;
+        blocksLimiting += processor.isLimiting() ? 1 : 0;
 
         position += blockLen;
     }
@@ -1947,6 +1953,8 @@ static int runTool (const juce::StringArray& arguments)
         auto* levels = new juce::DynamicObject();
         levels->setProperty ("peak", peak);
         levels->setProperty ("peakDb", peak > 0.0 ? 20.0 * std::log10 (peak) : -300.0);
+        levels->setProperty ("blocks", blocksRendered);
+        levels->setProperty ("limitingBlocks", blocksLimiting);   // blocks after which isLimiting() was true
         levels->setProperty ("rms", rms);
         levels->setProperty ("rmsDb", rms > 0.0 ? 20.0 * std::log10 (rms) : -300.0);
         levels->setProperty ("dcOffsetL", dcL);
