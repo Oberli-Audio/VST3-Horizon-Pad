@@ -50,7 +50,7 @@ MacrosPanel (KnobColumn), FooterBar (menu and About; the tagline on About).
 | `ctest --test-dir build-release --output-on-failure` | 46 of 46 passed (serial; the two new tests and the two validators included). One earlier run with `-j 4` failed `harness_contract_fast` (block timing under load); it passes alone and serially. |
 | `python3 tools/validate/validate.py --profile quick` | PASS on the final build: build, ctest 44/44, Steinberg validator 47 passed (SDK 3.8.1), pluginval strictness 5 (editor tests included). |
 | Brand sheet and CLAUDE.md | Rewritten from the Oberli tokens; CLAUDE.md's GUI section describes editor F; DEVELOPING.md and the README's feedback line follow. |
-| No grade 3 or 4 findings | None open. Open grade 1-2 below. |
+| No grade 3 or 4 findings | None open; the open findings below are all grade 1. |
 
 ### The processor changes, meter only (owner 2026-10-28)
 
@@ -89,11 +89,14 @@ Every value, the version and the menu's percentages use it, so no fixed-width ce
 
 | Grade | Where | Problem | Rule / evidence | Fix |
 |---|---|---|---|---|
-| 2 | Header: A/B group and preset pill | `line-control` outline on `surface-raised` is 2.79:1 (3.02:1 on ground) | WCAG 1.4.11, 3:1 for a control's boundary; letters, arrows and the selected fill still identify them | A design-system decision: a `line-control` a step lighter on raised surfaces (#716B62 gives 3.01:1) |
 | 1 | Knobs with keyboard focus | The focus ring (3 px off the cap, the card's geometry) covers the inner half of the value arc | Knob card; render `--knob-sheet` | Keep (pointer and value still show it), or move the ring outside the track in the system |
 | 1 | Reopening the editor | Resident memory 45 → 66 MB over the first four opens, then flat (+1 MB from round 15 to 45, +0.03 MB over the last five of twenty) | `HorizonPadGuiSnapshot --reopen=20/45`; the old editor read 47 MB flat | Bounded warm-up (text and glyph caches; not the fonts - holding them made no difference). Re-check U.7 in a DAW. |
 | 1 | Drawer, Yours | × deletes a preset in one click | Recoverable: it goes to the Trash (`moveToTrash`), and the tooltip says so | Undo in the drawer if friends ask |
 | 1 | `snapshot_contrast.py` at 2x | Reads antialiased glyph edges as background at night ("#6B6C72" on a #2C2D40 sky) | Same symptom as noted on 2026-10-22 | A skill-tool fix: skip rows within one glyph-edge of the text |
+
+Closed after the review: the header's A/B group and preset pill outlines read 2.79:1 on
+`surface-raised` (grade 2). The owner moved `line-control` (Charcoal) to #716B62 on 2026-10-28,
+in the design system and the plugin: 3.01:1 on the header, 3.26:1 on ground.
 
 ## Still owed (owner side)
 

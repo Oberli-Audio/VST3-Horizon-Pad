@@ -33,7 +33,7 @@ outlines and graphical parts 3:1).
 | `surface-panel` | #2A2826 | knob cap, wheel thumb, hovered and current rows | - |
 | `line` | #3A3836 | hairlines: header bottom, group dividers, the sky's border, meter well border | decorative only |
 | `line-strong` | #4A4844 | unfilled knob and wheel track | paired with the accent arc |
-| `line-control` | #6B665D | outline of an operable control: knob cap ring, A/B group, preset pill, menu and drawer edges, LIMIT idle | 3.02:1 on ground, **2.79:1 on surface-raised** (open, see below) |
+| `line-control` | #716B62 | outline of an operable control: knob cap ring, A/B group, preset pill, menu and drawer edges, LIMIT idle | 3.26:1 on ground, 3.01:1 on surface-raised, 3.43:1 on surface-sunken (#6B665D until 2026-10-28: 2.79:1 on the header) |
 | `ink` (bone) | #EDE8DF | values, names, the focus ring, the title on the sky | 14.1:1 on ground, 13.0:1 on raised |
 | `ink-muted` | #BDB6AA | labels, section titles, B, drawer categories | 8.6:1 on ground, 7.9:1 on raised |
 | `ink-subtle` | #9C968B | version, menu trailing value, placeholders, LIMIT idle | 5.4:1 on raised, 5.0:1 on panel, 5.9:1 on ground |
@@ -151,12 +151,11 @@ which JUCE takes as the point height.
 | Same at 2x | golden hour 4.64:1 with `--tol 200`; at 2x the script still reads antialiased glyph edges as background at night (a "background" of #6B6C72 where the sky is #2C2D40) |
 | `--metrics`, chrome (the sky masked in `ground`) | glow 0.3-0.6 %, halation 0 %, palette 2 colours, darkest surface ground: ok |
 | `--metrics`, whole render | palette 18-23 colours and, on golden skies, 4.6 % saturated pixels: the Scene's gradient (round 11), not the chrome |
-| Token pairs above | every text pair 4.5:1 or more; `line-control` on `surface-raised` 2.79:1 (open) |
+| Token pairs above | every text pair 4.5:1 or more; every control outline 3:1 or more |
 
-Open, for the design system: `line-control` reaches 3:1 on `ground` but 2.79:1 on
-`surface-raised`, where the header's A/B group and preset pill sit. Their letters, arrows and the
-selected fill identify them; a `line-control` a step lighter for raised surfaces (#716B62 gives
-3.0:1) would close it. Grade 2.
+`line-control` (Charcoal) moved from #6B665D to #716B62 on 2026-10-28 (owner's choice, in the
+design system's `tokens.json` too): the old value reached 3:1 on `ground` but 2.79:1 on
+`surface-raised`, where the header's A/B group and preset pill sit.
 
 ## Check before a release
 - [ ] Token pairs recomputed when a token changes.

@@ -19,7 +19,8 @@ namespace Tokens
     const juce::Colour surfacePanel   { 0xff2a2826 };   // knob cap, hovered and current rows
     const juce::Colour line           { 0xff3a3836 };   // hairlines; never the only cue for a control
     const juce::Colour lineStrong     { 0xff4a4844 };   // unfilled knob and slider track
-    const juce::Colour lineControl    { 0xff6b665d };   // outline of an operable control, 3.0:1 on ground
+    const juce::Colour lineControl    { 0xff716b62 };   // outline of an operable control: 3.0:1 on surface-raised, 3.3:1 on ground
+                                                        // (#6B665D until 2026-10-28, 2.79:1 on the header; owner's choice)
     const juce::Colour ink            { 0xffede8df };   // bone: text, values, focus ring
     const juce::Colour inkMuted       { 0xffbdb6aa };   // labels, section titles
     const juce::Colour inkSubtle      { 0xff9c968b };   // version, captions
