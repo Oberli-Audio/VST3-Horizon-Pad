@@ -2,7 +2,7 @@
 
 Rewritten 2026-10-28 for editor F from the Oberli Audio design system
 (https://claude.ai/artifact/GK9BTMQuZhZz8pxvhHsytp, `project/tokens.json` v1 and the
-component cards, rounds 1-11), in the shape of ux-ui-design-bob's `brand-sheet-template.md`.
+component cards, rounds 1-11), in the shape of plugin-ui-bob's filled brand sheet (`oberli-audio-brand.md`; the design system wins).
 The design system is the source; this sheet is what Horizon Pad builds from it and what was
 measured. In code: `Source/gui/HorizonLookAndFeel.h` (`Tokens`, `type`, `icons`, `logo`,
 `drawKnob`) and `Source/gui/HorizonScene.cpp` (the sky's palettes).
@@ -147,8 +147,7 @@ which JUCE takes as the point height.
 
 | Where | Result |
 |---|---|
-| Preset name and description on the sky, Talwind (longest description), FILTER 0 / 12 / 50 / 100 %, WIDTH 40 and 100 %, REVERB 100 %, 1x, `--tol 120` | worst 4.58:1 (description, FILTER/WIDTH/REVERB 100 %); name 5.28:1 or more; all 16 boxes AA |
-| Same at 2x | golden hour 4.64:1 with `--tol 200`; at 2x the script still reads antialiased glyph edges as background at night (a "background" of #6B6C72 where the sky is #2C2D40) |
+| Preset name and description on the sky, Talwind (longest description), FILTER 0 / 12 / 50 / 100 %, WIDTH 40 and 100 %, REVERB 100 %, at 1x and 2x (plugin-ui-bob 1.0.1's script, default tolerance, 2026-10-29) | worst 4.58:1 at 1x and 4.64:1 at 2x (description, FILTER and WIDTH 100 %); name 5.56:1 or more; all 32 boxes AA |
 | `--metrics`, chrome (the sky masked in `ground`) | glow 0.3-0.6 %, halation 0 %, palette 2 colours, darkest surface ground: ok |
 | `--metrics`, whole render | palette 18-23 colours and, on golden skies, 4.6 % saturated pixels: the Scene's gradient (round 11), not the chrome |
 | Token pairs above | every text pair 4.5:1 or more; every control outline 3:1 or more |

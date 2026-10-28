@@ -1,7 +1,7 @@
 # Status - Horizon Pad 0.1.0 (2026-10-29)
 Tier P, track I (also owns C: MIDI, pedal, wheels; E: shimmer, ensemble, reverb; F.5-F.6 mix and
-output), at gate G6, hosts. Recipe D.8.10 (release) next. sound-design-bob 5.0.0, plugin-ui-bob
-1.0.0, ship-bob 1.0.0; the scripts under `scripts/` are byte copies of those kits (2026-10-29).
+output), at gate G6, hosts. Recipe D.8.10 (release) next. sound-design-bob 5.0.1, plugin-ui-bob
+1.0.1, ship-bob 1.0.0; the scripts under `scripts/` are byte copies of those kits (2026-10-29).
 
 This page replaced `docs/gate-status.md`, `docs/exceptions.md` and `docs/handoff.md` on
 2026-10-29 (sound-design-bob D.9); their full records are in git at `8a14117`

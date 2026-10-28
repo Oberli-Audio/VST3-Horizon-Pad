@@ -15,7 +15,7 @@ namespace horizon::ui
     what Horizon Pad is, its own tagline (owner 2026-10-28: "Wäg zom Läbe -
     a life of joy" moved here from the old footer), Copy details and
     Licences, and the trademark sentence. Right: the DETAILS card - the
-    diagnostics block (ux-ui-design-bob audio-plugins.md 14, ship-bob
+    diagnostics block (plugin-ui-bob audio-plugins.md 14, ship-bob
     feedback-loop.md 3), on screen so a screenshot carries it - or, after
     Licences, the bundled LICENSE and THIRD_PARTY_NOTICES.md (compiled in,
     never a URL).

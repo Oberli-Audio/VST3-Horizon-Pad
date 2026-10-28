@@ -34,7 +34,7 @@ namespace horizon::ui
     picture: the corners outside the curve are the editor's ground.
 
     Text on the sky (SkyDisplay's recalled preset title) is measured over
-    the whole FILTER range with ux-ui-design-bob snapshot_contrast.py; the
+    the whole FILTER range with plugin-ui-bob snapshot_contrast.py; the
     numbers are in SkyDisplay.h. Re-measure after a palette change.
 
     Rendered into an image at the screen's own pixel density and

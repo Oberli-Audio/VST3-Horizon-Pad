@@ -1087,7 +1087,7 @@ def test_output_meter_per_channel():
 
 def test_about_copy_is_fourteen_lines():
     """The About box copies the fourteen diagnostics fields and nothing else
-    (ux-ui-design-bob audio-plugins.md 14, ship-bob feedback-loop.md 3): no user name, no paths."""
+    (plugin-ui-bob audio-plugins.md 14, ship-bob feedback-loop.md 3): no user name, no paths."""
     r = subprocess.run([TOOL, "--diagnostics", "--sample-rate=44100", "--block=256"], capture_output=True, encoding="utf-8")
     if r.returncode != 0:
         raise Fail(f"--diagnostics failed (exit {r.returncode}): {r.stderr[:200]}")

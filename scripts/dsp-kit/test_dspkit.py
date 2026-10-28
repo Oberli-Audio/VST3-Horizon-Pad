@@ -4,6 +4,7 @@ analytic result before any product trusts it (rule 17, F.13.11).
 
     python3 test_dspkit.py          # unittest, ~20 s
 """
+import json
 import math
 import unittest
 import os
@@ -299,6 +300,41 @@ class PresetAndPerfTools(unittest.TestCase):
         here = os.path.dirname(os.path.abspath(__file__))
         r = subprocess.run([sys.executable, os.path.join(here, "perf.py"), "selftest"], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
+
+
+class ValidatePluginSanitizer(unittest.TestCase):
+    """Under --sanitizer, a pluginval that cannot load the runtime fails the step loudly
+    instead of falling back to the signed download (D.1.6)."""
+
+    def run_pluginval(self, d, pluginval):
+        env = {k: v for k, v in os.environ.items() if k != "PLUGINVAL"}
+        if pluginval is not None:
+            env["PLUGINVAL"] = str(pluginval)
+        here = os.path.dirname(os.path.abspath(__file__))
+        out = Path(d) / ("logs-%d" % len(os.listdir(d)))
+        r = subprocess.run([sys.executable, os.path.join(here, "validate_plugin.py"), "--plugin", "/nonexistent.vst3",
+                            "--only", "pluginval", "--sanitizer", "asan", "--out", str(out)],
+                           capture_output=True, text=True, env=env, cwd=d)
+        step = json.loads((out / "summary.json").read_text())["steps"][0]
+        return r.returncode, step["status"], step["detail"]
+
+    def test_unset_missing_or_uninstrumented_pluginval_fails(self):
+        with tempfile.TemporaryDirectory() as d:
+            plain = Path(d) / "pluginval-plain"
+            plain.write_bytes(b"\xcf\xfa\xed\xfe _main _juce_init")
+            for pv, says in [(None, "needs PLUGINVAL"), ("~/pluginval-asan/pluginval", "use $HOME"),
+                             (Path(d) / "missing", "is not a file"), (plain, "not built with asan")]:
+                code, status, detail = self.run_pluginval(d, pv)
+                self.assertEqual((code, status), (1, "FAIL"), detail)
+                self.assertIn(says, detail)
+
+    def test_instrumented_pluginval_is_accepted(self):
+        with tempfile.TemporaryDirectory() as d:
+            asan = Path(d) / "pluginval-asan"
+            asan.write_bytes(b"\xcf\xfa\xed\xfe _main ___asan_init ___asan_report_load8")
+            code, status, detail = self.run_pluginval(d, asan)      # gets past pluginval, stops at the bundle
+            self.assertEqual((code, status), (77, "SKIP"), detail)
+            self.assertIn("no plugin bundle", detail)
 
 
 if __name__ == "__main__":

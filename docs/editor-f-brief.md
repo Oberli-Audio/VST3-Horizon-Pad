@@ -129,7 +129,7 @@ big it draws:
   200 % for Lagerfeuer, Mitternachtsblau, Goldstaub, a FILTER drag, the open menu, the open
   drawer and About, and they match the sketches.
 - `snapshot_contrast.py` passes on all text over the sky (4.5:1) and `--metrics` on the renders;
-  the code checklist in ux-ui-design-bob `audio-plugins.md` 15 is answered line by line
+  the code checklist in `audio-plugins.md` 15 (plugin-ui-bob since 2026-10-27) is answered line by line
   (focus, accessible names, double-click reset, drag sensitivity, host menu, scale, modified
   mark, units).
 - `ctest --test-dir build-release --output-on-failure` and

@@ -156,7 +156,7 @@ juce_add_binary_data(HorizonPadPresetData
     SOURCES     presets.csv ${HORIZON_FACTORY_PRESETS})
 set_target_properties(HorizonPadPresetData PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
 
-# The licence texts the About box shows (ux-ui-design-bob audio-plugins.md 14):
+# The licence texts the About box shows (plugin-ui-bob audio-plugins.md 14):
 # compiled in, so they open from the plugin itself, never from a URL.
 juce_add_binary_data(HorizonPadDocsData
     HEADER_NAME DocsData.h

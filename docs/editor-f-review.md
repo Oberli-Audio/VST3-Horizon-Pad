@@ -44,7 +44,7 @@ MacrosPanel (KnobColumn), FooterBar (menu and About; the tagline on About).
 | Item | Result |
 |---|---|
 | Renders at 100 / 150 / 200 % that match the sketches | Rendered with `HorizonPadGuiSnapshot` for Lagerfeuer, Mitternachtsblau, Goldstaub, a FILTER drag (FILTER 64 %, edited), the menu with its GUI scale submenu, the drawer, About and its licences, the Save card, and LIMIT lit. Each matches its sketch (SkyDisplay, FNight, FGolden, FTurning, FMenu, FDrawer, About E) in layout, sizes and colours; the differences are the owner's decisions and the deviations listed in the brand sheet. |
-| `snapshot_contrast.py` on all text over the sky | Pass at 1x: Talwind (the longest description) at FILTER 0 / 12 / 50 / 100 %, WIDTH 40 and 100 %, REVERB 100 %: worst 4.58:1 (description at the brightest corner), name 5.28:1 or more, every box AA (`--tol 120`; the default 60 counts antialiased glyph edges as background, a known limit of the script). At 2x the golden-hour case passes at 4.64:1 (`--tol 200`). Without the shadow it was 4.45:1 at that corner. |
+| `snapshot_contrast.py` on all text over the sky | Pass at 1x: Talwind (the longest description) at FILTER 0 / 12 / 50 / 100 %, WIDTH 40 and 100 %, REVERB 100 %: worst 4.58:1 (description at the brightest corner), name 5.28:1 or more, every box AA (`--tol 120`; the default 60 counted antialiased glyph edges as background). At 2x the golden-hour case passes at 4.64:1 (`--tol 200`). Without the shadow it was 4.45:1 at that corner. Re-measured 2026-10-29 with plugin-ui-bob 1.0.1's fixed script at its default tolerance: all 32 boxes AA at 1x and 2x, worst 4.58:1 and 4.64:1. |
 | `--metrics` on the renders | Chrome (the sky masked): glow 0.3-0.6 %, halation 0 %, 2 palette colours, ground #1C1B19: pass. Whole render: palette 18-23 colours and 4.6 % saturated pixels on golden skies, all from the Scene's gradient, which round 11 allows. |
 | `audio-plugins.md` 15 code checklist | Below, line by line. |
 | `ctest --test-dir build-release --output-on-failure` | 46 of 46 passed (serial; the two new tests and the two validators included). One earlier run with `-j 4` failed `harness_contract_fast` (block timing under load); it passes alone and serially. |
@@ -72,7 +72,7 @@ Rubik's default figures are proportional (Regular: 0 is 635 units wide, 1 is 428
 has a `tnum` feature, and JUCE 8.0.16 switches it on with `FontOptions::withFeatureEnabled`.
 Every value, the version and the menu's percentages use it, so no fixed-width cells were needed.
 
-## Code checklist (ux-ui-design-bob `audio-plugins.md` 15)
+## Code checklist (plugin-ui-bob `audio-plugins.md` 15; ux-ui-design-bob's until 2026-10-27)
 
 | Check | Answer |
 |---|---|
@@ -92,9 +92,10 @@ Every value, the version and the menu's percentages use it, so no fixed-width ce
 | 1 | Knobs with keyboard focus | The focus ring (3 px off the cap, the card's geometry) covers the inner half of the value arc | Knob card; render `--knob-sheet` | Keep (pointer and value still show it), or move the ring outside the track in the system |
 | 1 | Reopening the editor | Resident memory 45 → 66 MB over the first four opens, then flat (+1 MB from round 15 to 45, +0.03 MB over the last five of twenty) | `HorizonPadGuiSnapshot --reopen=20/45`; the old editor read 47 MB flat | Bounded warm-up (text and glyph caches; not the fonts - holding them made no difference). Re-check U.7 in a DAW. |
 | 1 | Drawer, Yours | × deletes a preset in one click | Recoverable: it goes to the Trash (`moveToTrash`), and the tooltip says so | Undo in the drawer if friends ask |
-| 1 | `snapshot_contrast.py` at 2x | Reads antialiased glyph edges as background at night ("#6B6C72" on a #2C2D40 sky) | Same symptom as noted on 2026-10-22 | A skill-tool fix: skip rows within one glyph-edge of the text |
 
-Closed after the review: the header's A/B group and preset pill outlines read 2.79:1 on
+Closed after the review: `snapshot_contrast.py` read antialiased glyph edges as background at 2x
+(grade 1); plugin-ui-bob 1.0.1 fixed the script (2026-10-29) and the re-measure passes at its default
+tolerance. The header's A/B group and preset pill outlines read 2.79:1 on
 `surface-raised` (grade 2). The owner moved `line-control` (Charcoal) to #716B62 on 2026-10-28,
 in the design system and the plugin: 3.01:1 on the header, 3.26:1 on ground.
 

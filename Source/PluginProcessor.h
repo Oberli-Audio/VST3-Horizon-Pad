@@ -150,7 +150,7 @@ public:
     bool isActivePresetModified() const;
 
     /** The editor's size as a factor of its designed 1160 x 548 (0.75-2.0):
-        a machine-local preference, not part of the session (ux-ui-design-bob
+        a machine-local preference, not part of the session (plugin-ui-bob
         audio-plugins.md 9) - every instance opens at the size last chosen on
         this machine (EditorSettings.xml in PresetFile::settingsFolder()).
         Message thread. */

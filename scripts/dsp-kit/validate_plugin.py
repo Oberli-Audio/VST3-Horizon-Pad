@@ -34,6 +34,8 @@ Profiles - pick by tier and occasion (playbook D.3.6):
 
 pluginval is looked for in $PLUGINVAL, on PATH, in /Applications/pluginval.app,
 then in build-validators/; --fetch-pluginval downloads the pinned release there.
+With --sanitizer only $PLUGINVAL counts, and it must be built with that sanitizer:
+unset, not a file or uninstrumented fails the step (no fallback, no download).
 The Steinberg validator is built from the pinned VST3 SDK commit into
 build-validators/ on first use (without full Xcode, -DXCODE_VERSION is passed).
 It is never built with a sanitizer: on macOS, --sanitizer inserts the runtime the
@@ -86,6 +88,10 @@ class Unavailable(Exception):
     """A step cannot run here (missing tool or bundle) - reported as skipped."""
 
 
+class Refused(Exception):
+    """A step was asked for with a tool that cannot give a valid verdict - reported as failed."""
+
+
 def run(cmd, log, cwd=None, env=None, timeout=None):
     """Run cmd, tee everything to log, return (exit code, output)."""
     t0 = time.time()
@@ -116,13 +122,38 @@ def bundle_from(path):
 
 # ------------------------------------------------------------------ tools
 
-# OPEN, to fix at the next proper skill update (Horizon Pad, 2026-10-27): with --sanitizer, a
-# PLUGINVAL that is not a file - e.g. "~/..." passed as an `env` argument, where the shell does
-# not expand "~" - silently falls back to /Applications/pluginval.app, the signed download built
-# without the sanitizer. The run then dies on "ERROR: Interceptors are not working", which reads
-# like a sanitizer report against the plugin. Under --sanitizer: fail when $PLUGINVAL is set but
-# missing, and refuse a pluginval whose `otool -L` (macOS) shows no libclang_rt.<sanitizer> runtime.
-def find_pluginval(fetch):
+SANITIZER_MARKERS = {"asan": b"__asan_", "tsan": b"__tsan_"}
+
+
+def instrumented(binary, sanitizer):
+    """Whether binary was built with the sanitizer: instrumented code calls the runtime's
+    __asan_/__tsan_ entry points, imported (macOS, Windows) or linked in (Linux)."""
+    return SANITIZER_MARKERS[sanitizer] in Path(binary).read_bytes()
+
+
+def sanitized_pluginval(sanitizer, fetch):
+    """Under --sanitizer only $PLUGINVAL counts, and only a build with that sanitizer. The
+    signed download dies on "Interceptors are not working", which reads like a sanitizer
+    report against the plugin, so there is no fallback to PATH, /Applications or a download."""
+    pv = os.environ.get("PLUGINVAL")
+    if fetch:
+        raise Refused("--fetch-pluginval with --sanitizer %s: the download is built without it; "
+                      "build pluginval from source (D.1.6) and set PLUGINVAL" % sanitizer)
+    if not pv:
+        raise Refused("--sanitizer %s needs PLUGINVAL set to a pluginval built from source with %s (D.1.6)"
+                      % (sanitizer, sanitizer))
+    if not Path(pv).is_file():
+        hint = ' ("~" is not expanded inside an env argument: use $HOME)' if pv.startswith("~") else ""
+        raise Refused("PLUGINVAL=%s is not a file%s; no fallback under --sanitizer" % (pv, hint))
+    if not instrumented(pv, sanitizer):
+        raise Refused("PLUGINVAL=%s is not built with %s (no %s symbols): build it from source (D.1.6)"
+                      % (pv, sanitizer, SANITIZER_MARKERS[sanitizer].decode()))
+    return Path(pv)
+
+
+def find_pluginval(fetch, sanitizer="none"):
+    if sanitizer != "none":
+        return sanitized_pluginval(sanitizer, fetch)
     candidates = [os.environ.get("PLUGINVAL"), shutil.which("pluginval"),
                   "/Applications/pluginval.app/Contents/MacOS/pluginval"]
     local = TOOLS_DIR / ("pluginval-" + PINS["pluginval"])
@@ -272,12 +303,18 @@ def selftest():
            + "Info:  MIDI Mapping supplied for an unknown event bus\n[Succeeded]\n")
     assert wrong_midi_mappings(log) == 17, wrong_midi_mappings(log)
     assert wrong_midi_mappings("[MIDI Mapping]\nInfo:  ===MIDI Mapping ===\n[Succeeded]\n") == 0
-    print("validate_plugin selftest OK: rpath parsing, wrong MIDI mapping lines")
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        plain, asan = Path(d) / "plain", Path(d) / "asan"
+        plain.write_bytes(b"\xcf\xfa\xed\xfe _main _juce_init")
+        asan.write_bytes(b"\xcf\xfa\xed\xfe _main ___asan_init ___asan_report_load8")
+        assert not instrumented(plain, "asan") and instrumented(asan, "asan") and not instrumented(asan, "tsan")
+    print("validate_plugin selftest OK: rpath parsing, wrong MIDI mapping lines, sanitizer symbols")
     return 0
 
 
 def pluginval_cmd(a, prof, seed, repeat, randomise, logs, name):
-    pv = find_pluginval(a.fetch_pluginval)
+    pv = find_pluginval(a.fetch_pluginval, a.sanitizer)
     if not a.plugin.exists():
         raise Unavailable("no plugin bundle at %s" % a.plugin)
     # pinned to PINS["pluginval"] (1.x syntax). pluginval 2.0 (beta, 2026-10) changes this to
@@ -374,7 +411,8 @@ def main():
     ap.add_argument("--timeout-ms", type=int, default=60000, help="pluginval: max silence per test")
     ap.add_argument("--sanitizer", choices=("none", "asan", "tsan"), default="none",
                     help="the plugin and pluginval are built with this sanitizer: timeouts x10, PLUGINVAL must point at a "
-                         "from-source build (the signed download cannot load the runtime). Tier P's release gate runs "
+                         "from-source build (the signed download cannot load the runtime), anything else fails the "
+                         "pluginval step. Tier P's release gate runs "
                          "the full profile once plain and once with --sanitizer asan (D.1.6); tsan is Tier F")
     ap.add_argument("--step-timeout", type=int, default=3600, help="seconds per pluginval run")
     ap.add_argument("--out", help="log folder (default build-validation/<timestamp>)")
@@ -407,6 +445,8 @@ def main():
             status = "PASS" if ok else "FAIL"
         except Unavailable as e:
             status, detail = "SKIP", str(e)
+        except Refused as e:
+            status, detail = "FAIL", str(e)
         except subprocess.CalledProcessError as e:
             status, detail = "FAIL", "setup failed (%s): see %s" % (Path(str(e.cmd[0])).name, TOOLS_DIR / "vst3sdk-build.log")
         dt = time.time() - t0
