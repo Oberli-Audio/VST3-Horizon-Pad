@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Complete, unattended validation run for any VST3 plugin (playbook G6, D.5.7).
+"""The unattended part of the release gate (joint-plugin-workflow.md "Release gate";
+playbook G6, D.5.7) for any VST3 plugin.
 
-Generic version of Horizon Pad's tools/validate/validate.py. One command runs your
-build command, your test command, the Steinberg VST3 validator and pluginval, and an
-optional RealtimeSanitizer command - then writes every log and a JSON summary to one
-folder and exits non-zero if anything failed. Copy it into the project (CI must not
+One command runs your build command, your test command, the Steinberg VST3 validator
+and pluginval, and an optional real-time check command (RTSan or the malloc trap) -
+then writes every log and a JSON summary to one folder and exits non-zero if anything
+failed. The attended part of the gate (hosts, the friend at 64 samples, listening) stays
+in the list. Copy it into the project (CI must not
 depend on ~/.claude) together with a versions.json:
 
     {"pluginval": "v1.0.4", "vst3sdk": {"commit": "<sha>", "version": "3.8.1"}}
@@ -15,9 +17,10 @@ Profiles - pick by tier and occasion (playbook D.3.6):
           validator, pluginval strictness 5 (the host-compatibility floor)
   full    before a merge or release - Tier P's G6: DSP tests, Steinberg
           validator, pluginval strictness 10 at all six sample rates and eight
-          block sizes, with a fixed, logged seed; RTSan suite if built. The
-          release gate runs it twice: plain, and --sanitizer asan against the
-          asan build (D.1.6)
+          block sizes, with a fixed, logged seed; the real-time check if its
+          command is given. At Tier F the release gate runs it a second time
+          with --sanitizer asan against a from-source pluginval and the asan
+          build (D.1.6, tiers.md)
   soak    nightly or before a Tier F release: everything in full, plus pluginval
           strictness 10 repeated 5x in random order with a fresh seed (fuzzing
           state and parameters; the seed is logged so any failure reproduces)
@@ -361,8 +364,8 @@ def main():
     ap.add_argument("--plugin", required=True, help="the .vst3 bundle (or a path inside it)")
     ap.add_argument("--build-cmd", help="command that builds the bundle")
     ap.add_argument("--test-cmd", help="command that runs the product's tests")
-    ap.add_argument("--rtsan-cmd", help="command that runs the tests under RealtimeSanitizer")
-    ap.add_argument("--rtsan-selftest-cmd", help="command that must FAIL if RTSan is live (D.1.6)")
+    ap.add_argument("--rtsan-cmd", help="command that runs the real-time check: the harness suite under RealtimeSanitizer, or with the malloc trap (D.1.6)")
+    ap.add_argument("--rtsan-selftest-cmd", help="command that must FAIL if the real-time check is live (D.1.6)")
     ap.add_argument("--pins", help="versions.json (default: the kit's pins)")
     ap.add_argument("--no-build", action="store_true")
     ap.add_argument("--seed", default="0x48505631", help="pluginval random seed (default fixed, so runs compare)")

@@ -5,7 +5,7 @@ Companion to make_session.py: after a blind A/B pass, run this with the same two
 builds to see what actually changed behind each verdict - band balance, width
 (side/mid) per band, spectral centroid and movement, after the session's own
 -20 LUFS loudness match. Used on 2026-10-06/07 to turn the owner's preferences
-into targeted changes (docs/gate-status.md).
+into targeted changes (docs/status.md, Listening debt).
 
     python3 tools/listening/compare_items.py --baseline ../hp-v1/build/HorizonPadSoundTool \
             --candidate build-release/HorizonPadSoundTool [--prefs verdicts.json]
@@ -16,7 +16,7 @@ import sys, json, subprocess, tempfile, warnings
 from pathlib import Path
 import numpy as np
 warnings.filterwarnings("ignore")
-import os; sys.path.insert(0, os.environ.get("DSPKIT", str(Path.home()/"bob-skills/sound-design-bob/scripts/dsp-kit"))); import dspkit as K
+import os; sys.path.insert(0, os.environ.get("DSPKIT", str(Path(__file__).resolve().parents[2] / "scripts" / "dsp-kit"))); import dspkit as K
 sys.path.insert(0, "tools/listening"); import make_session as M
 import argparse
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)

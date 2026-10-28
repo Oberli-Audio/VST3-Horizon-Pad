@@ -50,7 +50,7 @@ Measured (seeded renders; commands in the session that built it):
 
 Clearing is the pad DETUNE moves least, because its ensemble adds pitch
 movement of its own. That is on the listening list in
-[`gate-status.md`](gate-status.md), along with the profile itself.
+`gate-status.md` (git `8a14117`), along with the profile itself.
 
 Full descriptor baseline after the change: `docs/baselines/descriptors-v2-macros.json`.
 

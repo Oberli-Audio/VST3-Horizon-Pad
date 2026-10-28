@@ -174,7 +174,7 @@ holds the five most different sounds in the bank. The plugin opens on **Lagerfeu
 
 All are loudness-matched to -16.9 LUFS (the bank median on the same chord
 measurement): 16 of 17 within +/-0.6 LU; Sternenzelt sits ~1.7 LU lower, an accepted
-exception confirmed by ear (EX-002 in [`docs/exceptions.md`](docs/exceptions.md)).
+exception confirmed by ear (EX-002 in [`docs/status.md`](docs/status.md), Open exceptions).
 Every preset is checked by the test suite (`all_presets_safe`) for clipping, NaN/Inf
 and peaks above 0 dBFS on an eight-note chord.
 
@@ -288,9 +288,11 @@ Run it with `--help`.
 
 ## Testing and validating
 
-The project runs at playbook **Tier P**; [`docs/gate-status.md`](docs/gate-status.md)
-is the one-page view of where each gate stands, and the artefacts sit beside it
-in [`docs/`](docs/).
+The project runs at playbook **Tier P**; [`docs/status.md`](docs/status.md)
+is the one-page view of where each gate stands (with the open exceptions, the
+listening debt, the handoff and the decisions), [`docs/failures.md`](docs/failures.md)
+lists every fixed defect with its regression test, and the gate artefacts sit beside
+them in [`docs/`](docs/).
 
 ### Test suite
 
@@ -372,7 +374,7 @@ probe.
 ### AddressSanitizer and UBSan (release gate)
 
 Before every tag the plugin runs under AddressSanitizer and UndefinedBehaviorSanitizer
-(playbook D.1.6; [`docs/exceptions.md`](docs/exceptions.md) EX-006 has the first run). The
+(playbook D.1.6; EX-006, closed 2026-10-26, in [`docs/status.md`](docs/status.md), Decisions). The
 `asan` CMake preset builds the plugin and `HorizonPadSoundTool` with
 `-fsanitize=address,undefined -fno-omit-frame-pointer` into `build-asan/` (RelWithDebInfo,
 arm64 only, no LTO).
@@ -431,9 +433,10 @@ rather than copying them, so it cannot drift from the prototype.
 
 ### Known gaps
 
-- **Three hosts, two platforms is 1 of 3.** Ableton Live on macOS is
-  confirmed. Windows Ableton and Waveform are outstanding — the last open
-  item in G6.
+- **Two hosts, two platforms (Tier P) is 1 of 2.** Ableton Live 10.1 under
+  Rosetta on the Mac is confirmed (editor F tried by the owner 2026-10-28);
+  Ableton Live on Windows is outstanding, the last open item in G6. A third
+  host, Reaper, belongs to Tier F.
 - **The CPU budget is not yet checked on its own machine.** On an Apple M3
   Pro, eight voices at every pad's full volume take 6% of the block deadline
   at p99 (64 and 128 samples, 2026-10-17); the budget is written for a
@@ -442,10 +445,11 @@ rather than copying them, so it cannot drift from the prototype.
 - **Listening items are open** - the ends of the register (C0, C7) per
   layer, and Bloom's movement since DETUNE's default went to 0%. The list
   and the blind A/B page that plays them are in
-  [`docs/gate-status.md`](docs/gate-status.md).
-- **One open exception**, accepted with written triggers: EX-002
-  (Sternenzelt sits below the loudness-matched bank). See
-  [`docs/exceptions.md`](docs/exceptions.md).
+  [`docs/status.md`](docs/status.md), Listening debt.
+- **Open exceptions**, accepted with numeric triggers: EX-002 (Sternenzelt sits
+  below the loudness-matched bank), EX-004 (block-size dependence), EX-005 (the
+  hand-written parameter layout), EX-008 (scaling through `setScaleFactor`). See
+  [`docs/status.md`](docs/status.md).
 - **Code-signing / notarization**: the macOS `.pkg` is unsigned (no Apple
   Developer ID on this project) — Gatekeeper will warn on first launch (see
   Installing below for the workaround). This needs the project owner's own
@@ -607,13 +611,13 @@ sound design/
   Horizon_Pad_VST3_Handoff.md      Control-to-GUI mapping from the original handoff
   reference-renders/               Signed-off renders: per layer + the full blend
 docs/
-  gate-status.md                   One page: where every Tier P gate stands
+  status.md                        One page: gates, listening debt, open exceptions, handoff, decisions
+  failures.md                      Every fixed defect: symptom, cause, measurement, regression test
   brief.md                         G0 sonic brief + dated amendments
   g1-algorithm.md                  G1 algorithm audit against the playbook
   g2-prototype.md                  G2 prototype artefact
   g3-measurements.md               G3 metric table
   g5-null-test.md                  G5 port-vs-prototype characterisation
-  exceptions.md                    Playbook 12.5 exception log
   preset-curation-2026-09-23.md    How the bank went from 30 to 18
   dsp-audit-2026-09-20.md          DSP invariant audit
 packaging/

@@ -44,7 +44,7 @@ def run(params=None, **flags):
     res = K.render(HARNESS, params, **f)
     echo = {k: v for k, v in f.items() if k in ("seed", "sample_rate", "block", "seconds", "preset")
             and not (k == "block" and str(v).startswith("random:"))}
-    K.assert_echo(res, params, **echo)                                     # rule 28
+    K.assert_echo(res, params, **echo)                                     # rule 13
     return res
 
 
@@ -62,7 +62,7 @@ class Timed(unittest.TestCase):
 
 
 class Contract(Timed):
-    def test_harness_echoes_params(self):                                  # rule 28
+    def test_harness_echoes_params(self):                                  # rule 13
         pid, val = PARAM
         res = run({pid: val})
         self.assertAlmostEqual(res["applied"]["params"][pid], val, places=6)
@@ -93,7 +93,7 @@ class RateAndBlock(Timed):
     def test_block_larger_than_announced(self):                            # D.5.1
         # NaN-free is not enough: a plugin that renders only the announced part of an oversized
         # block leaves a silent gap. Compare, window by window, against the same render in
-        # announced-size blocks (Horizon Pad, Round 14: a 6 dB drop in one window, whole-file
+        # announced-size blocks (seen once: a 6 dB drop in one window, whole-file
         # RMS within 1 dB).
         with tempfile.TemporaryDirectory() as d:
             a, b = Path(d) / "ref.wav", Path(d) / "big.wav"
@@ -112,10 +112,10 @@ class Health(Timed):
             flags["gate"] = 0.5                                             # notes off early, the rest silent
         res = run(**flags)
         self.assertLess(res["levels"]["dc_dbfs"], -80.0)
-        self.assertLess(res["profile"]["p999_pct"], 25.0)                  # rule 37
-        self.assertEqual(res["profile"]["over_deadline"], 0)
+        self.assertLess(res["profile"]["p999_pct"], 25.0)                  # rule 20: p99.9 judged
+        print("over_deadline (reported, not judged, rule 20):", res["profile"]["over_deadline"])
 
-    def test_latency_matches_impulse(self):                                # rule 11
+    def test_latency_matches_impulse(self):                                # rule 7
         if INSTRUMENT:
             self.skipTest("effects only")
         with tempfile.TemporaryDirectory() as d:
@@ -196,7 +196,7 @@ class Goldens(Timed):
 
 
 class DefiningFeatures(Timed):
-    """Rule 22: one presence test per defining feature in the brief. Show each failing
+    """Rule 13: one presence test per defining feature in the brief. Show each failing
     on a build without the feature (D.3.8) before trusting it."""
     label = "render"
 

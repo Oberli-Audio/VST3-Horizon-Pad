@@ -65,7 +65,7 @@ void WarmFoundationLayer::renderVoice (int voiceIndex, juce::AudioBuffer<float>&
     // the middle register. In the bass, tracked down, it started as a dull hum
     // for the first seconds (centroid ~80-100 Hz at C1/C2, the harmonics arriving
     // 6-12 dB later); the owner disliked that start and liked the opened tone
-    // (owner's second blind A/B, 2026-10-07 (docs/gate-status.md)). Below C3 the cutoff now starts near
+    // (owner's second blind A/B, 2026-10-07 (git 8a14117:docs/gate-status.md)). Below C3 the cutoff now starts near
     // where the envelope settles: the envelope term moves towards the sustain
     // level by up to kBassOnsetLift, fading out by C3. Sustain is unchanged.
     const auto bassness = 1.0f - registerBlend (baseFreq, kBassOnsetFullHz, kBassOnsetNoneHz);

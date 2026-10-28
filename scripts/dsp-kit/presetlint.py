@@ -13,12 +13,12 @@ bank    the CSV alone: columns, slug and name rules, one init, categories, edge 
 render  per preset through the harness: Init equals the parameter table's defaults; seeded
         loudness spread (P: one render each, every preset within +/-1 LU of the bank median;
         F: --n renders each, mean, within +/-0.35 LU); true peak under the ceiling; health (NaN, clipping, click on note-off);
-        CPU worst block per preset (rule 37); state round trip (state out, in, out: bytewise
+        CPU worst block per preset (rule 20); state round trip (state out, in, out: bytewise
         and render-identical); drift against a baseline (F.13.10). Writes the Markdown
         preset list for docs/presets.md and a JSON report.
 
 presets.csv columns: slug,name,category,tags,edge,author,notes
-  slug      ^[a-z0-9-]+$, unique, the file name (rule 14); exactly one row 'init'
+  slug      ^[a-z0-9-]+$, unique, the file name (rule 10); exactly one row 'init'
   name      display name, 24 characters or fewer, no trailing period, unique case-insensitively
   category  one of the brief's fixed list (CATEGORIES below, override with --categories)
   tags      3-6 from a fixed vocabulary, '|'-separated (Tier F; may be empty at P)
@@ -87,7 +87,7 @@ def check_bank(rows, tier="P", track="instrument", categories=None, listing=None
     for r in rows:
         s = r["slug"]
         if not SLUG_RE.match(s):
-            errs.append("slug %r is not ^[a-z0-9-]+$ (rule 14: ASCII slugs, the display name lives inside)" % s)
+            errs.append("slug %r is not ^[a-z0-9-]+$ (rule 10: ASCII slugs, the display name lives inside)" % s)
         n = r["name"]
         if not n:
             errs.append("%s: empty name" % s)
@@ -214,14 +214,14 @@ def check_cpu(harness, rows, a):
             return ["harness returned no profile block (contract --profile)"], {}
         table[r["slug"]] = {k: prof.get(k) for k in ("p99_pct", "p999_pct", "max_pct", "over_deadline", "first_block_pct")}
         if prof.get("p999_pct", 0) > a.budget_p999:
-            errs.append("%s: p99.9 %.1f %% of the deadline at %d/%d; budget %.0f (rule 37)"
+            errs.append("%s: p99.9 %.1f %% of the deadline at %d/%d; budget %.0f (rule 20)"
                         % (r["slug"], prof.get("p999_pct", 0), fs, block, a.budget_p999))
         if prof.get("max_pct", 0) > a.budget_max:
             runs = [prof] + [K.render(harness, preset=r["slug"], profile=1, warmup=200, **_render_args(a)).get("profile", prof) for _ in range(2)]
             rm = P.read_max(runs, block, fs)
             table[r["slug"]]["max_reading"] = rm["reading"]
             if rm["reading"] == "DSP":
-                errs.append("%s: recurring max %.1f %% of the deadline at %.2f s in three runs; budget %.0f (rule 37)"
+                errs.append("%s: recurring max %.1f %% of the deadline at %.2f s in three runs; budget %.0f (rule 20)"
                             % (r["slug"], rm["max_pct"], rm["at_s"], a.budget_max))
             else:
                 table[r["slug"]]["note"] = "max %.1f %% moved between runs: scheduling, not DSP (perf.py)" % rm["max_pct"]

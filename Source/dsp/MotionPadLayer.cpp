@@ -64,7 +64,7 @@ void MotionPadLayer::beginBlock (int numSamples)
 
         cutoff[n] = std::sin (filterLfoPhase * twoPi) * 600.0f + 1400.0f;
         // +/-0.20 (0.35 until 2026-10-07): the shared pulse was too obvious in
-        // chords - the owner preferred v1's Bloom (owner's blind A/B of 2026-10-06 (docs/gate-status.md)).
+        // chords - the owner preferred v1's Bloom (owner's blind A/B of 2026-10-06 (git 8a14117:docs/gate-status.md)).
         // Still shared, so the depth no longer depends on the voicing.
         trem[n] = std::sin (tremPhase * twoPi) * 0.20f + 0.65f;
     }

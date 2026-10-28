@@ -6,7 +6,7 @@
 
 namespace Params
 {
-// IDs are frozen at the first shared build (rule 36). Never rename, never reuse.
+// IDs are frozen at the first shared build (rule 19). Never rename, never reuse.
 inline constexpr const char* rootVolume = "rootVolume";
 inline constexpr const char* clearingVolume = "clearingVolume";
 inline constexpr const char* expanseVolume = "expanseVolume";

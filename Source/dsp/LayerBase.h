@@ -597,7 +597,7 @@ protected:
     {
         // Above the designed detune (1.0) the slow pitch drift grows at half the
         // rate of the static detune: 1.5x at DETUNE 100%, not 2x. The owner found
-        // DETUNE 100% "a bit seasick" (owner's second blind A/B, 2026-10-07 (docs/gate-status.md)); the
+        // DETUNE 100% "a bit seasick" (owner's second blind A/B, 2026-10-07 (git 8a14117:docs/gate-status.md)); the
         // static detune keeps its full range, so the stack still thickens.
         const auto driftScale = detune > 1.0f ? 1.0f + (detune - 1.0f) * 0.5f : detune;
         return kBaseDriftDepth * driftScale + modAmount * kModDriftDepth;

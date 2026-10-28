@@ -51,7 +51,7 @@ private:
     static constexpr float kOscDetuneFraction[2] { 0.0004f, -0.0005f }; // det * 0.01 from the Faust source
     static constexpr float kOscDriftRateHz[2] { 0.33f, 0.37f };
     static constexpr float kOscSpread[2] { -0.8f, 0.8f };
-    static constexpr float kCutoffTrackingBelowC4 = 0.5f;  // 1.0 until 2026-10-07: low chords too dark (owner's blind A/B of 2026-10-06 (docs/gate-status.md))
+    static constexpr float kCutoffTrackingBelowC4 = 0.5f;  // 1.0 until 2026-10-07: low chords too dark (owner's blind A/B of 2026-10-06 (git 8a14117:docs/gate-status.md))
     static constexpr float kCutoffTrackingAboveC4 = 0.5f;
 
     struct VoiceState

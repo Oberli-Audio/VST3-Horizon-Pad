@@ -56,7 +56,7 @@ private:
         does, so high notes are no longer filtered away (-29 LUFS at C7
         against -18 at C4) while Root stays the darkest pad. Below C4, full
         tracking: a low note keeps C4's harmonic count instead of buzzing. */
-    static constexpr float kCutoffTrackingBelowC4 = 0.5f;  // 0.8 until 2026-10-07: low chords too dark (owner's blind A/B of 2026-10-06 (docs/gate-status.md))
+    static constexpr float kCutoffTrackingBelowC4 = 0.5f;  // 0.8 until 2026-10-07: low chords too dark (owner's blind A/B of 2026-10-06 (git 8a14117:docs/gate-status.md))
     static constexpr float kCutoffTrackingAboveC4 = 0.5f;
 
     /** Bass onset (see renderVoice): how far below C3 the cutoff's envelope term

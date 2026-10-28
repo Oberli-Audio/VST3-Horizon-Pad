@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""perf - the CPU budget as a repeatable measurement (rule 37, D.2.1).
+"""perf - the CPU budget as a repeatable measurement (rule 20, D.2.1).
 
     perf.py run --harness H [--harness2 H_x86] [--presets all|slug,...] [--config 48000/64,44100/32]
                 [--seconds 60] [--runs 3] [--warmup 200] [--notes 48,55,60,64] [--preset-at 30:slug]
@@ -12,9 +12,12 @@ Reported per cell: median p50 / p99 / p99.9, the maximum with its reading - "DSP
 worst_block_at_s recurs within one block in at least two runs, "scheduling" when it moves
 (D.2.1: read a maximum by where it falls) - over_deadline, the first block after prepare,
 the preset-change spike (--preset-at), and the idle figure (a render with --gate 0.5 and
-the rest silent). Budget: p99.9 and a recurring max per instance; a scheduling max is
-reported, not failed. Regression: p99 or a recurring max up by more than --regress (20 %)
-against the baseline of the same arch and machine tag fails.
+the rest silent). Judged: p99.9 and a recurring max per instance, the first block after
+prepare, the idle figure, and the regression (p99 or a recurring max up by more than
+--regress, 20 %, against the baseline of the same arch and machine tag). Reported, never
+judged: over_deadline and a scheduling max; an offline normal-priority harness is
+preempted now and then, and the friend playing the heaviest preset at 64 samples is the
+dropout test (rule 20).
 
 Exit 0 pass, 1 budget or regression, 2 inputs unusable. Local machine only at Tier P: on a
 shared CI runner the absolute numbers are noise (D.3.6).
@@ -89,8 +92,7 @@ def judge(cell, a, base=None):
         errs.append("p99.9 %.1f %% over the budget %.0f %%" % (cell["p999_pct"], a.budget_p999))
     if cell["max"]["reading"] == "DSP" and cell["max"]["max_pct"] > a.budget_max:
         errs.append("recurring max %.1f %% at %.2f s over the budget %.0f %%" % (cell["max"]["max_pct"], cell["max"]["at_s"], a.budget_max))
-    if cell["over_deadline"] and cell["max"]["reading"] == "DSP":
-        errs.append("%d block(s) over the deadline at a recurring position" % cell["over_deadline"])
+    # over_deadline is in the row and the JSON but never judged (rule 20): the harness thread is preempted now and then
     if cell["first_block_pct"] > 2.0 * max(cell["max"]["max_pct"], cell["p999_pct"]) and cell["first_block_pct"] > a.budget_max:
         errs.append("first block after prepare %.0f %% (lazy initialisation? D.2.1)" % cell["first_block_pct"])
     if base:
@@ -146,8 +148,8 @@ def run(a):
 
 
 def markdown(report):
-    out = ["## CPU (rule 37) - %s, %d runs, %.0f s each" % (report["machine"], report["runs"], report["seconds"]), "",
-           "| arch | preset | fs/block | p50 | p99 | p99.9 | max | reading | first block | over |", "|---|---|---|---|---|---|---|---|---|---|"]
+    out = ["## CPU (rule 20) - %s, %d runs, %.0f s each" % (report["machine"], report["runs"], report["seconds"]), "",
+           "| arch | preset | fs/block | p50 | p99 | p99.9 | max | reading | first block | over (reported) |", "|---|---|---|---|---|---|---|---|---|---|"]
     for key, c in report["cells"].items():
         arch, preset, cfg = key.split("|")
         if "max" not in c:
@@ -185,6 +187,8 @@ def selftest():
     expect("preset-change spike is the recurring max", cell["max"]["reading"] == "DSP" and abs(cell["max"]["at_s"] - 2.0) < 0.01
            or cell.get("preset_change_max_pct", 0) > cell["p999_pct"])
     expect("no errors on the fake", not judge(cell, a))
+    over = dict(cell); over["over_deadline"] = 3
+    expect("over_deadline is reported, never judged", not judge(over, a) and "| 3 |" in markdown({"machine": "t", "runs": 3, "seconds": 4.0, "cells": {"x86_64|warm|48000/64": over}}))
     # a moving spike (seed-dependent position) reads as scheduling: fake jitter at block n+seed, three runs same seed -> recurring.
     # So vary the seed per run to make it move: emulate by three cells with different seeds
     runs = []
@@ -218,7 +222,7 @@ def selftest():
     if fails:
         print("perf selftest FAILED:\n  " + "\n  ".join(fails), file=sys.stderr)
         return 1
-    print("perf selftest OK: first block, preset-change spike, recurring vs scheduling maximum, budget, regression, arch check, baseline round trip")
+    print("perf selftest OK: first block, preset-change spike, recurring vs scheduling maximum, over_deadline reported not judged, budget, regression, arch check, baseline round trip")
     return 0
 
 

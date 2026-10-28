@@ -109,7 +109,7 @@ cmake --build build-release --target HorizonPadSoundTool -j 8
 ctest --test-dir build-release --output-on-failure
 ```
 
-Twenty-five tests (~70 s), `tools/tests/dsp_tests.py`, registered by CMake (plus the two validators, label `validation`). They
+Forty-one tests in `tools/tests/dsp_tests.py` plus the harness contract and the deployment-target check, registered by CMake (with the two validators, label `validation`, 46 in ~110 s). They
 drive the real DSP through `HorizonPadSoundTool` rather than unit-testing
 classes: latency, seeded-reset determinism, the 36 sample-rate x block-size
 combinations, 60 s of silence, all 17 presets; regression guards, one per bug
@@ -122,9 +122,10 @@ feature (`root_sub_present`, `clearing_ensemble_present`,
 `low_register_stays_musical`, `bass_is_mono`, `attack_release_span`,
 `presets_have_worship_envelopes`, `register_is_c0_to_c7`); and the control path
 through real MIDI and host-style automation (`velocity_curve`, `pitch_bend_range`,
-`mod_wheel_adds_movement`, `automation_is_zipper_free`, rule 30). **Add a regression test whenever a
-DSP defect is fixed, and show it failing on the build that has the defect**
-(a `git worktree` of the previous commit). Needs python3 + numpy + scipy; CMake
+`mod_wheel_adds_movement`, `automation_is_zipper_free`, rule 16); and what the editor reads
+from the audio thread (`limit_led_only_past_knee`, `output_meter_per_channel`). **Add a regression
+test whenever a DSP defect is fixed, show it failing on the build that has the defect** (a
+`git worktree` of the previous commit), **and add its row to `docs/failures.md`**. Needs python3 + numpy + scipy; CMake
 skips registration if they are missing, so a plain plugin build never fails
 without them.
 
@@ -133,10 +134,10 @@ battery, reverb decay, port-vs-prototype null test), `descriptors.py` (is it the
 sound we designed: layer grid, keyboard, mix pocket, stereo, movement, presets -
 four seeds per figure, `--save`/`--compare` against `docs/baselines/`) and
 `register.py` (roughness, pitch salience, harmonic content and low side energy
-per note over the register C0-C7, and low voicings), and `translation.py` (playbook F.7 / rule 34:
+per note over the register C0-C7, and low voicings), and `translation.py` (playbook F.7 / rule 18:
 mono sum, phone speaker, -14 LUFS normalisation, AAC/MP3 round trip, stereo bass;
-baseline `docs/baselines/translation-v2.json`; uses the playbook's `dspkit` from
-`~/bob-skills/sound-design-bob/scripts/dsp-kit` (override with `DSPKIT`), plus `afconvert` and `lame`). `tools/listening/make_session.py` renders a
+baseline `docs/baselines/translation-v2.json`; uses the playbook's `dspkit` from the repo's copy in
+`scripts/dsp-kit` (override with `DSPKIT`), plus `afconvert` and `lame`). `tools/listening/make_session.py` renders a
 blind, loudness-matched A/B/X page (baseline build vs candidate) for the
 listening passes the measurements cannot settle.
 
@@ -145,7 +146,7 @@ before 2026-09-26 - G5 was re-run, see `docs/g5-null-test.md`); the applied
 state is echoed under `activeParams`, and scripts should assert on it.
 `--pedal=down,up` sends the sustain pedal.
 
-**Real-time safety (rule 35).** `-DHORIZON_RTSAN=ON` builds the sound tool with
+**Real-time safety (rule 1).** `-DHORIZON_RTSAN=ON` builds the sound tool with
 RealtimeSanitizer; every `processBlock` then runs as a real-time context, and any
 allocation, lock or system call aborts with a stack trace. Needs Homebrew LLVM (Apple
 clang has no RTSan) and, as found with JUCE 8.0.4 (not yet re-checked on 8.0.16), two workarounds - the SDK's libc++ headers
@@ -249,7 +250,7 @@ edge and sub and the MOD wheel's drift are not scaled), and the register helpers
 split at 160 Hz keeps the bass dry and only the band above is sent (20 ms
 pre-delay) and crossfaded equal-power; the side channel of the finished mix -
 dry and reverb return - is high-passed at 140 Hz, 24 dB/oct, **last** (mono bass,
-rule 26; it ran first until 2026-10-03, and the reverb return rebuilt stereo bass).
+rule 15; it ran first until 2026-10-03, and the reverb return rebuilt stereo bass).
 
 ### The register
 
@@ -358,16 +359,21 @@ sky (`--title`).
 
 ## Tier P process
 
-The project runs at playbook **Tier P**. `docs/gate-status.md` is the one-page
-view of where each gate stands and what is outstanding; the per-gate artefacts
-sit beside it (`brief.md`, `g1-algorithm.md`, `g2-prototype.md`,
-`g3-measurements.md`, `g5-null-test.md`), and `docs/exceptions.md` is the
-playbook 12.5 log. **A failed measurement is either fixed or gets a dated,
-named exception** — it is not negotiable by whoever wrote the code. `brief.md`
-is owner-confirmed: do not edit the YAML, add a dated amendment beneath it.
+The project runs at playbook **Tier P** and keeps the documents of sound-design-bob D.9:
+`docs/brief.md` (owner-confirmed: do not edit the YAML, add a dated amendment beneath it),
+`docs/status.md` (one page, rewritten at every checkpoint: the gates with the command behind
+every number, the listening debt, the open exceptions as one dated line each with a numeric
+"unacceptable if" and a `Friends:` sentence when a friend can notice it, the handoff, the
+decisions) and `docs/failures.md` (one row per fixed defect with its regression test). The gate
+artefacts `g1-algorithm.md`, `g2-prototype.md`, `g3-measurements.md`, `g5-null-test.md` are the
+evidence the Gates table cites. The separate `gate-status.md`, `exceptions.md` and `handoff.md`
+were folded into `status.md` on 2026-10-29 (their records: git `8a14117`). **A failed measurement
+is either fixed or gets a dated exception line** - it is not negotiable by whoever wrote the
+code; a resolved one moves to Decisions. The README's Known issues are generated from the open
+lines (`python3 scripts/ship/shipcheck.py known-issues . --write`).
 
 ## DSP work
 
-Invariants load automatically for `Source/**` and `*.dsp` (`~/.claude/rules/dsp-invariants.md`, installed from `~/bob-skills/rules/`). For design, porting, measurement, testing, review or release, and for any defect, use the **sound-design-bob** skill (synced from claude.ai; source and playbook in `~/bob-skills`). It carries the DSP playbook (v3.6 at 2026-10-17) in its `references/`: the core card `dsp-playbook-core.md` (read whole; section 0 maps tasks to recipes), the reference split into `dsp-selection.md` (S, algorithm choice), `dsp-foundations.md` (F), `dsp-instruments.md` (I), `dsp-effects.md` (E), `dsp-control.md` (C), `dsp-analysis.md` (A) and `dsp-development.md` (D: real-time safety, performance, testing, CI, host contract, licensing, agent workflow, task recipes) - grep them, never read them whole - and `dsp-sound-design-playbook.md` as the index. Its `scripts/dsp-kit/` holds the tested measurement library (`dspkit.py`), the harness contract new products follow, a test scaffold and the document templates. For the plugin editor, ux-ui-design-bob runs alongside on the same tier, gates and parameter table.
+Invariants load automatically for `Source/**` and `*.dsp` (`~/.claude/rules/dsp-invariants.md`, installed from `~/bob-skills/rules/` by `~/bob-skills/install.sh`). For design, porting, measurement, testing, review or release, and for any defect, use the **sound-design-bob** skill (5.0.0, 2026-10-27; source in `~/bob-skills/plugins/`). It carries the DSP playbook v4.0 in its `references/`: the core card `dsp-playbook-core.md` (read whole; section 0 maps tasks to recipes; the 20 rules with an old-to-new map), `tiers.md`, `joint-plugin-workflow.md` (the one release gate), `dsp-selection.md` (S, algorithm choice) and the contracts, batteries, failure libraries, worked examples and workflow in `dsp-foundations.md` (F), `dsp-instruments.md` (I), `dsp-effects.md` (E), `dsp-control.md` (C), `dsp-analysis.md` (A) and `dsp-development.md` (D: real-time safety, performance, testing, CI, host contract, agent workflow, task recipes, the project documents) - grep them, never read them whole. The textbook half (oscillators, filters, reverb, shimmer, modulation, meters, the formulas; F.1-F.6, I.3-I.7, E.1-E.10, C.1-C.6, A.1-A.6) is **dsp-reference-bob**, loaded at G1 or in a diagnosis. The editor is **plugin-ui-bob** (1.0.0; ux-ui-design-bob 3.0.0 is web only now), on the same tier, gates and parameter table, with the Oberli Audio design system as its brand sheet. Releases, the README, notices and the feedback loop are **ship-bob** (1.0.0). `scripts/dsp-kit/` and `scripts/ship/` are byte copies of those kits (refreshed 2026-10-29); refresh them, never edit them here.
 
-The playbook is at v3.6 (2026-10-17): 37 rules tagged by track. Horizon Pad is an instrument (track I) that also owns control (C: MIDI, pedal, wheels), processing (E: the shimmer, ensemble, reverb), mix and output (F.5-F.6). Its v2 sound-design pass is the playbook's instrument worked example (I.10); see `docs/dsp-review-2026-09-26.md` (findings) and `docs/sound-design-v2.md` (changes, measurements, listening list). Audited 2026-10-17 (`docs/dsp-review-2026-10-17.md`, resolution at its end): event timing (29) passes - MIDI splits the block at sample offsets; control mappings (30) are tested through real MIDI; the output limiter's 1x `tanh` (33) is documented as deliberately unoversampled with a rate comparison beside it; the translation battery (34) passes on every preset; the suite runs clean under RTSan (35); worst-case block time (37) is measured with `--profile` (p99 6% of the deadline at 64 samples, M3 Pro) - on the budget machine it is still owed. Frozen IDs with a versioned state (36) is **not yet applicable**: Horizon Pad is unreleased and testing-only, so parameters, state and presets change freely with no migration or version flags until the owner announces a release; at that point the state gains a version and golden state files (D.5.3). Rule 32 (bypass) does not apply to an instrument.
+Horizon Pad is an instrument (track I) that also owns control (C: MIDI, pedal, wheels), processing (E: the shimmer, ensemble, reverb), mix and output (F.5-F.6). Its v2 sound-design pass is the playbook's instrument worked example (I.10); see `docs/dsp-review-2026-09-26.md` (findings) and `docs/sound-design-v2.md` (changes, measurements, listening list). Audited 2026-10-17 (`docs/dsp-review-2026-10-17.md`, resolution at its end; it uses the old rule numbers): event timing and control mappings (rule 16) pass - MIDI splits the block at sample offsets, the mappings are tested through real MIDI; the output limiter's 1x `tanh` (rule 3) is documented as deliberately unoversampled with a rate comparison beside it; the translation battery (rule 18) passes on every preset; the suite runs clean under RTSan (rule 1). CPU (rule 20): Tier P judges p99.9 and the recurring maximum at 48 k/64 on the slice the host runs (the x86_64 slice under Rosetta for Ableton Live 10.1): p99.9 14.3 % (`docs/perf.md`); `over_deadline` is reported, never judged; 44.1 k/32 is Tier F; the budget machine is still owed. Frozen IDs with a versioned state (rule 19): the state is versioned since 2026-10-21 (state version 2 with a v1 migration, golden states in `tools/tests/state`); IDs and the state format freeze at the first release, 0.1.0; ask the owner before any ID or state change. Rule 7 (bypass) does not apply to an instrument. Hosts at Tier P: Ableton Live 10.1 under Rosetta on the Mac and Ableton Live on Windows; the third host, Reaper, is Tier F.

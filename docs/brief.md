@@ -234,7 +234,7 @@ natural place for it.
 ### A-005 - gate tracking moved to its own page (2026-09-24)
 
 Gate status is no longer tracked in this document. It lives in
-[`gate-status.md`](gate-status.md), which links the artefact for each gate.
+[`status.md`](status.md), whose Gates table links the artefact for each gate.
 This file stays what it is: the G0 brief and its dated amendments.
 
 ### A-006 - one WIDTH macro, a DETUNE macro, ten parameters (2026-10-02)
@@ -268,13 +268,13 @@ Owner decisions, 2026-10-02, following [`width-design-draft.md`](width-design-dr
   in the playbook, F.14.2 and D.5.2.
 
 Measured and verified in [`width-design-draft.md`](width-design-draft.md) ("Built");
-the listening items are in [`gate-status.md`](gate-status.md).
+the listening items are in `gate-status.md` (git `8a14117`).
 
 ### A-007 - decisions from the owner's blind listening pass (2026-10-07)
 
 The owner ran the blind A/B/X session (v1 `bf17ee8` against the v2 build of
 2026-10-04, 19 items, every X identified correctly) and played the new presets.
-Results and measurements in [`gate-status.md`](gate-status.md); decisions:
+Results and measurements in `gate-status.md` (git `8a14117`); decisions:
 
 - **WIDTH at 100% is full width again on every pad.** Amends A-006's profiles: Root
   now opens from 20% (was 30%) and Bloom from 15% (was 20%), and both reach their full
@@ -295,7 +295,7 @@ Results and measurements in [`gate-status.md`](gate-status.md); decisions:
 
 ### A-008 - from the second blind listening pass (2026-10-07)
 
-Results in [`gate-status.md`](gate-status.md). The first pass's changes held up (four
+Results in `gate-status.md` (git `8a14117`). The first pass's changes held up (four
 items flipped to the candidate, two became inaudible). From the remaining verdicts and
 notes: Root's bass starts near its opened tone and sits brighter below C3; Expanse's
 shimmer send rolls off above C5 (the C6 chord); DETUNE's drift grows only to 1.5x at
@@ -388,5 +388,5 @@ released; its `.bobpreset` files and folders are read like the Quelle Music ones
 
 12.5 requires a written, dated, named exception whenever a measurement fails and the
 decision is to ship anyway: what failed, by how much, why it is acceptable, and what
-would make it unacceptable. Those live in [`exceptions.md`](exceptions.md), which
-currently holds one open entry (EX-001, limiter-induced DC offset).
+would make it unacceptable. Those live in the Open exceptions of [`status.md`](status.md) (in `exceptions.md` until
+2026-10-29, which then held one open entry, EX-001, limiter-induced DC offset).

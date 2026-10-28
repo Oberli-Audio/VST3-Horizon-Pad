@@ -104,7 +104,7 @@ def k_weighting_sos(fs):
 
     Same derivation as libebur128: at 48 kHz it reproduces the coefficients printed in
     BS.1770 (checked in test_dspkit.py); at other rates it is the matched redesign that
-    rule 31 requires instead of reusing the 48 kHz numbers.
+    rule 17 requires instead of reusing the 48 kHz numbers.
     """
     # Stage 1: high shelf
     f0, G, Q = 1681.974450955533, 3.999843853973347, 0.7071752369554196
@@ -318,7 +318,7 @@ def stats(values):
 
 
 def block_time_report(block_times_s, block_size, fs, warmup=0):
-    """Rule 37: block time against the deadline N / fs, as the harness contract's `profile`.
+    """Rule 20: block time against the deadline N / fs, as the harness contract's `profile`.
 
     warmup blocks are excluded from the distribution; the very first block is reported
     separately as first_block_pct (cold start, D.2.1). over_deadline counts blocks above
@@ -422,7 +422,7 @@ def list_presets(harness):
 
 
 def assert_echo(result, params=None, arch=None, **flags):
-    """Rule 28: the harness echoes what it rendered; fail if it differs from the request.
+    """Rule 13: the harness echoes what it rendered; fail if it differs from the request.
     arch: the slice this render must come from (applied.build.arch), e.g. "x86_64" (D.2.1)."""
     echo = result.get("applied", {})
     if arch is not None and echo.get("build", {}).get("arch") != arch:
@@ -442,7 +442,7 @@ def assert_echo(result, params=None, arch=None, **flags):
 
 def smoke(harness, arch=None):
     """`dspkit.py smoke <harness> [--arch x86_64]`: the contract's minimum, in one go. Lists the presets,
-    renders one second of the first preset at 48 k/64 with a profile, checks the echo (rule 28), the
+    renders one second of the first preset at 48 k/64 with a profile, checks the echo (rule 13), the
     arch, and that the output is finite and not silent. The real harness passes this before
     presetlint and perf are worth running."""
     global ARCH

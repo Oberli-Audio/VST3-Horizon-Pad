@@ -121,7 +121,7 @@ master). Calibration script: kept out of the repo; the numbers above reproduce w
 
 **Not available, by design**: mono mode and glide (the instrument is polyphonic;
 out of scope), and delayed vibrato (the MOD wheel is the only modulation gesture).
-Listening items: in the gate-status listening list.
+Listening items: in `status.md`, Listening debt.
 
 ## 2026-10-07: 17 presets in three families
 
@@ -200,7 +200,7 @@ within +/-0.9 LU (-17.24 to -16.02); Sternenzelt -18.90 (EX-002, accepted by ear
 ## 2026-10-07, second pass: listening results, cycles, Glasperle
 
 **From the blind A/B** (19 items, X correct on all 18 answered; full table in
-`gate-status.md`; verdicts in `docs/listening/2026-10-06-verdicts.json`). Measured with
+`gate-status.md` (git `8a14117`); verdicts in `docs/listening/2026-10-06-verdicts.json`). Measured with
 `tools/listening/compare_items.py` (current minus v1, after the session's -20 LUFS
 match), the v1-preferred items before and after this pass's DSP changes:
 

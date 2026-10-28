@@ -118,7 +118,7 @@ def check(repo, manifest=None, quiet=False):
         spdx = c.get("spdx", "")
         alternatives = [s.strip() for s in re.split(r"\s+OR\s+", spdx) if s.strip()] or [spdx]
         if alternatives and all(COPYLEFT.match(s) for s in alternatives):
-            errs.append("%s is %s: copyleft code cannot ship in this product (sound-design-bob D.6.1); replace it or make the product GPL" % (n, spdx))
+            errs.append("%s is %s: copyleft code cannot ship in this product (references/notices.md); replace it or make the product GPL" % (n, spdx))
         lf = c.get("license_file")
         if lf:
             p = repo / lf

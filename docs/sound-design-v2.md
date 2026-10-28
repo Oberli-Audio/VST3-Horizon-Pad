@@ -4,7 +4,7 @@ Branch `sound-design-v2`, started 2026-09-26 from `main` at `bf17ee8`. Answers t
 findings in [`dsp-review-2026-09-26.md`](dsp-review-2026-09-26.md). **Merged into
 `main` on 2026-10-04 (`2724152`)**; the owner's blind passes of 2026-10-06 and
 2026-10-07 then judged it against v1 - verdicts and follow-up changes in
-`gate-status.md`. Kept as
+`gate-status.md` (git `8a14117`). Kept as
 the record of what v2 changed and measured; the listening list at the end is
 historical.
 

@@ -2,7 +2,7 @@
 
 Scope: Horizon Pad's sound as shipped on `main` after the register change (A-010),
 reviewed against the playbook v3.4 core card: the definition of done (section 9),
-the instrument contract (I.0) and battery (I.8), the rule audits `gate-status.md`
+the instrument contract (I.0) and battery (I.8), the rule audits `gate-status.md` (git `8a14117`)
 still listed as owed (29, 30, 33, 37), and recipe D.8.5 (baselines first, findings
 with numbers). Everything marked **measured** was measured today with the Release
 `HorizonPadSoundTool` built from this commit, 48 kHz, seeded; the commands are given
@@ -150,7 +150,7 @@ below -0.9 dBTP from a -1 dBTP master, MP3 without clipped samples.
 6. One sentence on the limiter's aliasing being deliberate (rule 4/33), plus the B.5
    rate comparison at the pathological patch.
 
-## 7. Listening items added to `gate-status.md`
+## 7. Listening items added to `gate-status.md` (now `status.md`, Listening debt)
 
 | Item | Question |
 |---|---|

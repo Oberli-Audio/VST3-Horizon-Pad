@@ -51,6 +51,15 @@ def main(argv):
     params = {k: v["default"] for k, v in PARAMS.items()}
     applied_preset = None
     state_in = None
+    if "--help" in argv or "-h" in argv:
+        print(__doc__.rstrip())
+        print("\nFlags, --flag=value form (harness-contract.md): --seed=N --sample-rate=HZ --block=N|random:SEED\n"
+              "  --max-block=N --seconds=S --notes=60,64,67 --gate=S --signal=impulse|sine:HZ:DBFS --preset=SLUG\n"
+              "  --param=ID=VALUE (repeatable) --preset-at=T:SLUG --reprepare-at=T (repeatable) --warmup=N --profile=1\n"
+              "  --state-in=FILE --state-out=FILE --out=FILE.wav --list-presets --list-params\n"
+              "Prints one JSON object (applied state, metrics, profile) on stdout; exit 0 ok, 2 bad input, 3 NaN/Inf.\n"
+              "Only for testing the kit: python3 test_dspkit.py runs it; a product's own harness replaces it.")
+        return 0
     for a in argv:
         if a == "--list-presets":
             ps = [{"slug": p["slug"], "name": p["name"], "category": p["category"]} for p in PRESETS]
@@ -134,7 +143,7 @@ def main(argv):
     tone = 1.0 - 0.3 * (1.0 - params["tone"])
     y = np.concatenate([np.zeros(32), x])[:n] * 10.0 ** (gain_db(params["gain"]) / 20.0) * tone
     if os.environ.get("FAKE_BLOCK_GAP") and block_nominal > max_block:
-        pos = 0                                                # Horizon Pad, Round 14: the rest of an oversized block stayed silent
+        pos = 0                                                # the rest of an oversized block stays silent (a real bug seen once)
         for b in sizes:
             y[pos + max_block: pos + b] = 0.0
             pos += b

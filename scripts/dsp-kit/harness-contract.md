@@ -11,7 +11,7 @@ where it differs from this contract, the contract wins for new products.
 
 | Flag | Meaning | Default |
 |---|---|---|
-| `--seed=<int>` | Seeds every random source (rule 23). Two runs with the same seed from reset are bit-identical | product-defined, but fixed |
+| `--seed=<int>` | Seeds every random source (rule 8). Two runs with the same seed from reset are bit-identical | product-defined, but fixed |
 | `--sample-rate=<Hz>` | `prepareToPlay` rate | 48000 |
 | `--block=<n>` | Block size; `--block=random:<seed>` varies it per block **from 0** to `--max-block` (D.5.1; a zero-length block must be legal) | 512 |
 | `--max-block=<n>` | Size announced to `prepareToPlay`, to test blocks larger than announced | = `--block` |
@@ -42,7 +42,7 @@ automation. Each overrides the previous.
 {
   "contract": 3,                     // v3 (2026-10-19): --gate, --reprepare-at, --state-in takes any bytes, random blocks from 0,
                                      //    list formats, max_click_db defined; v2: build.arch, first_block_pct, warmup_blocks, --preset-at, --warmup
-  "applied": {                       // rule 28: what was ACTUALLY rendered
+  "applied": {                       // rule 13: what was ACTUALLY rendered
     "seed": 1, "sample_rate": 48000, "block": 64, "max_block": 64, "seconds": 4.0,
     "preset": "Lagerfeuer", "solo": null,
     "params": { "rootVol": 0.72, "reverb": 0.5 },   // every parameter, after all overrides
@@ -69,7 +69,7 @@ automation. Each overrides the previous.
 
 ## Build rules
 
-- A separate CMake target, never part of the shipped plugin (rule 15 - committed, not
+- A separate CMake target, never part of the shipped plugin (rule 10 - committed, not
   throwaway).
 - Builds in the RTSan configuration as well (D.1.6): `-fsanitize=realtime`, with the
   plugin's process path marked `[[clang::nonblocking]]`.

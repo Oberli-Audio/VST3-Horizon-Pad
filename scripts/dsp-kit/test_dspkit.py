@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Self-tests for dspkit.py - every measurement checked against a standard or an
-analytic result before any product trusts it (rule 31, F.13.11).
+analytic result before any product trusts it (rule 17, F.13.11).
 
     python3 test_dspkit.py          # unittest, ~20 s
 """
@@ -273,7 +273,7 @@ class HarnessContract(unittest.TestCase):
 class PresetAndPerfTools(unittest.TestCase):
     """The two bank and budget tools prove their checks on planted defects (D.3.8)."""
 
-    def test_dropout_catches_a_silent_gap(self):                           # D.5.1, Round 14
+    def test_dropout_catches_a_silent_gap(self):                           # D.5.1
         self.h = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_harness.py")
         with tempfile.TemporaryDirectory() as d:
             a, b = Path(d) / "a.wav", Path(d) / "b.wav"

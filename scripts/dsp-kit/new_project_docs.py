@@ -1,32 +1,27 @@
 #!/usr/bin/env python3
-"""Write the playbook's document templates into a project's docs/ folder.
+"""Write the two project documents of the playbook into a product's docs/ folder.
 
-The templates live in the playbook itself (F.15.2 brief, F.15.6 gate status, D.9.x the
-rest), so there is one source and no copies to drift. This script extracts them.
+A product keeps two documents for its own work (D.9): `docs/brief.md`, the sonic brief
+(the F.15.2 YAML, owner-confirmed, amended beneath), and `docs/status.md`, the one-page
+view (gate status, listening debt, open exceptions, handoff, decisions; template D.9.2).
+Both templates live in the playbook text, so there is one source and no copies to
+drift; this script extracts them. `docs/failures.md` starts as the D.9.3 table header.
 
     python3 new_project_docs.py <project>/docs            # writes missing files only
     python3 new_project_docs.py <project>/docs --list     # show what it would write
-    python3 new_project_docs.py <project>/docs --force    # overwrite (asks nothing - careful)
+    python3 new_project_docs.py <project>/docs --force    # overwrite existing files
 """
+import argparse
 import re
 import sys
 from pathlib import Path
 
 DOCS = Path(__file__).resolve().parents[2] / "references"   # the skill's playbook files
-# output file -> (playbook file, heading that contains the template's code block)
+# output file -> (playbook file, heading whose first fenced block is the template)
 TEMPLATES = {
     "brief.md": ("dsp-foundations.md", "### F.15.2"),
-    "gate-status.md": ("dsp-foundations.md", "### F.15.6"),
-    "g1-algorithm.md": ("dsp-development.md", "### D.9.1"),
-    "g3-measurements.md": ("dsp-development.md", "### D.9.2"),
-    "g5-null-test.md": ("dsp-development.md", "### D.9.3"),
-    "exceptions.md": ("dsp-development.md", "### D.9.4"),
-    "test-plan.md": ("dsp-development.md", "### D.9.5"),
-    "measurement-report.md": ("dsp-development.md", "### D.9.6"),
-    "handoff.md": ("dsp-development.md", "### D.9.7"),
-    "decision-record.md": ("dsp-development.md", "### D.9.8"),
-    "README.md": ("dsp-development.md", "### D.9.9"),
-    "notices.toml": ("dsp-development.md", "### D.9.10"),   # THIRD_PARTY_NOTICES.md is generated from it by ship-bob notices.py
+    "status.md": ("dsp-development.md", "### D.9.2"),
+    "failures.md": ("dsp-development.md", "### D.9.3"),
 }
 
 
@@ -39,31 +34,35 @@ def template(fname, heading):
     if not m:
         sys.exit("no template code block under %s in %s" % (heading, fname))
     body = m.group(1) + "\n"
-    if fname == "dsp-foundations.md" and heading.endswith("F.15.2"):
-        body = "# Sonic brief (owner-confirmed; amend below, never edit the YAML)\n\n```yaml\n" + body + "\n```\n\n## Amendments\n"
-    if heading.endswith("D.9.4"):
-        body = "# Exceptions (append-only, F.18.5)\n\n" + body
+    if heading.endswith("F.15.2"):
+        body = ("# Sonic brief (owner-confirmed <date>; amend below, never edit the YAML)\n\n```yaml\n"
+                + body + "```\n\n## Amendments\n- <date>: <what changed, why, which gates re-open>\n")
+    if heading.endswith("D.9.3"):
+        body = "# Failures - the product's own rows (D.9.3)\n\n" + body + "|---|---|---|---|---|\n"
     return body
 
 
-def main():
-    if len(sys.argv) < 2:
-        sys.exit(__doc__)
-    target = Path(sys.argv[1])
-    listing, force = "--list" in sys.argv, "--force" in sys.argv
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("docs", help="the product's docs/ folder (created if missing)")
+    ap.add_argument("--list", action="store_true", help="show what would be written, write nothing")
+    ap.add_argument("--force", action="store_true", help="overwrite files that exist")
+    a = ap.parse_args(argv)
+    target = Path(a.docs)
     target.mkdir(parents=True, exist_ok=True)
     for out, (fname, heading) in TEMPLATES.items():
         body = template(fname, heading)
         path = target / out
-        if listing:
-            print("%-24s <- %s %s (%d lines)" % (out, fname, heading, body.count("\n")))
+        if a.list:
+            print("%-12s <- %s %s (%d lines)" % (out, fname, heading, body.count("\n")))
             continue
-        if path.exists() and not force:
+        if path.exists() and not a.force:
             print("kept     %s (exists)" % path)
             continue
         path.write_text(body, encoding="utf-8")
         print("written  %s" % path)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

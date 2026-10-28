@@ -70,7 +70,7 @@ def find_pins(repo):
 
 
 def symbols_info(paths):
-    """Name and UUID of the debug symbols shipped beside this build (feedback-loop.md 6): a crash
+    """Name and UUID of the debug symbols shipped beside this build (feedback-loop.md 5): a crash
     file names the UUID of the slice that crashed, and this is how it is matched to a tag."""
     if not paths:
         return None
@@ -89,7 +89,7 @@ def symbols_info(paths):
     return out
 
 
-JUCE_MIN = (8, 0, 11)   # first JUCE whose bundled VST3 SDK is 3.8.0 under MIT (decided 2026-10-21)
+JUCE_MIN = (8, 0, 11)   # first JUCE whose bundled VST3 SDK is the MIT one (references/notices.md)
 
 
 def juce_version(repo, build, cache):
@@ -162,7 +162,7 @@ def check_info(info, expect_version=None, require_archs=None, plat=None):
     dt = info.get("deployment_target")
     if plat == "macos":
         if not dt:
-            errs.append("no deployment target recorded: without CMAKE_OSX_DEPLOYMENT_TARGET in the cache the binary needs the macOS it was built on (Round 14 found 26.0)")
+            errs.append("no deployment target recorded: without CMAKE_OSX_DEPLOYMENT_TARGET in the cache the binary needs the macOS it was built on (a shipped build once required macOS 26.0)")
         else:
             try:
                 major = tuple(int(x) for x in dt.split(".")[:2])

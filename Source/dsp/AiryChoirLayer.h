@@ -105,7 +105,7 @@ private:
 
         juce::dsp::StateVariableTPTFilter<float> bandpass;      // stereo
         // stereo, two poles as in v1: the owner preferred v1's Expanse to the prototype's
-        // one-pole top end (owner's blind A/B of 2026-10-06 (docs/gate-status.md))
+        // one-pole top end (owner's blind A/B of 2026-10-06 (git 8a14117:docs/gate-status.md))
         juce::dsp::StateVariableTPTFilter<float> safetyLowpass;
     };
 

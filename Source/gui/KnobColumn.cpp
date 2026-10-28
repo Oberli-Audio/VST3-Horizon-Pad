@@ -24,7 +24,7 @@ KnobColumn::KnobColumn (HorizonPadAudioProcessor& processor, const char* paramet
 {
     // Tooltips come from parameters.csv (Params::tooltipFor). ATTACK and
     // RELEASE read as a time, so their percent range is left off (paramgen
-    // has no display column yet - docs/exceptions.md EX-005).
+    // has no display column yet - docs/status.md EX-005).
     juce::String tooltip (Params::tooltipFor (parameterId));
 
     if (juce::String (parameterId) == ParamID::attackMacro || juce::String (parameterId) == ParamID::releaseMacro)

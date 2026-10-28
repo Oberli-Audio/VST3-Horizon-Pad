@@ -11,7 +11,7 @@ Reads a product's `parameters.csv` (columns defined in `joint-plugin-workflow.md
     paramgen.py selftest                                    runs the built-in checks on the sample table
 
 Exit codes: 0 ok, 1 check failed, 2 bad arguments or an invalid table.
-Pure Python 3.8+, no dependencies. The C++ it writes needs JUCE 7+ (ParameterID with version hint).
+Pure Python 3.8+, no dependencies. The C++ it writes needs JUCE 8.0.11 or newer (the pinned minimum, ship-bob notices.md).
 """
 from __future__ import annotations
 
@@ -141,7 +141,7 @@ def read_table(path: Path | str | io.TextIOBase) -> list[dict]:
             errors.append(f"{where}: smoothing must be a number of ms (0 = none)")
             p["fsmoothing"] = 0.0
         if p["type"] != "float" and p["fsmoothing"] != 0:
-            errors.append(f"{where}: {p['type']} parameters are never smoothed (rule 3, Law 5); set smoothing to 0")
+            errors.append(f"{where}: {p['type']} parameters are never smoothed (rule 2, Law 5); set smoothing to 0")
         if p["type"] != "float" and p["smoothing_domain"] not in ("", "crossfade"):
             errors.append(f"{where}: {p['type']} parameters switch by crossfade, not {p['smoothing_domain']}")
         try:
@@ -379,7 +379,7 @@ def emit_juce(params, namespace="Params") -> str:
     w("")
     w(f"namespace {namespace}")
     w("{")
-    w("// IDs are frozen at the first shared build (rule 36). Never rename, never reuse.")
+    w("// IDs are frozen at the first shared build (rule 19). Never rename, never reuse.")
     for p in params:
         w(f'inline constexpr const char* {p["id"]} = "{p["id"]}";')
     w("")
@@ -610,7 +610,7 @@ def _display_step(p, v):
 
 
 def check_harness(params, listing) -> list[str]:
-    """Diff the harness's --list-params output against the table (rule 28 for parameters)."""
+    """Diff the harness's --list-params output against the table (rule 13 for parameters)."""
     errors = []
     if isinstance(listing, dict) and "params" in listing:
         listing = listing["params"]
@@ -646,7 +646,7 @@ def check_harness(params, listing) -> list[str]:
 
 def check_frozen(params, frozen_params) -> list[str]:
     """Against the table of the last shared build: IDs, types, automatable, choices never change;
-    rows are only ever appended (D.5.2, rule 36)."""
+    rows are only ever appended (D.5.2, rule 19)."""
     errors = []
     old = {p["id"]: p for p in frozen_params}
     new = {p["id"]: p for p in params}
