@@ -260,7 +260,11 @@ void PresetDrawer::rebuildRows()
             // After the click has finished: the rebuild deletes this row.
             row->deleteButton->onClick = [this, index = entry.index]
             {
-                juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<PresetDrawer> (this), index]
+                // Made here, not as an init-capture of the inner lambda: MSVC reads
+                // `this` there as the outer lambda (C2440).
+                juce::Component::SafePointer<PresetDrawer> safe (this);
+
+                juce::MessageManager::callAsync ([safe, index]
                 {
                     if (safe != nullptr)
                     {
