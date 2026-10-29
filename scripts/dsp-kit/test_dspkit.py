@@ -336,6 +336,21 @@ class ValidatePluginSanitizer(unittest.TestCase):
             self.assertEqual((code, status), (77, "SKIP"), detail)
             self.assertIn("no plugin bundle", detail)
 
+    def test_soak_timeout_scales_with_the_sanitizer(self):
+        # --step-timeout 1 x 5 repeats is 5 s plain, 50 s under asan; the stand-in takes 5.5 s
+        with tempfile.TemporaryDirectory() as d:
+            pv = Path(d) / "pluginval-asan"
+            pv.write_text("#!%s\n# ___asan_init\nimport time\ntime.sleep(5.5)\nprint('SUCCESS')\n" % sys.executable)
+            pv.chmod(0o755)
+            (Path(d) / "Fake.vst3").mkdir()
+            here = os.path.dirname(os.path.abspath(__file__))
+            r = subprocess.run([sys.executable, os.path.join(here, "validate_plugin.py"), "--plugin", str(Path(d) / "Fake.vst3"),
+                                "--profile", "soak", "--only", "pluginval_soak", "--sanitizer", "asan", "--step-timeout", "1",
+                                "--out", str(Path(d) / "logs")],
+                               capture_output=True, text=True, env=dict(os.environ, PLUGINVAL=str(pv)), cwd=d)
+            step = json.loads((Path(d) / "logs" / "summary.json").read_text())["steps"][0]
+            self.assertEqual((r.returncode, step["status"]), (0, "PASS"), step["detail"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -313,6 +313,11 @@ def selftest():
     return 0
 
 
+def slowdown(a):
+    """A sanitizer build runs about ten times slower: every pluginval timeout scales with it."""
+    return 10 if a.sanitizer != "none" else 1
+
+
 def pluginval_cmd(a, prof, seed, repeat, randomise, logs, name):
     pv = find_pluginval(a.fetch_pluginval, a.sanitizer)
     if not a.plugin.exists():
@@ -320,7 +325,7 @@ def pluginval_cmd(a, prof, seed, repeat, randomise, logs, name):
     # pinned to PINS["pluginval"] (1.x syntax). pluginval 2.0 (beta, 2026-10) changes this to
     # `pluginval validate [opts] <plugin>`, errors on unknown options, compiles the Steinberg
     # validator in (run once, not twice) and adds --json-results; migrate here when it ships.
-    timeout_ms = a.timeout_ms * (10 if a.sanitizer != "none" else 1)
+    timeout_ms = a.timeout_ms * slowdown(a)
     cmd = [pv, "--strictness-level", str(prof["level"]), "--random-seed", seed,
            "--timeout-ms", str(timeout_ms), "--output-dir", logs]
     if prof["rates"]:
@@ -354,14 +359,14 @@ def count_pluginval(out):
 KNOWN_FALSE_POSITIVES = [
     "state restoration below strictness 8 on parameters that quantise (2.0 tests per parameter)",
     "GUI and DPI tests on a headless runner (use --skip-gui-tests there, never in the release gate)",
-    "timeouts under sanitizers (this script scales --timeout-ms 10x with --sanitizer)",
+    "timeouts under sanitizers (this script scales every pluginval timeout 10x with --sanitizer)",
     "a bundle broken by an artefact round trip (validate the build output, not a re-zipped copy)",
 ]
 
 
 def step_pluginval(a, logs, prof):
     cmd = pluginval_cmd(a, prof, a.seed, 1, False, logs, "strictness%d" % prof["level"])
-    code, out = run(cmd, logs / "pluginval.log", timeout=a.step_timeout * (10 if a.sanitizer != "none" else 1))
+    code, out = run(cmd, logs / "pluginval.log", timeout=a.step_timeout * slowdown(a))
     fails = summarise_pluginval(out) if code else []
     started, verdict = count_pluginval(out)
     ok = code == 0 and verdict and started > 0
@@ -374,7 +379,7 @@ def step_pluginval(a, logs, prof):
 def step_pluginval_soak(a, logs, prof):
     seed = "0x%08x" % random.SystemRandom().getrandbits(32)
     cmd = pluginval_cmd(a, prof, seed, prof["repeat"], True, logs, "soak")
-    code, out = run(cmd, logs / "pluginval-soak.log", timeout=a.step_timeout * prof["repeat"])
+    code, out = run(cmd, logs / "pluginval-soak.log", timeout=a.step_timeout * prof["repeat"] * slowdown(a))
     fails = summarise_pluginval(out) if code else []
     return code == 0, "strictness %d x%d randomised, seed %s (reproduce: --only pluginval --seed %s)%s" % (
         prof["level"], prof["repeat"], seed, seed, ("; " + " | ".join(fails)) if fails else "")
