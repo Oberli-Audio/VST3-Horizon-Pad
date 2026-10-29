@@ -101,8 +101,10 @@ in the design system and the plugin: 3.01:1 on the header, 3.26:1 on ground.
 
 ## Still owed (owner side)
 
-- The DAW checks of the release gate (joint-plugin-workflow.md): the editor at 100-200 % in
-  Ableton Live on the Mac and on Windows, keyboard focus and the space bar, the menu and drawer
-  inside the plugin window, reopening.
-- The design system follows the decisions: `label` 11 px, the Menu card with 125 %, the
-  PluginHeader card with A/B and copy, the Meter card's LIMIT and RMS variant.
+- The DAW checks of the release gate (joint-plugin-workflow.md) in Ableton Live on Windows: the
+  editor at 100-200 %, keyboard focus and the space bar, the menu and drawer inside the plugin
+  window, reopening. The Mac passed: Ableton Live 10.1 under Rosetta, all fine (owner
+  2026-10-29).
+- Done 2026-10-29: the design system follows the decisions (round 12): `label` 11 px, the Menu
+  card with 125 %, the PluginHeader card with A/B and copy, the Meter card's LIMIT and RMS
+  variant, and the copy and close icons.

@@ -16,7 +16,7 @@ This page replaced `docs/gate-status.md`, `docs/exceptions.md` and `docs/handoff
 | G3 Measure | closed 2026-09-24, one row short | `g3-measurements.md`; FILTER's response at 44.1 against 96 kHz not measured as a sweep (every filter is TPT/ZDF) |
 | G4 Port | closed | Release build; constants documented beside the code |
 | G5 Null test | closed, characterised and declared | `g5-null-test.md` |
-| G6 Validate | open: hosts | `ctest --test-dir build-release --output-on-failure` -> 46/46 (2026-10-28, `3aa75fd`); `python3 tools/validate/validate.py --profile quick` -> PASS (validator 47/47, SDK 3.8.1; pluginval L5); CI on every push to main: validator and pluginval L10 at six rates on the downloaded macOS and Windows artefacts, the DSP suite, Windows ASan -> green on `8a14117` (2026-10-28); ASan + UBSan on the Mac clean (2026-10-26); RTSan 29/29 (2026-10-17, re-run owed on the grown suite). Hosts: Ableton Live 10.1 under Rosetta, editor F tried by the owner 2026-10-28; Ableton Live on Windows: owed |
+| G6 Validate | open: hosts | `ctest --test-dir build-release --output-on-failure` -> 46/46 (2026-10-28, `3aa75fd`); `python3 tools/validate/validate.py --profile quick` -> PASS (validator 47/47, SDK 3.8.1; pluginval L5); CI on every push to main: validator and pluginval L10 at six rates on the downloaded macOS and Windows artefacts, the DSP suite, Windows ASan -> green on `8a14117` (2026-10-28); ASan + UBSan on the Mac clean (2026-10-26); RTSan 29/29 (2026-10-17, re-run owed on the grown suite). Hosts: Ableton Live 10.1 under Rosetta, editor F checked by the owner 2026-10-29 (100-200 %, keyboard focus and the space bar, menu and drawer in the plugin window, reopening: all fine); Ableton Live on Windows: owed |
 | G7 Product | closed, release gate owed | README (ship-bob template), 17 presets in three families, `CHANGELOG.md`, `THIRD_PARTY_NOTICES.md`; `python3 scripts/ship/shipcheck.py docs .` -> OK (2026-10-29) |
 
 CPU (rule 20): `perf.py run --harness build-release/HorizonPadSoundTool --arch x86_64 --presets
@@ -58,6 +58,7 @@ Open questions for the owner: Ableton Live on Windows (G6); the listening debt a
 Next command: `python3 scripts/dsp-kit/validate_plugin.py --help` (the unattended part of the release gate).
 
 ## Decisions
+- 2026-10-29: editor F passes the owner's host check in Ableton Live 10.1 under Rosetta on the Mac (100-200 %, keyboard focus and the space bar, menu and drawer, reopening); Windows still owed.
 - 2026-10-29: EX-007 (blocks over the deadline at 32 samples under Rosetta, idle CPU) closed under rule 20 (was 37): Tier P judges 48 k/64 on the slice the host runs, where p99.9 is 14.3 % with maxima moving between runs; `over_deadline` is reported, never judged; 44.1 k/32 is Tier F; idle 1.2 % (budget 2 %). Its Known issue left the README with it.
 - 2026-10-29: the project documents follow sound-design-bob D.9: `docs/brief.md`, this page, `docs/failures.md`; the gate artefacts `g1-algorithm.md`, `g2-prototype.md`, `g3-measurements.md`, `g5-null-test.md` stay as the evidence the Gates table cites.
 - 2026-10-28: `line-control` (Charcoal) #6B665D -> #716B62, in the Oberli Audio design system and the plugin: control outlines 3.01:1 on the header (2.79:1 before).
