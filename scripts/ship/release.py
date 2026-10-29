@@ -195,6 +195,8 @@ def run(a, dry):
 def selftest():
     import shutil, tempfile, io, contextlib
     here = HERE.parent.parent / "tests" / "fixtures" / "fakeplugin"
+    import os
+    os.environ["OBERLI_REGISTRY"] = str(here.parent / "plugins.toml")   # shipcheck docs checks the fixture against its own registry
     fails = []
     expect = lambda label, cond: None if cond else fails.append(label)
     with tempfile.TemporaryDirectory() as d:

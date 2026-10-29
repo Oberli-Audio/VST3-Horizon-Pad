@@ -68,3 +68,15 @@ __pycache__/
 /RELEASE_NOTES.md
 /enable-crashdumps.reg
 /dist/
+
+# ---- Machine-local: the toolchain is ~/.config/oberli/tools.toml, never in the repo ----
+/ship.local.toml
+/.env
+
+# ---- Sample material, renders and listening-panel files live in OneDrive, not in git ----
+*.wav
+!tools/tests/golden/*.wav
+!sound design/reference-renders/*
+*.aif
+*.aiff
+*.m4a

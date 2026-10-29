@@ -7,6 +7,7 @@
     shipcheck.py message <repo>           # the pasteable message to the friends
     shipcheck.py changelog-section <repo> # print the CHANGELOG section for VERSION (release body)
     shipcheck.py known-issues <repo> [--write]   # README's Known issues from docs/status.md, Open exceptions (lines with a Friends: sentence)
+    shipcheck.py registry <repo>          # ship.toml and CMakeLists.txt against the family registry (registry.py)
     shipcheck.py selftest
 
 Checks (references/shipcheck.md):
@@ -29,6 +30,9 @@ Checks (references/shipcheck.md):
   version     VERSION is x.y.z; the git tag v<VERSION>, if any, points at HEAD.
   license     a LICENSE file exists and carries the four things the README promises: free to use,
               the music is yours, presets you save are yours, all other rights reserved; no warranty.
+  registry    ship.toml name, slug, asset_name and repo and CMakeLists.txt's codes, bundle id and
+              names equal the product's entry in registry/plugins.toml (registry.py; skipped with a
+              note when no registry is reachable on this machine).
   secrets     (own command) private keys, tokens, passwords in `git log -p --all` and .github/workflows.
 Exit 0 pass, 1 failure(s), 2 unusable inputs.
 """
@@ -498,13 +502,26 @@ def run_docs(repo):
     errs += check_presets(repo)
     errs += check_params(repo)
     errs += check_known_issues(repo)
+    errs += check_registry(repo)
     for e in errs:
         print("ERROR: " + e)
     if errs:
         print("shipcheck docs: %d error(s)" % len(errs))
         return 1
-    print("shipcheck docs OK: README, CHANGELOG %s, notices, presets, parameters, known issues, VERSION" % version)
+    print("shipcheck docs OK: README, CHANGELOG %s, notices, presets, parameters, known issues, VERSION, registry" % version)
     return 0
+
+
+def check_registry(repo):
+    """The repo against the family registry (registry.py beside this script). No registry on this
+    machine is a note, not an error: CI runners and a friend's Mac have none."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import registry as R
+    path = R.find_registry(os.environ.get("OBERLI_REGISTRY"))
+    if path is None:
+        print("note: no plugin registry reachable (OBERLI_REGISTRY, tools.toml or ~/bob-skills); registry check skipped")
+        return []
+    return ["registry: " + e for e in R.check_repo(repo, R.load_toml(path))]
 
 
 # ----------------------------------------------------------------------------- selftest
@@ -514,6 +531,7 @@ def selftest():
     import shutil
     fails = []
     expect = lambda label, cond: None if cond else fails.append(label)
+    os.environ["OBERLI_REGISTRY"] = str(here.parent / "plugins.toml")   # the fixture's registry, not the family's
     with tempfile.TemporaryDirectory() as d:
         repo = Path(d) / "repo"
         shutil.copytree(here, repo)
@@ -529,7 +547,7 @@ def selftest():
                 mutate(r2)
                 cfg = read_toml(r2)
                 errs, v = check_version(r2)
-                errs += check_readme(r2) + check_license(r2) + (check_changelog(r2, v, cfg) if v else []) + check_notices(r2, cfg) + check_presets(r2) + check_params(r2) + check_known_issues(r2)
+                errs += check_readme(r2) + check_license(r2) + (check_changelog(r2, v, cfg) if v else []) + check_notices(r2, cfg) + check_presets(r2) + check_params(r2) + check_known_issues(r2) + check_registry(r2)
                 expect(label, any(needle in e for e in errs))
         planted("missing Open Anyway", lambda r: (r / "README.md").write_text((r / "README.md").read_text().replace("Open Anyway", "Open").replace("xattr", "x")), "open-anyway")
         planted("missing releases link", lambda r: (r / "README.md").write_text((r / "README.md").read_text().replace("releases/latest", "releases")), "releases-latest-link")
@@ -545,6 +563,8 @@ def selftest():
         planted("removed parameter in prose", lambda r: (r / "README.md").write_text((r / "README.md").read_text() + "\nTurn `oldShimmer` down.\n"), "oldShimmer")
         planted("bad version", lambda r: (r / "VERSION").write_text("1.2\n"), "not x.y.z")
         planted("licence file missing", lambda r: (r / "LICENSE").unlink(), "LICENSE missing")
+        planted("plugin code off the registry", lambda r: (r / "CMakeLists.txt").write_text((r / "CMakeLists.txt").read_text().replace("Fkpd", "Fkpx")), "PLUGIN_CODE")
+        planted("slug not registered", lambda r: (r / "ship.toml").write_text((r / "ship.toml").read_text().replace('slug = "fake-pad"', 'slug = "fake-pod"')), "not in the registry")
         planted("feedback without the About copy", lambda r: (r / "README.md").write_text(re.sub(r"(?i)about panel", "settings", (r / "README.md").read_text())), "feedback-about-copy")
         planted("feedback without what-and-expected", lambda r: (r / "README.md").write_text((r / "README.md").read_text().replace("what you were doing right before", "what happened")), "feedback-what-and-expected")
         planted("no Windows crash path", lambda r: (r / "README.md").write_text(re.sub(r"(?i)event viewer|crashdumps", "somewhere", (r / "README.md").read_text())), "crash-report-windows")
@@ -621,7 +641,7 @@ def selftest():
     if fails:
         print("shipcheck selftest FAILED:\n  " + "\n  ".join(fails), file=sys.stderr)
         return 1
-    print("shipcheck selftest OK: fixture passes; README sections (incl. the Feedback fields and both crash paths), licence file (and its reserved clause), changelog, Sounds different, a stale notices file, a dependency missing from notices.toml, presets, removed parameter, VERSION, stale Known issues each fail on a planted defect; known-issues --write restores the section; a token deleted from the tree is still found in the history; release-assets passes a clean set and catches detritus, prefixed checksums, a stale build-info and a zip without the notices, and warns (only) on a missing or empty symbols zip; the message has every part")
+    print("shipcheck selftest OK: fixture passes (against the fixture registry); README sections (incl. the Feedback fields and both crash paths), licence file (and its reserved clause), changelog, Sounds different, a stale notices file, a dependency missing from notices.toml, presets, removed parameter, VERSION, stale Known issues, a plugin code off the registry and an unregistered slug each fail on a planted defect; known-issues --write restores the section; a token deleted from the tree is still found in the history; release-assets passes a clean set and catches detritus, prefixed checksums, a stale build-info and a zip without the notices, and warns (only) on a missing or empty symbols zip; the message has every part")
     return 0
 
 
@@ -655,6 +675,14 @@ def main(argv=None):
             print("README.md: Known issues written from docs/status.md")
             return 0
         print(known_issues_text(repo), end="")
+        return 0
+    if cmd == "registry":
+        errs = check_registry(repo)
+        for e in errs:
+            print("ERROR: " + e)
+        if errs:
+            return 1
+        print("shipcheck registry OK")
         return 0
     if cmd == "changelog-section":
         errs, v = check_version(repo)

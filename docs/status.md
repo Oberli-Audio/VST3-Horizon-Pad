@@ -58,6 +58,7 @@ Open questions for the owner: Ableton Live on Windows (G6); the listening debt a
 Next command: `python3 scripts/dsp-kit/validate_plugin.py --help` (the unattended part of the release gate).
 
 ## Decisions
+- 2026-10-30: the repo moved out of OneDrive to `~/Developer/oberli-audio/horizon-pad` and is renamed `Oberli-Audio/horizon-pad` on GitHub (one repo per plugin, `main` only, the two merged branches deleted); the family registry (ship-bob `registry/plugins.toml`) carries its codes and accent and `shipcheck docs` checks the repo against it; machine paths live in `~/.config/oberli/tools.toml` (`toolchain.py`); kits refreshed to sound-design-bob 5.1.0 and ship-bob 1.1.0. This was the migration rehearsal for the plugin template.
 - 2026-10-29: editor F passes the owner's host check in Ableton Live 10.1 under Rosetta on the Mac (100-200 %, keyboard focus and the space bar, menu and drawer, reopening); Windows still owed.
 - 2026-10-29: EX-007 (blocks over the deadline at 32 samples under Rosetta, idle CPU) closed under rule 20 (was 37): Tier P judges 48 k/64 on the slice the host runs, where p99.9 is 14.3 % with maxima moving between runs; `over_deadline` is reported, never judged; 44.1 k/32 is Tier F; idle 1.2 % (budget 2 %). Its Known issue left the README with it.
 - 2026-10-29: the project documents follow sound-design-bob D.9: `docs/brief.md`, this page, `docs/failures.md`; the gate artefacts `g1-algorithm.md`, `g2-prototype.md`, `g3-measurements.md`, `g5-null-test.md` stay as the evidence the Gates table cites.

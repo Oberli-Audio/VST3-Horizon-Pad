@@ -32,9 +32,10 @@ Profiles - pick by tier and occasion (playbook D.3.6):
     python3 validate_plugin.py --plugin ... --profile quick --no-build
     python3 validate_plugin.py --plugin ... --only pluginval --seed 0x1234     # reproduce
 
-pluginval is looked for in $PLUGINVAL, on PATH, in /Applications/pluginval.app,
-then in build-validators/; --fetch-pluginval downloads the pinned release there.
-With --sanitizer only $PLUGINVAL counts, and it must be built with that sanitizer:
+pluginval is looked for in $PLUGINVAL, in ~/.config/oberli/tools.toml (pluginval.app,
+toolchain.py), on PATH, in /Applications/pluginval.app, then in build-validators/;
+--fetch-pluginval downloads the pinned release there. With --sanitizer only $PLUGINVAL
+(else tools.toml's pluginval.asan / pluginval.tsan) counts, built with that sanitizer:
 unset, not a file or uninstrumented fails the step (no fallback, no download).
 The Steinberg validator is built from the pinned VST3 SDK commit into
 build-validators/ on first use (without full Xcode, -DXCODE_VERSION is passed).
@@ -69,6 +70,17 @@ from pathlib import Path
 ROOT = Path.cwd()
 PINS = {"pluginval": "v1.0.4", "vst3sdk": {"commit": "3cdf9ca5d1f5b1b21e0a86832aa4abe55607bd96", "version": "3.8.1"}}
 TOOLS_DIR = ROOT / "build-validators"
+
+
+def toolchain_value(key):
+    """A path from the machine file ~/.config/oberli/tools.toml (toolchain.py beside this script),
+    or None: the file is optional and the environment always wins."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import toolchain
+        return toolchain.get(key)
+    except Exception:
+        return None
 SKIP = 77
 
 RATES_ALL = "44100,48000,88200,96000,176400,192000"
@@ -135,13 +147,13 @@ def sanitized_pluginval(sanitizer, fetch):
     """Under --sanitizer only $PLUGINVAL counts, and only a build with that sanitizer. The
     signed download dies on "Interceptors are not working", which reads like a sanitizer
     report against the plugin, so there is no fallback to PATH, /Applications or a download."""
-    pv = os.environ.get("PLUGINVAL")
+    pv = os.environ.get("PLUGINVAL") or toolchain_value("pluginval." + sanitizer)
     if fetch:
         raise Refused("--fetch-pluginval with --sanitizer %s: the download is built without it; "
                       "build pluginval from source (D.1.6) and set PLUGINVAL" % sanitizer)
     if not pv:
-        raise Refused("--sanitizer %s needs PLUGINVAL set to a pluginval built from source with %s (D.1.6)"
-                      % (sanitizer, sanitizer))
+        raise Refused("--sanitizer %s needs PLUGINVAL set (or pluginval.%s in ~/.config/oberli/tools.toml) to a "
+                      "pluginval built from source with %s (D.1.6)" % (sanitizer, sanitizer, sanitizer))
     if not Path(pv).is_file():
         hint = ' ("~" is not expanded inside an env argument: use $HOME)' if pv.startswith("~") else ""
         raise Refused("PLUGINVAL=%s is not a file%s; no fallback under --sanitizer" % (pv, hint))
@@ -154,7 +166,7 @@ def sanitized_pluginval(sanitizer, fetch):
 def find_pluginval(fetch, sanitizer="none"):
     if sanitizer != "none":
         return sanitized_pluginval(sanitizer, fetch)
-    candidates = [os.environ.get("PLUGINVAL"), shutil.which("pluginval"),
+    candidates = [os.environ.get("PLUGINVAL"), toolchain_value("pluginval.app"), shutil.which("pluginval"),
                   "/Applications/pluginval.app/Contents/MacOS/pluginval"]
     local = TOOLS_DIR / ("pluginval-" + PINS["pluginval"])
     candidates += [local / "pluginval.app/Contents/MacOS/pluginval", local / "pluginval.exe", local / "pluginval"]
